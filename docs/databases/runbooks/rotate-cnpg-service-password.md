@@ -2,9 +2,9 @@
 
 Rotate one (or all) service runtime passwords on `product-db` with a
 new-connection interruption while consumers converge; measure its duration.
-Every consumer —
-the `DatabaseRole`, the PgDog pooler, and the app pod — reads the same
-OpenBAO entry through ESO; nothing else holds the value. Each service has a
+Both consumers —
+the `DatabaseRole` and the app pod — read the same OpenBAO entry through
+ESO; PgDog keeps no copy (passthrough auth), and nothing else holds the value. Each service has a
 `<svc>_runtime` and a `<svc>_migrator` login (RFC-0029,
 [authorization](../authorization.md)); the migrator is covered in
 [Rotate a migrator password](#rotate-a-migrator-password).
@@ -13,8 +13,8 @@ OpenBAO entry through ESO; nothing else holds the value. Each service has a
 |---|---|
 | **Scope** | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` on `product-db` |
 | **Source of truth** | OpenBAO `secret/local/databases/product-db/<svc>-runtime` and `…/<svc>-migrator` (KV v2 — old versions retained) |
-| **Consumers** | `DatabaseRole` (`cnpg.io/reload`), PgDog HelmRelease (`valuesFrom`), app pods (env `secretKeyRef` via the app-namespace ESO copy) |
-| **Design record** | [RFC-0012](../../proposals/rfc/RFC-0012/) · [ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/) · [ADR-014](../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/) |
+| **Consumers** | `DatabaseRole` (`cnpg.io/reload`) and app pods (env `secretKeyRef` via the app-namespace ESO copy). PgDog holds no copy: it checks each client password against Postgres (passthrough auth) |
+| **Design record** | [RFC-0012](../../proposals/rfc/RFC-0012/) · [ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/) · [ADR-025](../../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) |
 
 ## How a rotation propagates
 
@@ -22,8 +22,8 @@ OpenBAO entry through ESO; nothing else holds the value. Each service has a
 flowchart LR
     OB[(OpenBAO<br/>new KV version)] -->|ESO force-sync| S[basic-auth Secrets<br/>product + app ns]
     S -->|cnpg.io/reload| R[DatabaseRole →<br/>ALTER ROLE in seconds]
-    S -->|flux reconcile HR| P[PgDog re-renders<br/>users N .password]
     S -->|rollout restart| A[app pods re-read env]
+    A -->|new password over TLS| P[PgDog passthrough<br/>checks it against Postgres]
 ```
 
 Existing PostgreSQL sessions survive a password change — only **new**
@@ -95,23 +95,19 @@ including workers, before changing its credential.
      -o jsonpath='{.status.applied}{" "}{.status.conditions}'
    ```
 
-4. **Reconcile the pooler — for `product-db` only.** The two clusters pool
-   differently, and that changes this step completely.
+4. **Nothing to do on either pooler.**
 
-   **`product-db` (PgDog).** PgDog holds a static `users[]` list whose
-   passwords Flux injects via `valuesFrom`, and helm-controller re-reads
-   `valuesFrom` only at reconcile:
-
-   ```bash
-   flux reconcile helmrelease pgdog-product -n product
-   kubectl rollout restart deploy/pgdog-product -n product
-   kubectl rollout status deploy/pgdog-product -n product
-   ```
-
-   The restart is **mandatory**: the pgdog chart (verified on v0.90 via
-   `helm template`) puts `users.toml` in a Secret. Its optional
-   `restartOnConfigChange` checksum covers `pgdog.toml` only, not the users
-   Secret, so a password change alone never rolls the pods.
+   **`product-db` (PgDog, passthrough auth, ADR-025).** PgDog holds no
+   password list. Each client sends its password over TLS; PgDog compares it
+   with the copy it cached at the last successful login and, when it differs,
+   checks the new one against Postgres and replaces the cache
+   (`passthrough_auth = "enabled_allow_change"`). The `ALTER ROLE` from step 3
+   is live for PgDog at the first new connection: no HelmRelease reconcile and
+   no rollout. Each PgDog replica accepts the old password until a client
+   brings the new one there, because a cached password is not re-checked;
+   after that the old one is refused (in about 5 s, PgDog's
+   `checkout_timeout`). Restarting the app in step 5 is what moves every
+   replica to the new password.
 
    **`platform-db` (CNPG PgBouncer `Pooler`, ADR-026).** Do **nothing** here.
    The pooler holds no passwords: CNPG configures PgBouncer with `auth_query`,
@@ -121,9 +117,8 @@ including workers, before changing its credential.
    lands — there is no config to reconcile and no Deployment to roll. (There
    is no `pgdog-platform`; it was removed with the pilot.)
 
-   This asymmetry is the pilot's clearest operational win: on `platform-db` a
-   rotation is two steps instead of four, and it cannot leave the pooler
-   serving a stale password.
+   Both poolers now follow a password change on their own, so neither can
+   serve a stale one.
 
 5. **Restart the app** so env-injected credentials refresh:
 

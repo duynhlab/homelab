@@ -211,6 +211,15 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **PgDog authenticates by passthrough and keeps no passwords.** The
+  `pgdog-product` HelmRelease drops its six `users[]` entries and their
+  positional password `valuesFrom` (ADR-014, now superseded) and sets
+  `passthrough_auth = "enabled_allow_change"` (ADR-025): PgDog asks each
+  client for its password over the required TLS, checks it against
+  `product-db` and caches it, and a rotated password replaces the cache at
+  the next login. A runtime password change no longer needs a HelmRelease
+  reconcile or a PgDog rollout (#1283 row 4).
+
 - **Both clusters serve a homelab-ca certificate, and every direct hop
   verifies it.** `platform-db` and `product-db` take their server certificate
   from a cert-manager `<cluster>-server-tls` (`spec.certificates`), so
@@ -709,6 +718,10 @@ Skeleton (copy what you need):
   1.32.0), matching local-stack and the search-attributes Job. No schema change.
 
 #### Databases
+
+- **PgDog chart v0.90 → v0.92 (PgDog v0.1.60 → v0.1.61).** v0.1.61 stops
+  one client with a wrong password from blocking the pool under passthrough
+  auth; the chart adds only QoS backoff settings.
 
 - **pgroles operator 0.13.0 → 0.14.0.** Chart values are unchanged and the
   CRDs add status fields only; Flux's `upgrade.crds: CreateReplace` applies them

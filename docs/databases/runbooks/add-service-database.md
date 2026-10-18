@@ -24,13 +24,10 @@ shape as `cart` or `inventory`:
    the catalog Job and CronJob are `product-db-authz` in namespace `product`.
 
 2. **Pooler entry** — in `clusters/product-db/poolers/helmrelease.yaml`:
-   - **Append** to `values.databases` and `values.users` (`<svc>_runtime` +
-     database only, no password). The migrator never goes through PgDog.
-   - **Append** a `valuesFrom` entry pointing at
-     `product-db-<svc>-runtime-secret` with
-     `targetPath: "users[<N>].password"` where `<N>` is the new **last**
-     index. Indices are positional — always append at the end, never insert
-     mid-list ([ADR-014](../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/)).
+   - **Append** to `values.databases` only. PgDog has no user list: passthrough
+     auth checks `<svc>_runtime`'s password against Postgres at its first
+     login ([ADR-025](../../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)).
+     The migrator never goes through PgDog.
    - The service connects to PgDog with `sslmode=verify-full` and
      `db_ca_secret: product-db-ca-trust`; add a `product-db-ca-trust`
      Certificate for its namespace in `poolers/ca-trust.yaml`

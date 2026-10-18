@@ -121,7 +121,7 @@ Replica behavior: roles and databases replicate through WAL to
 ## Operations
 
 - **Add a service database:** one new file in `services/` + an OpenBAO seed
-  entry + the app-namespace secret copy + a PgDog `users[]` entry.
+  entry + the app-namespace secret copy + a PgDog `databases` entry (product-db).
   Recipe: [add-service-database](./runbooks/add-service-database.md). Keep
   roles out of `instance.yaml`; adding the matching HBA allow rule there is
   still required before the terminal reject rule.

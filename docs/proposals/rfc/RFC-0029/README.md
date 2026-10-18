@@ -374,7 +374,7 @@ is still planned:
 | Monitoring (SQL login, if one is added) | Automatic, 90 days | Minimum privileges; shorten if sensitive/wide access. The native CNPG exporter has no password |
 | Authz / rotation management | Manual workflow, 30 days | Scoped identity and independent recovery path |
 | Pooler lookup: CNPG PgBouncer | Certificate lifecycle, not a password | The operator authenticates `cnpg_pooler_pgbouncer` with a TLS client certificate |
-| Pooler lookup: PgDog | Follows each runtime password today | PgDog's user list is static (`valuesFrom`, ADR-014) and needs a reconcile after every rotation; `passthrough_auth` (ADR-025) removes that copy before automatic 30-day runtime rotation on product-db |
+| Pooler lookup: PgDog | No password copy | Since 2026-10-18 `passthrough_auth = "enabled_allow_change"` (ADR-025) checks each client password against Postgres and follows a rotation without a reconcile; the static `valuesFrom` list (ADR-014) is gone |
 | Break-glass | After use; access review every 90 days | Review frequency is not a password rotation schedule |
 | Operator-managed internals / humans | Separate lifecycle | Do not impose application machine-password policy |
 

@@ -6,7 +6,7 @@ pool mode determines which session behaviors remain safe.
 | Cluster | Pooler | Replicas | Endpoint | Mode | Routing |
 |---|---|---:|---|---|---|
 | `platform-db` | CNPG PgBouncer `Pooler` | 2 | `platform-db-pooler-rw.platform.svc:5432` | transaction | Primary only |
-| `product-db` | PgDog chart v0.90 (PgDog v0.1.60) | 3 | `pgdog-product.product.svc:6432` | transaction | Primary only (`-rw`) |
+| `product-db` | PgDog chart v0.92 (PgDog v0.1.61) | 3 | `pgdog-product.product.svc:6432` | transaction | Primary only (`-rw`) |
 
 ## Why pooling exists
 
@@ -56,8 +56,16 @@ replica read right after a commit can miss it, so no PgDog database lists a
 replica any more. A flow that tolerates stale reads will opt in through a
 separate replica profile with a stated lag tolerance (**planned**, RFC-0029).
 
-PgDog declares the six product-cluster database/user pairs and receives their
-passwords through Flux `valuesFrom`. Every pair is the service's
+PgDog declares the six product-cluster databases and no users. With
+`passthrough_auth = "enabled_allow_change"` (ADR-025) it asks each client for
+its password over TLS, checks it against `product-db` at the first login,
+caches it, and replaces the cache when a later login brings a password that
+Postgres accepts, so a rotation needs no reconcile or rollout. A wrong password
+is refused without touching the cache, after PgDog's `checkout_timeout` (5 s)
+while it tries the password on Postgres. Each replica keeps its own cache, and
+a cached password is not re-checked: after `ALTER ROLE`, the old password keeps
+working on a replica until the first login there with the new one (measured
+on Kind, 2026-10-18). Every login is the service's
 `<svc>_runtime` login (RFC-0029 three-role split); migrators never go through
 PgDog, and every `migrate` init container connects to `product-db-rw:5432`
 directly. The order and checkout workers use their service's runtime login.

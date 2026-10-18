@@ -1,0 +1,56 @@
+name: ADR implementation tracking
+description: Open the one tracking issue for an accepted ADR. Each obligation becomes a sub-issue; tradeoffs met along the way are logged here as comments.
+title: "ADR-NNN: "
+labels:
+  - area/adr
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One issue per ADR, opened when the ADR reaches **Accepted**. Set the issue type to **ADR** (`gh issue create --type ADR`) and link it from the ADR's `Implementation tracking` row. The ADR keeps the decision; this issue keeps the working log. Process: `docs/proposals/adr/README.md` § Process.
+  - type: input
+    id: adr
+    attributes:
+      label: ADR
+      description: Path or link to the ADR, with its current Adoption.
+      placeholder: docs/proposals/adr/ADR-NNN-slug/ — Adoption Not started
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision in one paragraph
+      description: What was decided, in the ADR's words. No rationale here; the ADR has it.
+    validations:
+      required: true
+  - type: textarea
+    id: obligations
+    attributes:
+      label: Obligations
+      description: Every piece of work the ADR needs before Adoption can be Complete. After opening, create one sub-issue per row (`gh issue create --parent <this issue> --type Task`) and replace the row with its link. Deferred work gets a sub-issue too, labelled as debt, so nothing is lost in a comment.
+      placeholder: |
+        | Obligation | Depends on | Gate |
+        |---|---|---|
+        | | | |
+    validations:
+      required: true
+  - type: textarea
+    id: owner
+    attributes:
+      label: Owner-only actions
+      description: Steps only the repository owner can run (OIDC sessions, org settings, merges that need a grant) and what each one unblocks.
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        **Tradeoff log.** When a choice is made during implementation that the ADR did not settle, add a comment on this issue in this shape, then reference the comment from the PR and from the ADR's History row:
+
+        `**Tradeoff — <topic>** · chose X over Y · because … · evidence: <PR / gate row>`
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: The observable state that lets the ADR's Adoption move to Complete and this issue close.
+    validations:
+      required: true

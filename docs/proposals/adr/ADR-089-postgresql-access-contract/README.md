@@ -23,7 +23,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0029/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | [issue #1269](https://github.com/duynhlab/homelab/issues/1269) |
+| **Implementation tracking** | [#1283](https://github.com/duynhlab/homelab/issues/1283) (issue type `ADR`; #1269 and #1280 hold the RFC-0029 refactor and close history) |
 | **Adoption** | Partial: application `application_name` (2026-10-16), PgDog primary-only (2026-10-16) |
 
 ## Context

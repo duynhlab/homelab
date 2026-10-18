@@ -119,12 +119,39 @@ flowchart LR
 3. During RFC review, identify **independent** architectural decisions.
 4. Create one ADR per decision at **`Proposed`** (copy [`ADR-0000-template/`](ADR-0000-template/)).
 5. On architecture approval: RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**
-   (Adoption stays **`Not started`** until code lands).
-6. Implement code and tests.
+   (Adoption stays **`Not started`** until code lands). Open the ADR's
+   **tracking issue** (issue type `ADR`, template *ADR implementation
+   tracking*) and link it from the ADR's `Implementation tracking` row. Every
+   obligation becomes a **sub-issue** (`gh issue create --parent <issue>`);
+   work that is deferred becomes a sub-issue too, so debt has a number.
+6. Implement code and tests. Each PR names its sub-issue (`Part of #N`, or
+   `Closes #N` when it finishes it), and a tradeoff the ADR did not settle is
+   logged as a comment on the tracking issue (see [Working log](#working-log)).
 7. Update [`docs/api/`](../../api/README.md) to as-built (API-touching decisions).
-8. Update ADR **Adoption** and **History**; append RFC **Implementation History**.
+8. Update ADR **Adoption** and **History** (one line per PR, with its link);
+   append RFC **Implementation History**. When Adoption reaches **Complete**,
+   close the tracking issue; while it stays **Partial**, the open sub-issues
+   are the list of what remains.
 9. Add or update **runbooks** when the topic has meaningful operational failure
    modes (observability, databases, or other area — not a single root path).
+
+### Working log
+
+The three records do not repeat each other:
+
+| Record | Holds | Changes |
+|---|---|---|
+| ADR | the decision, its alternatives and consequences | rarely; one History line per landed PR |
+| Tracking issue (type `ADR`) + sub-issues | obligations, blockers, owner-only steps, the **tradeoff log** | throughout implementation |
+| PR | the diff, its gate evidence, the tradeoffs made in that PR | once |
+
+A tradeoff log entry is a comment on the tracking issue:
+
+`**Tradeoff — <topic>** · chose X over Y · because … · evidence: <PR / gate row>`
+
+The PR links the comment; the ADR's History row links the PR. Dependencies
+between sub-issues use GitHub's *blocked by* relationship
+(`gh issue edit <issue> --add-blocked-by <other>`), not prose.
 
 **docs/api sync (API-touching):** when Adoption reaches **Complete**, owning service
 files, hub rollup, and **Design records** links must match deployed reality. The ADR

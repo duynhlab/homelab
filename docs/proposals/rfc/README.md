@@ -57,12 +57,15 @@ Full ADR process: [`adr/README.md`](../adr/README.md).
    [`adr/`](../adr/) at **`Proposed`** (copy [`ADR-0000-template/`](../adr/ADR-0000-template/));
    fill RFC [**Resulting decisions**](RFC-0000/README.md#resulting-decisions) table.
 6. **On approval** — RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**; ADR
-   **Adoption** → **`Not started`**. Fill
+   **Adoption** → **`Not started`**; each ADR gets its tracking issue (issue
+   type `ADR`, one sub-issue per obligation — [`adr/README.md` § Process](../adr/README.md#process)).
+   An RFC-level issue is only for a documentation refactor of the RFC itself. Fill
    [**Decision outcome**](RFC-0000/README.md#decision-outcome) — the chosen option
    named as § Alternatives names it, plus the rationale against § Goals. Legacy index
    rows labelled **`implementable`** mean the same as **`Accepted`**.
 7. **Implement** → RFC Status **`implemented`**; ADR **Adoption** → Partial/Complete;
-   append **Implementation History** and PR links.
+   append **Implementation History** and PR links. PRs name their sub-issue
+   (`Part of #N`); the ADR's tracking issue holds the tradeoff log.
 8. **Sync `docs/api/` (API-touching)** — when Adoption is **Complete** / RFC is
    **`implemented`**:
    - Map the change → owning file(s) via [`docs/api/README.md` § Document Ownership](../../api/README.md#document-ownership).

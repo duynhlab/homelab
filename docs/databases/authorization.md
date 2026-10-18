@@ -103,11 +103,11 @@ flowchart TB
 ```
 
 PgDog lists every product-db service under its `<svc>_runtime` login; the
-order and checkout workers use their service's runtime login. payment's
-runtime reaches PgDog over client TLS (`sslmode=verify-full`;
-[poolers](poolers.md#tls)), and `pg_hba` admits `payment_runtime` and
-`payment_migrator` on `hostssl` lines only. The other services stay plaintext
-to PgDog.
+order and checkout workers use their service's runtime login. Every runtime
+reaches PgDog over client TLS (`sslmode=verify-full`;
+[poolers](poolers.md#tls)) and PgDog refuses plaintext. `pg_hba` admits
+`payment_runtime` and `payment_migrator` on `hostssl` lines only; the other
+pairs keep `host` until PgDog verifies its upstream hop.
 
 `product` is also `product-db`'s bootstrap database: `bootstrap.initdb` creates
 it owned by a role named `product`. That role is bootstrap-only. Its

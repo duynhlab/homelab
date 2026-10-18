@@ -5,10 +5,9 @@
 # opt-in profile (planned, docs/databases/poolers.md).
 # Prepared statements: extended mode (no prefer_simple_protocol needed)
 #
-# User passwords come from the per-service ESO basic-auth Secrets via Flux
-# valuesFrom targetPath (RFC-0012 P2, ADR-014) — no credentials in values.
-# helm-controller re-reads valuesFrom only at reconcile time: after a
-# password rotation, run `flux reconcile helmrelease pgdog-product -n product`.
+# Passthrough auth (ADR-025): PgDog holds no password list. It asks each client
+# for its password over TLS, checks it against product-db once and caches it;
+# a changed password replaces the cached one without a reload or a roll.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -22,7 +21,7 @@ spec:
     spec:
       chart: pgdog
       interval: 5m
-      version: "v0.90"
+      version: "v0.92"
       sourceRef:
         kind: HelmRepository
         name: pgdogdev
@@ -33,37 +32,9 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  # Indices are positional against values.users below — keep both lists in
-  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment,
-  # [4]=checkout, [5]=inventory, each the service's <svc>_runtime login
-  # (RFC-0029); migrators never go through PgDog.
   valuesFrom:
-    - kind: Secret
-      name: product-db-product-runtime-secret
-      valuesKey: password
-      targetPath: "users[0].password"
-    - kind: Secret
-      name: product-db-cart-runtime-secret
-      valuesKey: password
-      targetPath: "users[1].password"
-    - kind: Secret
-      name: product-db-order-runtime-secret
-      valuesKey: password
-      targetPath: "users[2].password"
-    - kind: Secret
-      name: product-db-payment-runtime-secret
-      valuesKey: password
-      targetPath: "users[3].password"
-    - kind: Secret
-      name: product-db-checkout-runtime-secret
-      valuesKey: password
-      targetPath: "users[4].password"
-    - kind: Secret
-      name: product-db-inventory-runtime-secret
-      valuesKey: password
-      targetPath: "users[5].password"
-    # Not positional. The serving certificate as a pod annotation: a renewal
-    # changes the pod template, so the pods roll onto it (the Secret carries
+    # The serving certificate as a pod annotation: a renewal changes the pod
+    # template, so the pods roll onto it (the Secret carries
     # reconcile.fluxcd.io/watch). Optional: cert-manager may not have issued
     # it yet on the first install.
     - kind: Secret
@@ -80,6 +51,9 @@ spec:
     # Client-side TLS (certificate.yaml). Every client verifies it with
     # verify-full (ADR-089), and a plaintext login is refused.
     tlsClientRequired: true
+    # Passthrough needs the client's password in clear, so TLS is mandatory;
+    # allow_change lets a rotated password replace the cached one.
+    passthroughAuth: enabled_allow_change
     tlsCertificate: /etc/pgdog-tls/tls.crt
     tlsPrivateKey: /etc/pgdog-tls/tls.key
     # Upstream: verify product-db-rw's homelab-ca certificate and host name.
@@ -156,21 +130,6 @@ spec:
         poolSize: 30
         poolMode: transaction
 
-    # Passwords injected per-user by spec.valuesFrom (order must match the
-    # targetPath indices above).
-    users:
-      - name: product_runtime
-        database: product
-      - name: cart_runtime
-        database: cart
-      - name: order_runtime
-        database: order
-      - name: payment_runtime
-        database: payment
-      - name: checkout_runtime
-        database: checkout
-      - name: inventory_runtime
-        database: inventory
 
     # The chart ships both probes commented out, so the pooler ran with none
     # and Kyverno's require-probes recorded a violation against it on every

@@ -33,7 +33,9 @@ check_hop() {
   if [ -z "$ip" ]; then
     printf "FAIL  %-11s Service %s/%s not found\n" "$label" "$svcns" "$svc"; FAIL=1; return
   fi
-  local base="port=$port dbname=$db user=$user password=wrong-on-purpose connect_timeout=5"
+  # 15 s: PgDog (passthrough) answers a wrong password only after its
+  # checkout_timeout (5 s) runs out while it tries the password on PostgreSQL.
+  local base="port=$port dbname=$db user=$user password=wrong-on-purpose connect_timeout=15"
   local script=""
   script+="echo \"CASE ok \$(psql 'host=$host sslmode=verify-full sslrootcert=/ca/ca.crt $base' -c 'select 1' 2>&1 | head -1)\";"
   script+="echo \"CASE wronghost \$(psql 'host=$ip sslmode=verify-full sslrootcert=/ca/ca.crt $base' -c 'select 1' 2>&1 | head -1)\";"

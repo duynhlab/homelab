@@ -12,7 +12,7 @@ spec:
     name: inventory
     # Do not restore the retired product-stock backfill reader: product migration
     # 000006 removes its source and grant. See RFC-0021/cutover-rollback.md.
-    image_tag: "0.9.1" # {"$imagepolicy": "flux-system:inventory:tag"}
+    image_tag: "0.9.2" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
     # pairs belong in the manifest rather than in compiled defaults.
@@ -33,6 +33,9 @@ spec:
     # plaintext.
     db_sslmode: "verify-full"
     db_ca_secret: "product-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "25"
     # Internal gRPC server (:9090) — inventory reservations for the checkout
     # confirm path and the order saga (RFC-0021). The domain template adds a

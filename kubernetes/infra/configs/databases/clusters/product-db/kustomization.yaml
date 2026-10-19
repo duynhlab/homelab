@@ -20,8 +20,10 @@ resources:
   - objectstore.yaml
   - server-tls.yaml
   - instance.yaml
+  - vault-rotator.yaml  # ADR-025: OpenBAO rotation administrator
   - authz/  # ADR-088: db_authz + role catalog Job/CronJob + pgroles policies
   - services/
+  - openbao-db-config.yaml  # ADR-025: static roles for the six runtimes
   - configmaps/monitoring-queries.yaml
   - poolers/
   - monitoring/podmonitor.yaml

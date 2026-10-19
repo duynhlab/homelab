@@ -419,7 +419,13 @@ data:
                 OR COALESCE(bool_or(m.admin_option), false) <> e.want_admin
                 OR COALESCE(bool_or(m.inherit_option), false) <> e.want_inherit
                 OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
-               FROM (VALUES ('product_migrator', 'product_owner', false, false, true),
+               FROM (VALUES ('vault_rotator', 'product_runtime', true, false, false),
+                            ('vault_rotator', 'inventory_runtime', true, false, false),
+                            ('vault_rotator', 'cart_runtime', true, false, false),
+                            ('vault_rotator', 'order_runtime', true, false, false),
+                            ('vault_rotator', 'checkout_runtime', true, false, false),
+                            ('vault_rotator', 'payment_runtime', true, false, false),
+                            ('product_migrator', 'product_owner', false, false, true),
                             ('inventory_migrator', 'inventory_owner', false, false, true),
                             ('cart_migrator', 'cart_owner', false, false, true),
                             ('order_migrator', 'order_owner', false, false, true),

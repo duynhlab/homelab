@@ -70,6 +70,9 @@ spec:
       - hostssl order     db_authz all scram-sha-256
       - hostssl checkout  db_authz all scram-sha-256
       - hostssl payment   db_authz all scram-sha-256
+      # OpenBAO's rotation administrator (ADR-025) logs in to `product` only;
+      # ALTER ROLE is cluster-wide, so one database is enough.
+      - hostssl product   vault_rotator all scram-sha-256
       - host    all     all     all reject
     parameters:
       max_connections: "200"

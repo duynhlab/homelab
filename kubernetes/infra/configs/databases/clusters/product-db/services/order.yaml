@@ -3,6 +3,9 @@
 # (../authz), which also reads the migrator Secret below; its pgroles policy
 # (../authz/policies/order.yaml) owns the grants; CNPG keeps the runtime
 # login and the Database. Conventions: docs/databases/authorization.md.
+# The runtime password belongs to OpenBAO's static role order-runtime
+# (ADR-025, ADR-089): vault_rotator rotates it, ESO reads it every 15s,
+# and the DatabaseRole has no passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -13,9 +16,9 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
-  refreshInterval: 1h
+  refreshInterval: 15s
   secretStoreRef:
-    name: openbao
+    name: openbao-db
     kind: ClusterSecretStore
   target:
     name: product-db-order-runtime-secret
@@ -28,18 +31,17 @@ spec:
           app.kubernetes.io/name: product-db-order-runtime-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
-          cnpg.io/reload: "true"
       data:
         username: "{{ .username }}"
         password: "{{ .password }}"
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/product-db/order-runtime
+        key: database/static-creds/order-runtime
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/product-db/order-runtime
+        key: database/static-creds/order-runtime
         property: password
 ---
 apiVersion: external-secrets.io/v1
@@ -100,8 +102,6 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: product-db-order-runtime-secret
   databaseRoleReclaimPolicy: retain
 ---
 # order_owner owns the database, which on PostgreSQL 15+ is what gives it

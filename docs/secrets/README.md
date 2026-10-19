@@ -13,7 +13,7 @@ Secrets — they never call OpenBAO directly.
 | Topic | Current local Kind state | Production target |
 |---|---|---|
 | Secret store | OpenBAO HA, 3 Raft pods, PVC-backed | Same HA shape, production seal/TLS hardening |
-| App secret delivery | ESO reads OpenBAO KV v2; the notification service reads the **database engine static role** instead ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) pilot) | Extend database-engine credentials beyond the pilot |
+| App secret delivery | ESO reads OpenBAO KV v2 for static secrets; every service runtime password comes from a **database engine static role** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/), [ADR-089](../proposals/adr/ADR-089-postgresql-access-contract/)) | Per-request dynamic roles for humans and jobs |
 | OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager (planned — RFC-0020 Slice 1) |
 | OpenBAO unseal | `awskms` auto-unseal via the floci KMS emulator (pods self-unseal at boot); `openbao-init-keys` holds only a break-glass recovery key; root token revoked ([ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap floci `endpoint`) |
 | TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (reconciled on Kind — RFC-0024 bring-up; has since passed the Kind gate) | Prod `platform-edge-tls` from Let's Encrypt via Cloudflare DNS-01 (planned — no production cluster deploys the edge yet) |
@@ -244,18 +244,22 @@ OpenBAO-backed secrets. No `-vault` suffix is used.
 | `platform-db-keycloak-secret` | identity | `secret/data/local/databases/platform-db/keycloak` |
 | `platform-db-vault-rotator-secret` | platform | `secret/data/local/databases/platform-db/vault-rotator` (random per cluster; CNPG + OpenBAO database configurator) |
 | `product-db-secret` | product | `secret/data/local/databases/product-db/product` (bootstrap role `product`, NOLOGIN; RFC-0029) |
-| `product-db-product-runtime-secret`, `product-db-product-migrator-secret` | product | `secret/data/local/databases/product-db/product-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `product-db-cart-runtime-secret`, `product-db-cart-migrator-secret` | cart, product | `secret/data/local/databases/product-db/cart-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `product-db-order-runtime-secret`, `product-db-order-migrator-secret` | order, product | `secret/data/local/databases/product-db/order-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `product-db-inventory-runtime-secret`, `product-db-inventory-migrator-secret` | inventory, product | `secret/data/local/databases/product-db/inventory-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `product-db-checkout-runtime-secret`, `product-db-checkout-migrator-secret` | checkout, product | `secret/data/local/databases/product-db/checkout-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `product-db-payment-runtime-secret`, `product-db-payment-migrator-secret` | payment, product | `secret/data/local/databases/product-db/payment-runtime` / `-migrator` (random per cluster; RFC-0029) |
+| `product-db-vault-rotator-secret` | product | `secret/data/local/databases/product-db/vault-rotator` (random per cluster; CNPG + OpenBAO database configurator) |
+| `product-db-{product,inventory,cart,order,checkout,payment}-runtime-secret` | each service's ns, product | `database/static-creds/<svc>-runtime` via store `openbao-db` (ADR-025 static role, 720h rotation, ESO refresh 15s) |
+| `product-db-product-migrator-secret` | product | `secret/data/local/databases/product-db/product-migrator` (random per cluster; RFC-0029) |
+| `product-db-cart-migrator-secret` | cart, product | `secret/data/local/databases/product-db/cart-migrator` (random per cluster; RFC-0029) |
+| `product-db-order-migrator-secret` | order, product | `secret/data/local/databases/product-db/order-migrator` (random per cluster; RFC-0029) |
+| `product-db-inventory-migrator-secret` | inventory, product | `secret/data/local/databases/product-db/inventory-migrator` (random per cluster; RFC-0029) |
+| `product-db-checkout-migrator-secret` | checkout, product | `secret/data/local/databases/product-db/checkout-migrator` (random per cluster; RFC-0029) |
+| `product-db-payment-migrator-secret` | payment, product | `secret/data/local/databases/product-db/payment-migrator` (random per cluster; RFC-0029) |
 
-Each product-db runtime and migrator Secret exists in `product` (the CNPG
-`passwordSecret`, the PgDog `valuesFrom` source and the role catalog Job's
-input) and, for every service outside `product`, as a copy in the service's
-namespace (`product-db/secrets/product-db-<svc>-{runtime,migrator}-secret-<svc>-ns.yaml`).
-`order-worker` and `checkout-worker` read their service's runtime Secret.
+Each product-db runtime and migrator Secret exists in `product` (the migrator
+one is the role catalog Job's input; the runtime one is mounted by nothing
+there except product's own pods) and, for every service outside `product`, as a
+copy in the service's namespace
+(`product-db/secrets/product-db-<svc>-{runtime,migrator}-secret-<svc>-ns.yaml`).
+`order-worker` and `checkout-worker` mount their service's runtime Secret as a
+file. PgDog holds no copy (passthrough auth).
 
 #### Shared secrets (ClusterExternalSecret)
 
@@ -354,8 +358,8 @@ so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 
 | Credential | Type | Rotation today | Target |
 |-----------|------|----------------|--------|
-| Notification DB creds | Database-engine static role | Automatic, `rotation_period=720h` | Same, fleet-wide |
-| Other service DB creds (KV) | Static | Manual — [rotate-static-secret](./runbooks/rotate-static-secret.md) | Database-engine roles |
+| Service runtime DB creds (10) | Database-engine static role | Automatic, `rotation_period=720h` | Same |
+| Migrator / `db_authz` / Temporal / Keycloak DB creds (KV) | Static | Manual — [rotate-static-secret](./runbooks/rotate-static-secret.md) | Manual on a schedule (ADR-089); Temporal/Keycloak in #1296 |
 | ESO OpenBAO token | Kubernetes-auth service token | Auto (auth TTL) | Same |
 | S3/backup creds (KV) | Static | Manual (`bao kv put` via staff OIDC login) | Static roles where supported |
 | Break-glass root token | Generated per ceremony (issuer-down fallback only since ADR-062) | Revoked after each use | Same |

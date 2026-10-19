@@ -19,7 +19,7 @@ afterwards.
 
 ## Impact
 
-For `vault_rotator → <svc>_runtime` (notification, user, shipping, review):
+For `vault_rotator → <svc>_runtime` (platform-db: notification, user, shipping, review; product-db: product, inventory, cart, order, checkout, payment):
 
 - **`ADMIN` lost, or the edge revoked:** OpenBAO can no longer rotate that
   service's password. The current credential keeps working; the next

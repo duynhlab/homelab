@@ -1,39 +1,42 @@
 # Add Service Dynamic Credentials
 
-Use this to put a platform-db runtime login under OpenBAO-managed rotation
-(ADR-025 pattern A, ADR-089: one writer per password). Deployed today for
-`notification_runtime`, `user_runtime`, `shipping_runtime` and `review_runtime`
-on `platform-db`, rotated every 720h. Copy any of them; `user` is the reference
-below.
+Use this to put a service runtime login under OpenBAO-managed rotation
+(ADR-025 pattern A, ADR-089: one writer per password). Deployed today for all
+ten runtimes: four on `platform-db` and six on `product-db`, rotated every
+720h. Copy any of them; `user` (platform-db) is the reference below, and
+`<cluster>` is `platform-db` or `product-db`.
 
 | Status | Meaning |
 |---|---|
 | Deployed pattern (static role) | OpenBAO rotates the password of an **existing** PostgreSQL role; ESO syncs `database/static-creds/<svc>-runtime` through ClusterSecretStore `openbao-db`; the pod reads it from a mounted file |
-| Planned | Dynamic `database/creds/*` roles (per-lease `CREATE ROLE`, TTLs) — **not deployed**; do not follow that pattern yet. product-db runtimes (ADR-089 P6) also still use KV |
+| Planned | Dynamic `database/creds/*` roles (per-lease `CREATE ROLE`, TTLs) — **not deployed**; do not follow that pattern yet |
 
 The service image must read `DB_PASSWORD_FILE` (pkg/dbx `WithPasswordFile`);
 every service from the 2026-10-18 release does.
 
 ## 1. Let vault_rotator administer the role
 
-`kubernetes/infra/configs/databases/clusters/platform-db/`:
+`kubernetes/infra/configs/databases/clusters/<cluster>/`:
 
 - `instance.yaml` `postInitSQL`: `CREATE ROLE <svc>_runtime WITH LOGIN` and
   `GRANT <svc>_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE`.
   This runs on a new cluster only; on a running one, run the grant by hand
   ([rotator credential runbook](../../databases/runbooks/rotate-vault-rotator-credential.md), step 5).
 - `vault-rotator.yaml`: add `<svc>_runtime` to `inRoles`, or CNPG revokes the
-  membership.
+  membership. (On product-db `vault_rotator` logs in through
+  `hostssl product vault_rotator`; the same line sits on `product-db-replica`.)
 - Drift guard: one row in `configmaps/monitoring-queries.yaml`
   (`('vault_rotator', '<svc>_runtime', true, false, false)`) and one `absent(...)`
   line in `observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml`.
 
 ## 2. Add the static role to the engine-config Job
 
-`openbao-db-config.yaml`: add `<svc>-runtime` to `allowed_roles` and `<svc>` to
-the static-role loop. The connection already reaches PostgreSQL as
-`vault_rotator`; `ALTER ROLE` is cluster-wide, so no new `pg_hba` line is
-needed.
+The cluster's `openbao-db-config.yaml`: add `<svc>-runtime` to `allowed_roles`
+and `<svc>` to the static-role loop. The connection already reaches PostgreSQL
+as `vault_rotator`; `ALTER ROLE` is cluster-wide, so no new `pg_hba` line is
+needed. A new cluster needs its own Job and ServiceAccount in its namespace,
+plus that namespace in the bootstrap's `db-configurator` auth role
+(`bound_service_account_namespaces`).
 
 ## 3. Grant ESO read on the static-creds path
 
@@ -56,8 +59,8 @@ fallback.
 
 ## 4. Point both ExternalSecrets at the engine
 
-`services/<svc>.yaml` (ns `platform`) and
-`secrets/platform-db-<svc>-runtime-secret-<svc>-ns.yaml` (service ns):
+`services/<svc>.yaml` (the cluster's namespace) and
+`secrets/<cluster>-<svc>-runtime-secret-<svc>-ns.yaml` (service ns):
 `secretStoreRef.name: openbao-db`, `remoteRef.key: database/static-creds/<svc>-runtime`
 (properties `username`, `password`), `refreshInterval: 15s`, and no
 `cnpg.io/reload` label. In the same file, delete the runtime `DatabaseRole`'s
@@ -75,9 +78,9 @@ The domain template mounts the runtime Secret as a directory, sets
 ```bash
 make validate
 # after merge, on a running cluster: let Flux re-create the completed Job
-kubectl delete job openbao-db-config -n platform
+kubectl delete job openbao-db-config -n <platform|product>
 flux reconcile kustomization databases-local -n flux-system --with-source
-kubectl logs -n platform job/openbao-db-config
+kubectl logs -n <platform|product> job/openbao-db-config
 kubectl get externalsecret -A | grep <svc>-runtime
 ```
 

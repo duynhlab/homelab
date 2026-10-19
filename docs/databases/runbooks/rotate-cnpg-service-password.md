@@ -1,146 +1,81 @@
 # Runbook: Rotate a product-db Service Password
 
-Rotate one (or all) service runtime passwords on `product-db` with a
-new-connection interruption while consumers converge; measure its duration.
-Both consumers —
-the `DatabaseRole` and the app pod — read the same OpenBAO entry through
-ESO; PgDog keeps no copy (passthrough auth), and nothing else holds the value. Each service has a
-`<svc>_runtime` and a `<svc>_migrator` login (RFC-0029,
-[authorization](../authorization.md)); the migrator is covered in
-[Rotate a migrator password](#rotate-a-migrator-password).
+Runtime passwords on `product-db` rotate on their own: each `<svc>_runtime`
+login is an OpenBAO database-engine static role (`rotation_period=720h`,
+ADR-025, ADR-089), and nothing else writes it. This runbook covers forcing a
+rotation ahead of schedule, what to watch while it propagates, and the manual
+[migrator rotation](#rotate-a-migrator-password), which stays a KV write.
 
 | | |
 |---|---|
-| **Scope** | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` on `product-db` |
-| **Source of truth** | OpenBAO `secret/local/databases/product-db/<svc>-runtime` and `…/<svc>-migrator` (KV v2 — old versions retained) |
-| **Consumers** | `DatabaseRole` (`cnpg.io/reload`) and app pods (env `secretKeyRef` via the app-namespace ESO copy). PgDog holds no copy: it checks each client password against Postgres (passthrough auth) |
-| **Design record** | [RFC-0012](../../proposals/rfc/RFC-0012/) · [ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/) · [ADR-025](../../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) |
+| **Scope** | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` on `product-db`; platform-db follows the same flow with its own Job and `vault_rotator` |
+| **Source of truth (runtime)** | OpenBAO `database/static-creds/<svc>-runtime` (rotated by `vault_rotator` through `database/config/product-db`) |
+| **Source of truth (migrator)** | OpenBAO `secret/local/databases/product-db/<svc>-migrator` (KV v2) |
+| **Consumers** | ESO (`refreshInterval: 15s`, store `openbao-db`) → Secret in `product` and the service namespace → the pod's mounted file (`DB_PASSWORD_FILE`, read on every new connection). The `DatabaseRole` has no `passwordSecret`; PgDog holds no copy (passthrough) |
+| **Design record** | [ADR-025](../../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) · [ADR-089](../../proposals/adr/ADR-089-postgresql-access-contract/) |
 
 ## How a rotation propagates
 
 ```mermaid
 flowchart LR
-    OB[(OpenBAO<br/>new KV version)] -->|ESO force-sync| S[basic-auth Secrets<br/>product + app ns]
-    S -->|cnpg.io/reload| R[DatabaseRole →<br/>ALTER ROLE in seconds]
-    S -->|rollout restart| A[app pods re-read env]
-    A -->|new password over TLS| P[PgDog passthrough<br/>checks it against Postgres]
+    OB["OpenBAO static role<br/>ALTER ROLE as vault_rotator"] -->|"at once"| PG[("product-db")]
+    OB -->|"ESO reads static-creds every 15 s"| S["Secrets<br/>product + service ns"]
+    S -->|"kubelet syncs the volume<br/>(up to its sync period)"| F["/etc/db/secret/password<br/>in the pod"]
+    F -->|"read on every new connection"| A["service / worker (pkg/dbx)"]
+    A -->|"new password over TLS"| D["PgDog passthrough<br/>checks it, replaces its cache"]
+    D --> PG
 ```
 
-Existing PostgreSQL sessions survive a password change — only **new**
-connections authenticate against the new value. The blip window is between
-the `ALTER ROLE` (step 3) and the pooler + app catching up (steps 4–5), so
-run the steps as one block.
+Open connections survive the change; a **new** connection fails
+authentication only in the window between the `ALTER ROLE` and the pod's file
+catching up (measured 19–47 s after rotation on platform-db, 2026-10-19). The
+pool keeps its connections for up to 30 minutes (`MaxConnLifetime`), so under
+normal load that window is not hit.
 
-## Steps
+## Force a rotation
 
-Run everything in one sitting. `<svc>` below is the service being rotated.
-Finish and verify one service before starting the next; inventory all consumers,
-including workers, before changing its credential.
-
-1. **New password into OpenBAO.**
-   Use the normal staff OIDC login (`infra-team`) and KV write path in
-   [Add a secret to a live cluster](../../secrets/runbooks/add-secret-live-cluster.md)
-   for `secret/local/databases/product-db/<svc>-runtime`, preserving `username` and
-   replacing `password`. Record the prior KV version without recording its
-   value. After login, the following Bash snippet prompts without echo and
-   passes the password on stdin, not in the command arguments:
+1. Rotate the role from a pod bound to the configurator ServiceAccount (the
+   same Kubernetes auth role the Job uses; it can rotate, but cannot read the
+   credential):
 
    ```bash
-   read -r -p 'Service to rotate: ' db_service
-   case "$db_service" in
-     product|cart|order|payment|checkout|inventory)
-       read -r -s -p 'New database password: ' db_next_password
-       printf '\n'
-       if [ -n "$db_next_password" ]; then
-         printf '%s' "$db_next_password" | bao kv put \
-           "secret/local/databases/product-db/$db_service-runtime" \
-           username="${db_service}_runtime" password=-
-       else
-         printf 'Empty password: no write performed.\n'
-       fi
-       unset db_next_password
-       ;;
-     *) printf 'Unknown service: no write performed.\n' ;;
-   esac
+   kubectl run bao-rotate --rm -i --restart=Never -n product \
+     --image=openbao/openbao:2.7.1 \
+     --overrides='{"spec":{"serviceAccountName":"openbao-db-configurator"}}' \
+     --env BAO_ADDR=http://openbao-active.openbao.svc.cluster.local:8200 -- sh -c '
+       JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+       export BAO_TOKEN=$(bao write -field=token auth/kubernetes/login role=db-configurator jwt="$JWT")
+       bao write -f database/rotate-role/<svc>-runtime'
    ```
 
-   Keep shell tracing disabled, verify the write succeeded before proceeding,
-   and revoke the OIDC token when finished. Do not put the password in Git,
-   shell history, diagnostics or captured terminal output.
-
-   The bootstrap Job is not a day-2 rotation mechanism: it revokes its root
-   token and exits as already bootstrapped on later runs. Do not read a presumed
-   persisted root token or delete the Job to rotate a credential.
-
-   KV rollback restores a prior value, but consumers still require steps 2–5;
-   it is not an atomic end-to-end undo.
-
-2. **Force ESO to sync now** (default `refreshInterval` is 1h) — both the
-   product-namespace Secret and the app-namespace copy:
+2. Watch it land, by hash only (never print the value):
 
    ```bash
-   kubectl annotate externalsecret -n product product-db-<svc>-runtime-secret \
-     force-sync=$(date +%s) --overwrite
-   kubectl annotate externalsecret -n <svc> product-db-<svc>-runtime-secret \
-     force-sync=$(date +%s) --overwrite
+   for ns in product <svc>; do
+     kubectl get secret -n $ns product-db-<svc>-runtime-secret -o jsonpath='{.data.password}' | sha256sum
+   done
+   kubectl exec -n <svc> deploy/<svc> -c <svc> -- cat /etc/db/secret/password | sha256sum
    ```
 
-   (`product` runs in namespace `product` and has no second copy.)
+   The Secrets change within 15 s, the file within the kubelet sync period.
+   `product` has no second copy. Order and checkout also run a worker that
+   mounts the same Secret; check its file the same way.
 
-3. **CNPG applies `ALTER ROLE` automatically** — the `cnpg.io/reload` label
-   on the product-namespace Secret triggers it within seconds. Verify:
+3. **Nothing to do on PgDog or the DatabaseRole.** PgDog checks the next login
+   against Postgres and replaces its cached copy; each replica does so at the
+   first login it receives with the new password. The `DatabaseRole` carries
+   no password, so CNPG never writes one back.
 
-   ```bash
-   kubectl get databaserole -n product product-db-role-<svc>-runtime \
-     -o jsonpath='{.status.applied}{" "}{.status.conditions}'
-   ```
-
-4. **Nothing to do on either pooler.**
-
-   **`product-db` (PgDog, passthrough auth, ADR-025).** PgDog holds no
-   password list. Each client sends its password over TLS; PgDog compares it
-   with the copy it cached at the last successful login and, when it differs,
-   checks the new one against Postgres and replaces the cache
-   (`passthrough_auth = "enabled_allow_change"`). The `ALTER ROLE` from step 3
-   is live for PgDog at the first new connection: no HelmRelease reconcile and
-   no rollout. Each PgDog replica accepts the old password until a client
-   brings the new one there, because a cached password is not re-checked;
-   after that the old one is refused (in about 5 s, PgDog's
-   `checkout_timeout`). Restarting the app in step 5 is what moves every
-   replica to the new password.
-
-   **`platform-db` (CNPG PgBouncer `Pooler`, ADR-026).** Do **nothing** here.
-   The pooler holds no passwords: CNPG configures PgBouncer with `auth_query`,
-   so it looks each credential up in `pg_shadow` at connect time and
-   authenticates itself to Postgres with a TLS client certificate. The
-   `ALTER ROLE` from step 3 is therefore live for the pooler the moment it
-   lands — there is no config to reconcile and no Deployment to roll. (There
-   is no `pgdog-platform`; it was removed with the pilot.)
-
-   Both poolers now follow a password change on their own, so neither can
-   serve a stale one.
-
-5. **Restart the app** so env-injected credentials refresh:
-
-   ```bash
-   kubectl rollout restart deploy -n <svc> -l app.kubernetes.io/component=api
-   ```
-
-   Order and checkout also have Temporal-managed workers. Inspect their
-   `WorkerDeployment` and child Deployments, identify every Secret consumer,
-   and follow the [worker lifecycle](../../api/temporal.md) before restarting
-   a child workload. Do not assume the old `component=worker` selector reaches
-   the current controller-managed deployments.
-
-6. **Verify** — old password must fail, new must work, e2e smoke green:
+4. **Verify** — the old password fails, the new one works, e2e smoke green:
 
    ```bash
    kubectl run psql-check --rm -it --restart=Never -n product \
      --image=ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie -- \
-     psql -W "host=product-db-rw.product user=<svc>_runtime dbname=<svc>" -c 'select 1'
+     psql -W "host=pgdog-product.product port=6432 user=<svc>_runtime dbname=<svc> sslmode=require" -c 'select 1'
    ```
 
-   (Every login is `hostssl`: add `sslmode=require` to the connection string.)
+   No pod restart is needed or expected. A restart is only the recovery path
+   when a pod's file never changes (ESO or the mount is broken).
 
 ## Rotate a migrator password
 

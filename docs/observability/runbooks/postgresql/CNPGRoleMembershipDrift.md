@@ -19,13 +19,13 @@ afterwards.
 
 ## Impact
 
-For `vault_rotator → notification_runtime`:
+For `vault_rotator → <svc>_runtime` (notification, user, shipping, review):
 
-- **`ADMIN` lost, or the edge revoked:** OpenBAO can no longer rotate
-  notification's password. The current credential keeps working; the next
+- **`ADMIN` lost, or the edge revoked:** OpenBAO can no longer rotate that
+  service's password. The current credential keeps working; the next
   rotation fails.
 - **`INHERIT` or `SET` gained:** the rotation administrator can read and write
-  notification's data, which the edge is shaped to prevent.
+  that service's data, which the edge is shaped to prevent.
 
 ## Diagnosis
 

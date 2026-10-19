@@ -398,3 +398,4 @@ Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS
   chart v0.92 (PgDog v0.1.61) runs `passthrough_auth = "enabled_allow_change"`
   behind `tls_client_required`, with no `users[]` list and no password
   `valuesFrom`. The rest of this record keeps its status.
+- 2026-10-19 — Decision 2 (static, rotated login roles) and 5 (pattern A reload) extended from the notification pilot to every platform-db runtime: user, shipping and review (#1309).

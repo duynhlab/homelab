@@ -235,11 +235,10 @@ OpenBAO-backed secrets. No `-vault` suffix is used.
 
 | K8s Secret | Namespace | Source |
 |------------|-----------|--------|
-| `platform-db-user-runtime-secret`, `platform-db-user-migrator-secret` | user, platform | `secret/data/local/databases/platform-db/user-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `platform-db-notification-runtime-secret` | notification | `database/static-creds/notification-runtime` via store `openbao-db` (ADR-025 static role, 720h rotation) |
+| `platform-db-{user,shipping,review,notification}-runtime-secret` | each service's ns, platform | `database/static-creds/<svc>-runtime` via store `openbao-db` (ADR-025 static role, 720h rotation, ESO refresh 15s) |
+| `platform-db-user-migrator-secret` | user, platform | `secret/data/local/databases/platform-db/user-migrator` (random per cluster; RFC-0029) |
 | `platform-db-notification-migrator-secret` | notification, platform | `secret/data/local/databases/platform-db/notification-migrator` (random per cluster; RFC-0029) |
-| `platform-db-shipping-runtime-secret`, `platform-db-shipping-migrator-secret` | shipping, platform | `secret/data/local/databases/platform-db/shipping-runtime` / `-migrator` (random per cluster; RFC-0029) |
-| `platform-db-review-runtime-secret` | review, platform | `secret/data/local/databases/platform-db/review-runtime` (random per cluster; `review_runtime`, RFC-0029) |
+| `platform-db-shipping-migrator-secret` | shipping, platform | `secret/data/local/databases/platform-db/shipping-migrator` (random per cluster; RFC-0029) |
 | `platform-db-review-migrator-secret` | review, platform | `secret/data/local/databases/platform-db/review-migrator` (random per cluster; `review_migrator`, RFC-0029) |
 | `platform-db-temporal-secret` | temporal, platform | `secret/data/local/databases/platform-db/temporal` |
 | `platform-db-keycloak-secret` | identity | `secret/data/local/databases/platform-db/keycloak` |

@@ -461,33 +461,45 @@ role `product`.
 
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
-> **✅ Deployed — pattern-A static-role pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) records the pattern choice; [RFC-0008](../proposals/rfc/RFC-0008/) the roadmap).
-> The database secrets engine is **enabled** and serving one pilot role. Everything
-> below describing *per-request dynamic* roles or other services is still **planned** —
-> those services stay on KV v2 static credentials.
+> **✅ Deployed — pattern-A static roles on platform-db** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) records the pattern choice, [ADR-089](../proposals/adr/ADR-089-postgresql-access-contract/) the one-writer rule; [RFC-0008](../proposals/rfc/RFC-0008/) the roadmap).
+> The database secrets engine is **enabled** and rotates the four platform-db
+> runtime logins (notification, user, shipping, review). Everything below describing
+> *per-request dynamic* roles or the product-db services is still **planned** — those
+> stay on KV v2 static credentials.
 
-**What is deployed today.** The engine rotates the password of one *fixed* PostgreSQL
-role instead of minting per-request users:
+**What is deployed today.** The engine rotates the passwords of *fixed* PostgreSQL
+roles instead of minting per-request users:
 
 - The bootstrap pre-provisions the pieces the engine needs without root: the
   `db-configurator` policy + Kubernetes-auth role (bound to SA
-  `openbao-db-configurator`, ns `platform`) and an `eso-read` grant on
-  `database/static-creds/notification-runtime` (`openbao-bootstrap/configmap.yaml`).
+  `openbao-db-configurator`, ns `platform`) and `eso-read` grants on
+  `database/static-creds/{notification,user,shipping,review}-runtime`
+  (`openbao-bootstrap/configmap.yaml`).
 - The `openbao-db-config` Job (`configs/databases/clusters/platform-db/openbao-db-config.yaml`)
   runs in the **databases wave** — after `platform-db` is up, because
   `database/config` validates the live PG connection, which the bootstrap (secrets
   wave) cannot. It logs in via Kubernetes auth (no root token), enables the engine,
   reads its PostgreSQL administrator credential from the ESO-managed
   `platform-db-vault-rotator-secret`, writes `database/config/platform-db`
-  (postgresql plugin, `allowed_roles=notification`), and creates static role
-  `notification` with `rotation_period=720h`.
+  (postgresql plugin, `sslmode=require`, `allowed_roles` the four
+  `<svc>-runtime` roles), and creates one static role per runtime login with
+  `rotation_period=720h`. `vault_rotator` holds `ADMIN` on each runtime role
+  (bootstrap SQL in `instance.yaml`), which is all `ALTER ROLE … PASSWORD` needs.
 - ESO reads the rotated credential through a **second ClusterSecretStore `openbao-db`**
   (`configs/secrets/cluster-secret-store-db.yaml`): the default `openbao` store is
   pinned to the KV v2 mount, so this store uses `version: "v1"` with no `path` to read
-  the raw engine path `database/static-creds/notification-runtime` verbatim (KV-v2 semantics
+  the raw engine path `database/static-creds/<svc>-runtime` verbatim (KV-v2 semantics
   would insert `/data/` and 403).
-- The `platform-db-notification-runtime-secret` ExternalSecret (ns `notification`,
-  `refreshInterval: 1m`) materialises it for the service.
+- `platform-db-<svc>-runtime-secret` ExternalSecrets (ns `platform` and the service's
+  namespace, `refreshInterval: 15s`) materialise it. The service mounts the Secret as
+  a directory and reads `DB_PASSWORD_FILE` on every new connection; its container has
+  no `DB_PASSWORD` env. The `DatabaseRole` has no `passwordSecret`, so OpenBAO is the
+  only writer.
+- **Rotation window.** OpenBAO changes the password in PostgreSQL at once; a pod
+  sees it after the ESO refresh (≤ 15 s) plus the kubelet's Secret-volume sync (up to
+  its sync period, 1 m by default). Open connections are unaffected; a *new*
+  connection inside that window fails authentication. Measured numbers live in the
+  ADR-089 history.
 
 ```mermaid
 flowchart LR
@@ -495,18 +507,18 @@ flowchart LR
     adm["ExternalSecret → Secret<br/>platform-db-vault-rotator-secret<br/>(store openbao, ns platform)"]:::platform
     dbrole["DatabaseRole vault_rotator<br/>(CNPG sets its password)"]:::platform
     job["openbao-db-config Job<br/>(databases wave, k8s auth<br/>db-configurator — no root)"]:::platform
-    eng["database/config/platform-db<br/>static role notification<br/>rotation_period 720h"]:::platform
-    pg[("platform-db (CNPG)<br/>roles notification · vault_rotator")]:::data
+    eng["database/config/platform-db<br/>static roles notification · user<br/>shipping · review -runtime (720h)"]:::platform
+    pg[("platform-db (CNPG)<br/>&lt;svc&gt;_runtime · vault_rotator")]:::data
     store["ClusterSecretStore openbao-db<br/>(v1 — raw engine paths)"]:::platform
-    es["ExternalSecret<br/>platform-db-notification-runtime-secret<br/>(ns notification, 1m)"]:::service
+    es["ExternalSecrets<br/>platform-db-&lt;svc&gt;-runtime-secret<br/>(2 ns each, 15s)"]:::service
 
     kv --> adm
     adm -->|"passwordSecret"| dbrole
     dbrole --> pg
     adm -->|"admin credential (stdin)"| job
     job -->|"enable + configure"| eng
-    eng -->|"as vault_rotator (ADMIN on notification):<br/>ALTER ROLE ... PASSWORD (720h)"| pg
-    store -->|"read database/static-creds/notification-runtime"| eng
+    eng -->|"as vault_rotator (ADMIN on each runtime):<br/>ALTER ROLE ... PASSWORD (720h)"| pg
+    store -->|"read database/static-creds/&lt;svc&gt;-runtime"| eng
     es --> store
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;

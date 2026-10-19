@@ -244,7 +244,7 @@ address the SPA submits into its own session and does not call user.
 | Concern | Value |
 |---------|-------|
 | Probes | `GET /health`; `GET /ready` flips to `503 shutting_down` during the readiness drain window (`READINESS_DRAIN_DELAY`, default 5s) before `SHUTDOWN_TIMEOUT` (default 10s) |
-| Key env | `SERVICE_NAME=user`, `PORT=8080`, `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD/DB_SSLMODE`, `DB_POOL_MAX_CONNECTIONS`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL` (pkg v0.37.0 — empty derives `<issuer>/protocol/openid-connect/certs`), `LOG_LEVEL`, `TRACING_ENABLED`/`OTEL_COLLECTOR_ENDPOINT`/`OTEL_SAMPLE_RATE`, `PROFILING_ENABLED`/`PYROSCOPE_ENDPOINT` |
+| Key env | `SERVICE_NAME=user`, `PORT=8080`, `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD/DB_SSLMODE`, `DB_PASSWORD_FILE` (mounted runtime Secret, read per new connection; on the cluster it replaces `DB_PASSWORD`, rotated by OpenBAO), `DB_POOL_MAX_CONNECTIONS`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL` (pkg v0.37.0 — empty derives `<issuer>/protocol/openid-connect/certs`), `LOG_LEVEL`, `TRACING_ENABLED`/`OTEL_COLLECTOR_ENDPOINT`/`OTEL_SAMPLE_RATE`, `PROFILING_ENABLED`/`PYROSCOPE_ENDPOINT` |
 | Subcommands | `migrate` (versioned schema, runs in the init container) and `seed` (dev-only demo profiles; refuses on `ENV=production`) |
 | Cluster wiring | Namespace `user`, domain `identity` (`kubernetes/apps/services/user.yaml`); app traffic via `platform-db-pooler-rw.platform:5432`, migrations direct to `platform-db-rw.platform:5432` |
 | Telemetry | obsx OTLP (RFC-0014): traces, RED metrics, teed logs — no scrape endpoint |

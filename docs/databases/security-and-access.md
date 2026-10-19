@@ -65,9 +65,9 @@ authentication does not continue down the list looking for another method.
   operator still issues the replication client certificates. The Secret
   carries `cnpg.io/reload`, so a renewal reloads PostgreSQL without a
   restart.
-- The OpenBAO database configuration Job currently declares `sslmode=disable`
-  for its direct notification-database connection. This is a current limitation,
-  not the recommended transport for production.
+- The OpenBAO database engine connects to platform-db with `sslmode=require`
+  (encrypted, server not verified) through its `host` line; verifying it is part
+  of [#1296](https://github.com/duynhlab/homelab/issues/1296).
 
 Verified TLS needs trusted CA material and hostname validation at the client
 (for libpq, `verify-full`), with certificates covering the chosen endpoint.
@@ -86,7 +86,7 @@ application namespaces; successful ESO sync is only one step. CNPG must apply
 the credential and the client or pooler must consume it. Never paste Secret
 payloads, SCRAM verifiers or credential-bearing DSNs into evidence.
 
-Notification's OpenBAO rotation path and the separate `vault-rotator` management
+The platform-db runtimes' OpenBAO rotation path and the separate `vault-rotator` management
 identity have different owners and ordering from a normal service-password
 change. Follow the [rotator credential runbook](./runbooks/rotate-vault-rotator-credential.md)
 for that identity; do not rotate it as though it were a PgDog service password.

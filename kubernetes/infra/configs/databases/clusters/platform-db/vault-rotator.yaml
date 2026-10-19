@@ -54,7 +54,7 @@ spec:
   cluster:
     name: platform-db
   name: vault_rotator
-  comment: "OpenBAO administrator for notification_runtime static-role rotation"
+  comment: "OpenBAO administrator for runtime static-role rotation"
   login: true
   superuser: false
   createdb: false
@@ -65,6 +65,9 @@ spec:
   connectionLimit: -1
   inRoles:
     - notification_runtime
+    - user_runtime
+    - shipping_runtime
+    - review_runtime
   passwordSecret:
     name: platform-db-vault-rotator-secret
   databaseRoleReclaimPolicy: retain

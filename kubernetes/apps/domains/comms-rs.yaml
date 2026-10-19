@@ -191,21 +191,27 @@ spec:
               secretKeyRef:
                 name: << inputs.db_runtime_secret >>
                 key: username
+          <<- if not (index inputs "db_password_file") >>
           - name: DB_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: << inputs.db_runtime_secret >>
                 key: password
+          <<- end >>
           <<- else >>
           - name: DB_USER
             value: << index inputs "db_user" | default inputs.name >>
+          <<- if not (index inputs "db_password_file") >>
           - name: DB_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: << inputs.db_secret >>
                 key: password
           <<- end >>
+          <<- end >>
           <<- if (index inputs "db_password_file") >>
+          # With a password file the env carries no password: the mounted file
+          # is the only copy, so a broken mount fails instead of falling back.
           - name: DB_PASSWORD_FILE
             value: /etc/db/secret/password
           <<- end >>

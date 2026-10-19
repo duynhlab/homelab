@@ -259,7 +259,7 @@ east-west gRPC surface is unauthenticated by design — the policy is the fence.
   on shutdown, pings the DB pool with a 1 s timeout); gRPC `:9090`.
 - **Addressing:** clients dial `dns:///shipping.shipping.svc.cluster.local:9090`
   (single multi-port Service; see [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model)).
-- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_HOST`/`DB_PORT`/`DB_SSLMODE`/`DB_POOL_MAX_CONNECTIONS`,
+- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_HOST`/`DB_PORT`/`DB_SSLMODE`/`DB_POOL_MAX_CONNECTIONS`, `DB_PASSWORD_FILE` (mounted runtime Secret, read per new connection; on the cluster it replaces `DB_PASSWORD`, rotated by OpenBAO),
   `TRACING_ENABLED`, `OTEL_SAMPLE_RATE`, `LOG_LEVEL`, `SHUTDOWN_TIMEOUT`, `READINESS_DRAIN_DELAY`.
 - **Database:** app connects through `platform-db-pooler-rw.platform:5432`
   (pool max 30); migrations run against `platform-db-rw` directly

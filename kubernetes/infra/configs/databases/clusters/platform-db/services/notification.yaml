@@ -4,7 +4,7 @@
 # (../authz/policies/notification.yaml) owns the grants; CNPG keeps the
 # runtime login and the Database. Conventions: docs/databases/authorization.md.
 # The runtime password belongs to OpenBAO's static role (ADR-025): vault_rotator
-# rotates it, ESO reads it every minute, and the DatabaseRole has no
+# rotates it, ESO reads it every 15s, and the DatabaseRole has no
 # passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
-  refreshInterval: 1m
+  refreshInterval: 15s
   secretStoreRef:
     name: openbao-db
     kind: ClusterSecretStore

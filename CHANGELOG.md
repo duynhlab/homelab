@@ -92,6 +92,8 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- Select native chart VMRules while retaining unselected static PrometheusRules for rollback; keep SLO rule selection unchanged.
+
 - Stage vm-rules 0.2.0 through platform-rules and temporal-rules HelmReleases; keep native rules excluded until the explicit selector cutover.
 
 - Prepare the native VMRule migration with source labels and a selector that keeps chart rules staged; preserve all existing static and SLO evaluations.

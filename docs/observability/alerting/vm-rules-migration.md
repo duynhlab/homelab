@@ -13,9 +13,9 @@ release owns 70 native VMRules; the separate Temporal release owns one and remai
 under temporal-config's dependency on the Temporal server. Sloth and the slo
 chart keep their PrometheusRules and converter path. Compose is unchanged.
 
-**Current repository stage: stage.** The two HelmReleases install native chart
-rules, which are excluded by VMAlert; existing static rules remain selected.
-Merge only after chart 0.2.0 is published and the prepare-stage gate passed. This document describes the subsequent
+**Current repository stage: cutover.** VMAlert selects native chart rules and
+excludes the old static sources. The old PrometheusRules remain available for
+rollback. Merge only after the staging readiness and parity gates passed. This document describes the subsequent
 stages as planned until their corresponding commits have been reconciled.
 
 Apply the stages as separate GitOps changes, never squash all stages into one

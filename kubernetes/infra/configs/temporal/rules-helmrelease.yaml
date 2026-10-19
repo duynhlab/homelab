@@ -1,4 +1,4 @@
-# Staged native rules: VMAlert excludes source=chart until the cutover commit.
+# Native static rules; Sloth keeps its independent PrometheusRule/converter path.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

@@ -90,7 +90,7 @@ payloads, SCRAM verifiers or credential-bearing DSNs into evidence.
 The runtimes' OpenBAO rotation path and the separate `vault-rotator` management
 identity have different owners and ordering from a normal service-password
 change. Follow the [rotator credential runbook](./runbooks/rotate-vault-rotator-credential.md)
-for that identity; do not rotate it as though it were a PgDog service password.
+for that identity; do not rotate it as though it were a service runtime password.
 
 The operator manages internal certificates, while client trust and pooler TLS
 still require deliberate configuration. Inspect `Cluster.status.certificates`
@@ -99,10 +99,11 @@ client verifies the issuer or hostname.
 
 ### Authorization and audit boundaries
 
-The current service login owns its database. HBA isolates which database it can
-enter; it does not prevent that owner from changing its schema. The planned
-owner/migrator/runtime split and membership evidence belong exclusively to
-[authorization](./authorization.md). CNPG role attributes and memberships are
+Each service database is owned by a `NOLOGIN` `<svc>_owner`; the migrator
+becomes that owner at login and the runtime login gets CRUD grants only. HBA
+isolates which database a login can enter; it does not limit what the owner
+does to its schema. The owner/migrator/runtime split and membership evidence
+belong exclusively to [authorization](./authorization.md). CNPG role attributes and memberships are
 not a replacement for application migration-owned object grants.
 
 Statement logging, pgAudit and `auto_explain` can expose query text or values.

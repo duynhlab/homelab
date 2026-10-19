@@ -38,7 +38,7 @@ Known gaps: [platform mTLS and cache tradeoffs](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | None. Historically `ReserveStock` + `ReleaseStock`; the saga now reserves at inventory-service |
 | **Idempotency** | `reservation_id` = order id (historical) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 

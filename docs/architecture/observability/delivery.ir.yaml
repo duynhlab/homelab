@@ -4,6 +4,11 @@
 # one spec.dependsOn entry between two of these waves (20 of 20), each layer is
 # the wave's longest dependsOn chain from controllers-local, and each gate line
 # is the wave's wait / healthChecks / healthCheckExprs.
+# Re-verified on 2026-10-19 (repository review): the 20 dependsOn edges still match; the
+# dashboards wave now lists 19 GrafanaManifests (postgresql-query-telemetry added); the
+# dashboards OCI source pins semver 0.7.0; tracing-local sets wait: true AND a Deployment
+# healthCheck, so wait wins and the gate is the applied HelmRelease (AGENTS.md gotcha);
+# secrets-local applies the OpenBao bootstrap Job + ESO stores/ExternalSecrets, not the operators.
 diagram:
   id: delivery
   title: "duynhlab homelab — Observability delivery order"
@@ -32,7 +37,7 @@ boundaries:
 nodes:
   - {id: w_controllers, label: "controllers-local\n./controllers\ngate: wait — operators + namespaces", role: platform, layer: w0, parent: f_cluster}
 
-  - {id: w_secrets, label: "secrets-local\n./configs/secrets\ngate: wait — OpenBao + ESO", role: platform, layer: w1, parent: f_cluster}
+  - {id: w_secrets, label: "secrets-local\n./configs/secrets\ngate: wait — OpenBao bootstrap · ESO stores", role: platform, layer: w1, parent: f_cluster}
   - {id: w_monitoring, label: "monitoring-local\n./configs/observability\ngate: wait — VM CRs · rules · Grafana", role: metric, layer: w1, parent: f_cluster}
 
   - {id: w_keeper, label: "clickhouse-keeper-local\n./configs/clickhouse-keeper\ngate: healthChecks — 3× StatefulSet", role: data, layer: w2, parent: f_cluster, icon: clickhouse}
@@ -42,11 +47,11 @@ nodes:
 
   - {id: w_chi, label: "clickhouse-local\n./configs/clickhouse\ngate: healthChecks — 3× StatefulSet", role: data, layer: w3, parent: f_cluster, icon: clickhouse}
   - {id: w_profiling, label: "profiling-local\n./controllers/profiling\ngate: wait — Pyroscope HelmRelease", role: profile, layer: w3, parent: f_cluster}
-  - {id: w_dash, label: "grafana-dashboards-as-code-dashboards-local\n./dashboards\ngate: healthCheckExprs — 18× GrafanaManifest", role: platform, layer: w3, parent: f_cluster}
+  - {id: w_dash, label: "grafana-dashboards-as-code-dashboards-local\n./dashboards\ngate: healthCheckExprs — 19× GrafanaManifest", role: platform, layer: w3, parent: f_cluster}
 
   - {id: w_schema, label: "clickhouse-schema-local\n./configs/clickhouse-schema\ngate: wait — DDL bootstrap Job", role: worker, layer: w4, parent: f_cluster, icon: clickhouse}
 
-  - {id: w_tracing, label: "tracing-local\n./controllers/tracing\ngate: wait — OTel Collector Deployment", role: collector, layer: w5, parent: f_cluster, icon: opentelemetry}
+  - {id: w_tracing, label: "tracing-local\n./controllers/tracing\ngate: wait — OTel Collector HelmRelease", role: collector, layer: w5, parent: f_cluster, icon: opentelemetry}
 
 edges:
   - {id: d0, source: w_controllers, target: w_secrets, type: control}
@@ -76,4 +81,4 @@ notes:
     text: "wait — the wave is Ready when the objects it applies are Ready. healthChecks / healthCheckExprs — wait is deliberately absent: the objects worth gating on are StatefulSets and GrafanaManifests an operator creates later, so they are never in the wave's own applied set and wait would pass instantly. Listing them is the only thing that holds the next wave back (RFC-0028 / ADR-065). The two are mutually exclusive and wait wins, so a wave setting both gates only on what it applies."
   - id: note_src
     title: "Sources and scope"
-    text: "Every wave reads infrastructure-oci (oci://homelab-registry:5000/flux-infra-sync, ref local) except apps-local, which reads apps-oci (flux-apps-sync), and the two dashboards-as-code waves, which read grafana-dashboards-as-code-oci (ghcr.io/duynhlab/grafana-dashboards-as-code, semver 0.2.1). apps-local also waits for databases-local, temporal-config-local and keda-local, which sit outside this diagram."
+    text: "Every wave reads infrastructure-oci (oci://homelab-registry:5000/flux-infra-sync, ref local) except apps-local, which reads apps-oci (flux-apps-sync), and the two dashboards-as-code waves, which read grafana-dashboards-as-code-oci (ghcr.io/duynhlab/grafana-dashboards-as-code, semver 0.7.0). apps-local also waits for databases-local, temporal-config-local and keda-local, which sit outside this diagram."

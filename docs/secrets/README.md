@@ -55,7 +55,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     flux(Flux Kustomizations):::platform
     bootstrap(openbao-bootstrap Job):::worker
     bao(OpenBAO HA Raft<br/>namespace: openbao):::service
-    css(ClusterSecretStore<br/>openbao):::platform
+    css(ClusterSecretStores<br/>openbao · openbao-db):::platform
     eso(External Secrets Operator<br/>namespace: external-secrets-system):::platform
     es(ExternalSecret / ClusterExternalSecret):::platform
     k8ssecret[(Kubernetes Secret)]:::data
@@ -65,13 +65,14 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     edgecert[(platform-edge-tls<br/>namespace: envoy-gateway)]:::edge
     tm(trust-manager Bundle<br/>homelab-ca-bundle):::platform
     cabundle[(ConfigMap homelab-ca-bundle<br/>monitoring only · no workload mounts it yet)]:::data
+    dbcert[(PostgreSQL server + pooler certificates<br/>and per-namespace *-db-ca-trust · ADR-089)]:::data
 
     staff(Operators<br/>staff OIDC login — ADR-062):::service
 
     flux -->|"applies manifests"| bootstrap
     bootstrap -->|"init, seed KV v2, policies, revoke root"| bao
     staff -->|"auth/oidc → team policies"| bao
-    bao -->|"Kubernetes auth + KV v2 reads"| css
+    bao -->|"Kubernetes auth · KV v2 + database static-creds reads"| css
     css -->|"store reference"| eso
     eso -->|"reconciles app secrets"| es
     es -->|"writes"| k8ssecret
@@ -80,6 +81,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     cfsecret -->|"Cloudflare API token"| cm
     cm -->|"local: homelab-ca (reconciled)<br/>prod: Let's Encrypt DNS-01"| edgecert
     cm -->|"homelab CA source"| tm
+    cm -->|"homelab-ca"| dbcert
     tm -->|"namespaceSelector: needs-trust=true"| cabundle
 end
 
@@ -94,8 +96,8 @@ classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
 The Draw.io view below draws the same pipeline with what keeps OpenBao running:
 - floci auto-unseal and the one-shot bootstrap Job;
-- the two ClusterSecretStores, and the database engine rotating `notification`
-  every 720 h;
+- the two ClusterSecretStores, and the database engine rotating the ten
+  runtime passwords every 720 h;
 - where the Secrets land;
 - the edge certificate and the homelab CA bundle.
 
@@ -111,15 +113,19 @@ yet.
 
 ### ESO sync path
 
+This diagram answers how a value reaches a pod. KV values refresh every hour;
+database static-creds (the ten runtime passwords) every 15 seconds.
+
 ```mermaid
 flowchart LR
-    subgraph OpenBAOBox["OpenBAO (HA Raft)"]
-        KV["KV v2 Secrets Engine"]
-    end
-
-    subgraph K8s["Kubernetes"]
+    subgraph K8s["Kind cluster · homelab"]
+        subgraph OpenBAOBox["OpenBAO (HA Raft)"]
+            KV["KV v2 Secrets Engine"]
+            DBE["Database engine<br/>static-creds"]
+        end
         ESO["External Secrets Operator"]
-        CSS["ClusterSecretStore"]
+        CSS["ClusterSecretStore openbao"]
+        CSSDB["ClusterSecretStore openbao-db"]
         CES["ClusterExternalSecret"]
         ES["ExternalSecret"]
         Secret["Kubernetes Secret"]
@@ -127,7 +133,9 @@ flowchart LR
     end
 
     KV --> CSS
+    DBE --> CSSDB
     CSS --> ESO
+    CSSDB --> ESO
     ESO --> CES
     ESO --> ES
     CES --> ES
@@ -182,8 +190,8 @@ root token revoked; production target is a real cloud KMS. See
 | 1 | Flux | Applies OpenBAO, ESO, cert-manager, trust-manager, and their config Kustomizations in dependency order |
 | 2 | OpenBAO bootstrap | Ensures the floci KMS alias, initializes OpenBAO (**awskms auto-unseal** — pods self-unseal), enables KV v2, Kubernetes auth, the `oidc` mount, policies (`eso-read`, `infra-team`, `sre-team`, `db-configurator`, `oidc-configurator`), seeds learning secrets, then **revokes the root token** |
 | 2b | openbao-oidc-config Job | A later Flux wave (after the edge) writes `auth/oidc/config` against the staff realm + team external groups — the ADR-062 human door; no root token (k8s-auth role from step 2) |
-| 3 | ClusterSecretStore | Points ESO at `http://openbao.openbao.svc.cluster.local:8200` with Kubernetes auth role `eso-reader` |
-| 4 | ESO | Reads OpenBAO paths and materializes Kubernetes Secrets with `refreshInterval: 1h` |
+| 3 | ClusterSecretStores | `openbao` (KV v2) and `openbao-db` (raw `database/` engine paths) point ESO at `http://openbao.openbao.svc.cluster.local:8200` with Kubernetes auth role `eso-reader` |
+| 4 | ESO | Reads OpenBAO paths and materializes Kubernetes Secrets: KV with `refreshInterval: 1h`, the runtime database passwords (`database/static-creds/<svc>-runtime`) with `15s` |
 | 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `platform-edge-tls` to `homelab-ca` (the patch in `envoy-gateway-config.yaml` has reconciled on Kind — RFC-0024 bring-up) |
 | 6 | trust-manager | Combines Mozilla CAs and the committed `homelab-ca` PEM into `homelab-ca-bundle` ConfigMaps |
 | 7 | Workloads | Consume Kubernetes Secrets or mount trust bundles; they do not call OpenBAO directly |
@@ -196,7 +204,7 @@ scalability:
 | Category | Location | Mechanism | Rationale |
 |----------|----------|-----------|-----------|
 | **DB credentials** | `configs/databases/clusters/*/secrets/` | ExternalSecret | Co-located with the DB cluster they serve |
-| **Pooler credentials** | `configs/databases/clusters/*/secrets/` | ExternalSecret | Co-located with the pooler they serve |
+| **Pooler credentials** | none | — | PgBouncer authenticates to PostgreSQL with a CNPG client certificate (`auth_query`); PgDog passes each client's password through (ADR-025) |
 | **Backup credentials** | `configs/secrets/cluster-external-secrets/` | ClusterExternalSecret | Shared across CloudNativePG cluster namespaces via namespace labels |
 | **Future shared secrets** | `configs/secrets/cluster-external-secrets/` | ClusterExternalSecret | Any secret needed by multiple namespaces |
 
@@ -223,7 +231,7 @@ future-app placeholders) see
 > the `openbao-bootstrap` Job seeds a **dev placeholder** so the ExternalSecret
 > syncs; on **prod** the real token is operator-supplied (not in Git) and
 > re-seeded after every fresh cluster — see
-> [OpenBAO initial setup § Step 7](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+> [OpenBAO initial setup § Step 6](./runbooks/openbao-initial-setup.md#step-6--seed-bootstrap-only-cloudflare-token-operator).
 
 ### Kubernetes secret catalog
 
@@ -331,17 +339,16 @@ kubectl get clustersecretstore
 
 | Current | Planned / not yet deployed |
 |---|---|
-| KV v2 static secrets + database engine **static-role pilot** (notification, 720h rotation — [ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)) | Extend database-engine credentials to the remaining services; per-request dynamic roles |
+| KV v2 static secrets + database engine **static roles** for all ten service runtime logins (720h rotation — [ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/), [ADR-089](../proposals/adr/ADR-089-postgresql-access-contract/)) | Migrators, `db_authz`, Temporal and Keycloak off KV; per-request dynamic roles |
 | Kubernetes auth for ESO **+ OIDC for humans (shipped — [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/))** | AppRole for CI/CD |
 | Best-effort audit to stdout | Durable, fail-closed audit storage |
 | Local floci KMS emulator (`awskms` auto-unseal, root token revoked — [ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap `endpoint`) |
 | HTTP in-cluster OpenBAO listener | TLS listener and ESO `caBundle` |
 | Dev placeholder Cloudflare token on local | Operator-supplied production token outside Git |
-| PgDog inline pooler passwords (dev-only) | Pooler `secretRef` or initContainer config rendering |
 
-**Pooler inline passwords:** The PgDog Helm chart doesn't support `secretRef`,
-so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
-[RFC-0008](../proposals/rfc/RFC-0008/) for the production target.
+**Pooler passwords:** neither pooler holds one. PgDog uses passthrough auth
+(`enabled_allow_change`, ADR-025) and PgBouncer `auth_query`, so a rotation
+needs no pooler change.
 
 ### Hardening workstreams
 
@@ -349,7 +356,7 @@ so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 |---|---|---|
 | TLS for OpenBAO | Prevent plaintext OpenBAO traffic and allow ESO `caBundle` validation | [RFC-0020](../proposals/rfc/RFC-0020/) Slice 1 (planned) |
 | Real cloud KMS | Swap the floci emulator's `endpoint` for a managed KMS (auto-unseal itself shipped — ADR-024) | [RFC-0008](../proposals/rfc/RFC-0008/) |
-| Database-engine credentials fleet-wide | Replace the remaining long-lived KV passwords with rotated/leased users (pilot shipped — ADR-025) | [OpenBAO §5.2](./openbao.md#52-database-secrets-engine--dynamic-credentials) |
+| Database-engine credentials fleet-wide | Replace the remaining long-lived KV passwords (migrators, `db_authz`, Temporal, Keycloak) with rotated/leased users; all ten runtime logins already rotate (ADR-025, ADR-089) | [OpenBAO §5.2](./openbao.md#52-database-secrets-engine--dynamic-credentials) |
 | ~~OIDC human access~~ **shipped** (ADR-062) — day-to-day ceremony use is gone; ceremony is the issuer-down fallback | Remove day-to-day break-glass ceremony use | [OpenBAO Architecture](./openbao.md) |
 | Durable audit | Make secret access reconstructable after incidents | [ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) |
 | Cloudflare token handling | Keep production DNS-01 token outside Git and re-seed fresh clusters safely | [Seed bootstrap-only token](./runbooks/openbao-initial-setup.md) |
@@ -358,7 +365,7 @@ so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 
 | Credential | Type | Rotation today | Target |
 |-----------|------|----------------|--------|
-| Service runtime DB creds (10) | Database-engine static role | Automatic, `rotation_period=720h` | Same |
+| Service runtime DB creds (10) | Database-engine static role | Automatic, `rotation_period=720h`; scheduler-driven rotation audited 2026-10-19 (#1303) | Same — [rotation runbook](../databases/runbooks/rotate-cnpg-service-password.md) |
 | Migrator / `db_authz` / Temporal / Keycloak DB creds (KV) | Static | Manual — [rotate-static-secret](./runbooks/rotate-static-secret.md) | Manual on a schedule (ADR-089); Temporal/Keycloak in #1296 |
 | ESO OpenBAO token | Kubernetes-auth service token | Auto (auth TTL) | Same |
 | S3/backup creds (KV) | Static | Manual (`bao kv put` via staff OIDC login) | Static roles where supported |

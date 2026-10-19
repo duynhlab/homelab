@@ -52,7 +52,7 @@
         <mxCell id="keycloak" value="&lt;b&gt;Keycloak&lt;/b&gt;&lt;br&gt;Existing OIDC / roles&lt;br&gt;planned" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;image=data:image/png,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;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;dashed=1;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
           <mxGeometry x="355" y="525" width="230" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="admin_tail" value="Private administration (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="tailscale">
+        <mxCell id="admin_tail" value="Private administration (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="tailscale">
           <mxGeometry relative="1" as="geometry" x="-0.68">
             <Array as="points">
               <mxPoint x="200" y="215" />
@@ -60,7 +60,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="tail_proxy" value="Permitted API access (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tailscale" target="proxy">
+        <mxCell id="tail_proxy" value="Permitted API access (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tailscale" target="proxy">
           <mxGeometry relative="1" as="geometry" x="-0.93">
             <Array as="points">
               <mxPoint x="200" y="355" />
@@ -70,7 +70,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="proxy_api" value="Authenticated requests (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="proxy" target="api">
+        <mxCell id="proxy_api" value="Authenticated requests (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="proxy" target="api">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
               <mxPoint x="200" y="535" />
@@ -78,7 +78,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="web_access" value="HTTPS / Access policy (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="cf">
+        <mxCell id="web_access" value="HTTPS / Access policy (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="cf">
           <mxGeometry relative="1" as="geometry" x="-0.68">
             <Array as="points">
               <mxPoint x="510" y="215" />
@@ -86,7 +86,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="access_tunnel" value="Tunnel delivery (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cf" target="tunnel">
+        <mxCell id="access_tunnel" value="Tunnel delivery (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cf" target="tunnel">
           <mxGeometry relative="1" as="geometry" x="-0.01">
             <Array as="points">
               <mxPoint x="510" y="355" />
@@ -94,7 +94,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="tunnel_envoy" value="Validated origin HTTPS (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tunnel" target="envoy">
+        <mxCell id="tunnel_envoy" value="Validated origin HTTPS (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tunnel" target="envoy">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
               <mxPoint x="510" y="535" />
@@ -102,7 +102,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="envoy_apps" value="Allowed web routes (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="apps">
+        <mxCell id="envoy_apps" value="Allowed web routes (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="apps">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
               <mxPoint x="510" y="695" />
@@ -110,7 +110,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="apps_oidc" value="Existing identity contract (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="apps" target="keycloak">
+        <mxCell id="apps_oidc" value="Existing identity contract (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="apps" target="keycloak">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
               <mxPoint x="510" y="855" />
@@ -118,7 +118,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="local_lan" value="Independent LAN path (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="local" target="lan">
+        <mxCell id="local_lan" value="Independent LAN path (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="local" target="lan">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
               <mxPoint x="800" y="215" />
@@ -126,7 +126,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="lan_host" value="Host recovery (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="lan" target="hostapi">
+        <mxCell id="lan_host" value="Host recovery (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="lan" target="hostapi">
           <mxGeometry relative="1" as="geometry" x="-0.01">
             <Array as="points">
               <mxPoint x="800" y="355" />
@@ -152,7 +152,7 @@
         <mxCell id="legend-role-planned-text" value="planned (not deployed)" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="48" y="34" width="130" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-planned" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;" edge="1" parent="legend">
+        <mxCell id="legend-edge-planned" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="196" y="45" as="sourcePoint" />
             <mxPoint x="222" y="45" as="targetPoint" />

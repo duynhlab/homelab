@@ -1,6 +1,9 @@
 # RFC-0011 / ADR-087 reference target, reviewed 2026-10-12. Not installed.
 # Sources: kubernetes/clusters/local; infra/controllers and configs; docs/api/api.md;
 # docs/observability/README.md; docs/databases/architecture.md.
+# 2026-10-19: re-checked every card against kubernetes/ (all products exist on Kind;
+# no Kong/Loki/Tempo/Jaeger). Pooler card now names both poolers: PgDog for
+# product-db and the CNPG PgBouncer Pooler for platform-db (was PgDog only).
 diagram:
   id: rfc0011-stack
   title: 02 / duynhlab — Homelab stack
@@ -289,9 +292,9 @@ nodes:
   parent: data
   icon: postgresql
 - id: pgdog
-  label: 'PgDog
+  label: 'Connection poolers
 
-    Database connection pooling
+    PgDog + CNPG PgBouncer
 
     planned'
   role: data
@@ -300,7 +303,6 @@ nodes:
   w: 225
   h: 70
   parent: data
-  icon: pgdog
 - id: valkey
   label: 'Valkey
 

@@ -14,6 +14,12 @@
 #   - controllers/tracing/otel-collector/otel-collector.yaml (tcp://clickhouse-clickhouse:9000),
 #     configs/observability/grafana/datasource-clickhouse.yaml (protocol native, port 9000),
 #     configs/clickhouse/clickhouseinstallation.yaml (probes on 8123, prometheus/port 9363, hot_cold TTL)
+# Re-verified on 2026-10-19 (repository review, no cluster; image now clickhouse-server:26.9):
+#   - the OTel Collector HelmRelease is in the monitoring namespace, not tracing;
+#   - a second writer: product-db + platform-db preload pg_stat_ch and INSERT into database
+#     pg_stat_ch over native :9000 as the INSERT-only user pg_stat_ch (instance.yaml, the CHI users
+#     section); the clickhouse-schema Job creates DATABASES="otel pg_stat_ch" -- events_raw
+#     (hot_cold, 7/90 d) + 3 rollup materialized views (query-telemetry.md).
 diagram:
   id: clickhouse-engine
   title: "duynhlab homelab — Inside one ClickHouse replica"
@@ -25,7 +31,7 @@ diagram:
   legend:
     roles:
       service: "ClickHouse engine component"
-      data: "Tables, disks, peer replicas"
+      data: "Tables, disks, peer replicas · PostgreSQL writer"
       platform: "Clients and coordination"
     edges:
       traffic: "a connection or a step inside the query"
@@ -44,36 +50,38 @@ boundaries:
   - {id: f_rustfs, label: "rustfs namespace", parent: f_cluster}
 
 nodes:
-  - {id: otelcol, label: "OTel Collector\nsingle writer · tracing ns", role: collector, layer: clients, parent: f_cluster, icon: opentelemetry}
+  - {id: pgch, label: "product-db · platform-db\npg_stat_ch extension", role: data, layer: clients, parent: f_cluster, icon: postgresql}
   - {id: grafana, label: "Grafana\nClickHouse datasource", role: platform, layer: clients, parent: f_mon, icon: grafana}
   - {id: kubelet, label: "kubelet\nliveness · readiness", role: platform, layer: clients, parent: f_cluster, icon: kubernetes}
   - {id: vmagent, label: "vmagent\nPodMonitor scrape", role: metric, layer: clients, parent: f_mon, icon: victoriametrics}
+  - {id: otelcol, label: "OTel Collector\nwrites database otel", role: collector, layer: clients, parent: f_mon, icon: opentelemetry}
 
-  - {id: native, label: "Native TCP :9000\ntyped columnar blocks", role: service, layer: access, parent: f_access}
   - {id: http, label: "HTTP :8123\nonly /ping here", role: service, layer: access, parent: f_access}
+  - {id: native, label: "Native TCP :9000\ntyped columnar blocks", role: service, layer: access, parent: f_access}
   - {id: prom, label: "Prometheus endpoint :9363\n/metrics", role: service, layer: access, parent: f_access}
 
   - {id: parser, label: "Parser\nSQL text → AST", role: service, layer: query, parent: f_query}
   - {id: planner, label: "Analyzer + planner\nAST → optimised query plan", role: service, layer: query, parent: f_query}
   - {id: executor, label: "Pipeline executor\nprocessors on query threads", role: service, layer: query, parent: f_query}
 
-  - {id: acl, label: "Access control\nusers.xml users · no SQL roles", role: service, layer: orthogonal, parent: f_orth}
-  - {id: caches, label: "Caches · 1 GiB each\nmark · uncompressed · query", role: service, layer: orthogonal, parent: f_orth}
-  - {id: bgpool, label: "Background pools\nmerges · fetches · TTL moves", role: service, layer: orthogonal, parent: f_orth}
   - {id: syslogs, label: "System log tables\nquery_log · part_log · trace_log", role: service, layer: orthogonal, parent: f_orth}
+  - {id: bgpool, label: "Background pools\nmerges · fetches · TTL moves", role: service, layer: orthogonal, parent: f_orth}
+  - {id: caches, label: "Caches · 1 GiB each\nmark · uncompressed · query", role: service, layer: orthogonal, parent: f_orth}
+  - {id: acl, label: "Access control\nusers.xml users · no SQL roles", role: service, layer: orthogonal, parent: f_orth}
 
-  - {id: tables, label: "Database otel · Replicated engine\notel_logs · otel_traces\notel_traces_trace_id_ts\nReplicatedMergeTree", role: data, layer: storage, parent: f_storage, icon: clickhouse}
-  - {id: mv, label: "otel_traces_trace_id_ts_mv\nMaterializedView · per insert block", role: data, layer: storage, parent: f_storage}
+  - {id: tables, label: "Databases otel · pg_stat_ch (Replicated)\notel_logs · otel_traces · trace_id_ts\npg_stat_ch.events_raw · 3 rollups\nReplicatedMergeTree", role: data, layer: storage, parent: f_storage, icon: clickhouse}
+  - {id: mv, label: "Materialized views ×4\ntrace_id_ts_mv · 3 pg_stat_ch rollups", role: data, layer: storage, parent: f_storage}
 
-  - {id: hot, label: "Disk default · hot\nlocal PVC 10Gi", role: data, layer: disks, parent: f_storage, shape: datastore}
   - {id: cold, label: "Disk s3_cache · cold\n1 GiB cache over the s3 disk", role: data, layer: disks, parent: f_storage, shape: datastore}
+  - {id: hot, label: "Disk default · hot\nlocal PVC 10Gi", role: data, layer: disks, parent: f_storage, shape: datastore}
   - {id: rustfs, label: "RustFS bucket\nclickhouse-otel/{replica}/", role: data, layer: coordination, parent: f_rustfs, shape: datastore}
 
   - {id: peers, label: "Replicas 0-1 · 0-2\nsame engine · own disks", role: data, layer: coordination, parent: f_mon, icon: clickhouse}
   - {id: keeper, label: "ClickHouse Keeper ×3\nRaft quorum · :2181", role: platform, layer: coordination, parent: f_mon, icon: clickhouse}
 
 edges:
-  - {id: c_ins, source: otelcol, target: native, type: traffic, label: "INSERT"}
+  - {id: c_ins, source: otelcol, target: native, type: traffic, label: "INSERT otel.*"}
+  - {id: c_pgch, source: pgch, target: native, type: traffic, label: "INSERT pg_stat_ch.*"}
   - {id: c_sel, source: grafana, target: native, type: traffic, label: "SELECT"}
   - {id: c_ping, source: kubelet, target: http, type: traffic, label: "GET /ping"}
   - {id: c_scrape, source: vmagent, target: prom, type: telemetry, signal: metric, label: "scrape"}
@@ -87,7 +95,7 @@ edges:
   - {id: q_rw, source: executor, target: tables, type: data, label: "read granules · write part"}
 
   - {id: b_merge, source: bgpool, target: tables, type: control, label: "merge · TTL move"}
-  - {id: s_mv, source: tables, target: mv, type: event, label: "otel_traces block"}
+  - {id: s_mv, source: tables, target: mv, type: event, label: "insert block"}
   - {id: s_cold, source: tables, target: cold, type: data, label: "parts ≥ 7 d", label_pos: 0.85}
   - {id: s_hot, source: tables, target: hot, type: data, label: "parts < 7 d", label_pos: 0.85}
   - {id: s_s3, source: cold, target: rustfs, type: data, label: "S3 API"}
@@ -98,4 +106,4 @@ edges:
 notes:
   - id: note
     title: "What is not drawn"
-    text: "Distributed tables, dictionaries and more than one shard are not deployed (chapter 07 treats them as reference). The pod also listens on MySQL :9004 and PostgreSQL :9005 because the image enables them by default, but no Service port exposes them and no client uses them; gRPC and HTTPS are off. No backup mechanism is deployed. The materialized view writes the rows it derives back into otel_traces_trace_id_ts; merges and TTL moves run on the background pools, never on the query thread."
+    text: "Distributed tables, dictionaries and more than one shard are not deployed (chapter 07 treats them as reference). The pod also listens on MySQL :9004 and PostgreSQL :9005 because the image enables them by default, but no Service port exposes them and no client uses them; gRPC and HTTPS are off. No backup mechanism is deployed. Each materialized view fires per insert block and writes the rows it derives back into a table of the same database (otel_traces_trace_id_ts, the pg_stat_ch rollups); merges and TTL moves run on the background pools, never on the query thread."

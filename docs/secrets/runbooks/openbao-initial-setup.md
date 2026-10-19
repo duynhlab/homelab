@@ -92,7 +92,7 @@ kubectl exec -n openbao openbao-0 -- bao operator raft list-peers
 # ESO sync status
 kubectl get externalsecret -A
 kubectl get clustersecretstore openbao
-kubectl get clustersecretstore openbao-db   # ADR-025 database static-role pilot
+kubectl get clustersecretstore openbao-db   # database static roles (ten runtime logins)
 
 # Specific ExternalSecret state
 kubectl describe externalsecret product-db-secret -n product

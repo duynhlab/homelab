@@ -489,6 +489,15 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **ADR-089 records its parameters and the rotation runbook covers both
+  clusters.** ADR-089 lists the certificate lifetimes, renewal pickup, expiry
+  alerts, the planned CA-overlap procedure, the rotation error budget (zero
+  failed requests; window measured on manual and scheduler-driven rotations)
+  and the credentials as built. The rotation runbook (`rotate-cnpg-service-password.md`)
+  now covers both clusters, adds an emergency rotation (roll PgDog to drop
+  cached passwords, end old sessions) and keeps the manual migrator flow
+  (#1303).
+
 - **Git commit conventions have one owner.** The `git-commits` skill defines
   homelab messages and branch names; agent instructions and documentation link
   to it and distinguish the microservice Gitflow target from current practice.

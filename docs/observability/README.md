@@ -137,7 +137,7 @@ The Mermaid map above is the fan-out. The diagram below answers the narrower
 question a reader usually brings to it — **which collector pipeline carries each
 signal, where it is stored, and for how long** — including the paths that bypass
 the collector (the Pyroscope SDK push, vmagent's scrapes, Vector's container
-logs), the span-metrics connector, and the edge access logs that only
+logs, PostgreSQL's pg_stat_ch events), the span-metrics connector, and the edge access logs that only
 ClickHouse keeps:
 
 <p align="center">

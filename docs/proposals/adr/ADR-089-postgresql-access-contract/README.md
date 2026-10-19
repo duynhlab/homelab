@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1283](https://github.com/duynhlab/homelab/issues/1283) (issue type `ADR`; #1269 and #1280 hold the RFC-0029 refactor and close history) |
-| **Adoption** | Partial: application `application_name` (2026-10-16), PgDog primary-only (2026-10-16) |
+| **Adoption** | Partial: `application_name` and PgDog primary-only (2026-10-16); `verify-full` on every application, migration and pooler hop (2026-10-18); automatic rotation of all ten runtime passwords (2026-10-19). Open: [#1304](https://github.com/duynhlab/homelab/issues/1304), [#1305](https://github.com/duynhlab/homelab/issues/1305), [#1306](https://github.com/duynhlab/homelab/issues/1306), [#1296](https://github.com/duynhlab/homelab/issues/1296) |
 
 ## Context
 
@@ -119,7 +119,32 @@ All of it is the target. Today's routes are drawn in the
 - Set `PGAPPNAME` per the naming table in the RFC, application workloads first.
 - Pooler profiles: a CNPG Pooler `clientTLSSecret` and `server_tls_sslmode: verify-full`; PgDog `tls_verify = verify_full` with its server CA, and no automatic read split.
 - Confirm each pooler setting on the deployed version, and again after a pooler bump.
-- Set the CA overlap, renewal thresholds and error budget before the first certificate switch.
+- Set the CA overlap, renewal thresholds and error budget before the first certificate switch (values below).
+
+### Parameters in force (2026-10-19)
+
+| Parameter | Value | Where |
+|---|---|---|
+| Leaf certificates (poolers, `<cluster>-server-tls`, `*-db-ca-trust`) | 90 days, renewed 15 days before expiry, ECDSA P-256, new key on every renewal | cert-manager `Certificate`s under `configs/databases/clusters/` |
+| Renewal pickup | PostgreSQL and PgBouncer reload in place (`cnpg.io/reload`, ~15 s); PgDog rolls itself (watched Secret, `tls.crt` pod annotation, ~80 s) | measured on Kind, 2026-10-17/18 |
+| Expiry alerts | `CertManagerCertExpiringSoon` < 7 days, `CertManagerCertExpiryCritical` < 24 h, `CertManagerCertNotReady` 15 min | `prometheusrules/gitops/cert-manager-alerts.yaml` |
+| Root (`homelab-ca`) | 10 years; every client trusts it through a per-namespace `*-db-ca-trust` Certificate | `cert-manager/clusterissuers.yaml` |
+| CA overlap (planned, not rehearsed) | Issue the new CA; add it next to the old one in every `*-db-ca-trust` bundle and PgDog's server CA; wait one leaf renewal (≥ 15 days) so every client holds both; switch the issuer; verify `make db-tls`; remove the old CA | this ADR; rehearse before the first real switch |
+| Runtime password rotation | OpenBAO static role per runtime, `rotation_period` 720h; ESO refresh 15 s; pod reads the mounted file on every new connection; `MaxConnLifetime` 30 min | ADR-025; [rotation runbook](../../../databases/runbooks/rotate-cnpg-service-password.md) |
+| Rotation error budget | **Zero failed requests** under normal load. The window in which a *new* connection still holds the old password is ESO refresh + kubelet volume sync: measured 19–83 s on manual rotations (P5/P6) and ~50 s on a scheduler-driven one (P7: a probe opening a fresh PgBouncer connection every 2 s failed 20 times between 07:06:46 and 07:07:36; through PgDog the old password kept working from the replica cache, so the probe saw no failure). Application traffic saw none: 133 smoke runs across the window passed, 0 authentication errors in the logs, because the pools reused open connections. Residual risk: a connection the pool must open inside the window (lifetime expiry, scale-up, burst) fails. Any failed request reopens the choice between a shorter kubelet sync and a retry in `pkg/dbx` | #1309, #1311, #1303 |
+| Mismatch recovery | A Secret edited away from OpenBAO is restored by ESO in ~1 s, before the kubelet projects it | P7, 2026-10-19 |
+
+### Credentials as built (2026-10-19)
+
+| Credential | Writer | Cadence | State |
+|---|---|---|---|
+| Runtime (10 services, 2 workers share their service's) | OpenBAO static role through the cluster's `vault_rotator` | automatic, 720h | done |
+| Migrator, `db_authz` | KV, written by an operator; the catalog Job converges the migrator | manual | runbook exists; no schedule yet |
+| Monitoring | none (exporter runs inside the instance, peer auth) | — | no password |
+| PgBouncer / PgDog | none (TLS client certificate / passthrough) | — | no password |
+| Temporal, Keycloak | KV, random per cluster | manual | rotation deferred ([#1296](https://github.com/duynhlab/homelab/issues/1296)) |
+| CDC | — | manual 90 days (planned) | not deployed; PeerDB will reach the primary through a platform-owned CDC pooler profile with `verify-full` on both hops and no direct fallback ([#1305](https://github.com/duynhlab/homelab/issues/1305), ADR-066) |
+| Break-glass | none (`kubectl exec … psql` over the socket) | after use | no password |
 
 ## Validation and compliance
 
@@ -157,3 +182,4 @@ All of it is the target. Today's routes are drawn in the
 - 2026-10-18 — Partial: the DR cluster `product-db-replica` serves a `homelab-ca` certificate and the same `pg_hba` as product-db (guarded by `make validate`), so a promoted replica keeps `verify-full` and connection isolation (#1307).
 - 2026-10-19 — Partial: OpenBAO rotates all four platform-db runtime passwords (#1309). Measured on Kind for user, shipping and review: after `rotate-role`, the Secret changed in 8–14 s (ESO refresh 15s) and the mounted file in 19–47 s (kubelet sync); the old password was refused through PgBouncer, no pod restarted, no authentication error was logged, and e2e run across the window passed 26/26 because the pools kept their open connections.
 - 2026-10-19 — Partial: OpenBAO rotates all ten runtime passwords; product-db joins with its own `vault_rotator` and configurator Job (#1311). Measured on Kind for the six product-db runtimes: Secrets changed in 9–16 s, pod files in 30–83 s, both workers followed; the old password was refused on all three PgDog replicas after one login with the new one; no pod restarted, PgDog did not reload, and e2e (saga included) passed 26/26 across the window. The Credentials row for runtimes is met; migrator, authz, CDC and the deferred direct clients remain.
+- 2026-10-19 — Partial: the scheduler-driven rotation audit (#1303) passed on Kind: with `rotation_period` 3h, OpenBAO rotated `cart-runtime` at T0+3h+3s and `notification-runtime` at T0+3h+4s without any API call; a fresh-connection probe failed for ~50 s on PgBouncer and not at all through PgDog (replica cache), application traffic saw no failure, the old password was refused afterwards (PgBouncer and all three PgDog replicas), and a Secret corrupted by hand was restored by ESO in ~1 s. Both roles were restored to 720h.

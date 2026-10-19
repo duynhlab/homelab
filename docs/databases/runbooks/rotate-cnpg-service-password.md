@@ -1,16 +1,21 @@
-# Runbook: Rotate a product-db Service Password
+# Runbook: Rotate a Service Database Password
 
-Runtime passwords on `product-db` rotate on their own: each `<svc>_runtime`
+Runtime passwords on both clusters rotate on their own: each `<svc>_runtime`
 login is an OpenBAO database-engine static role (`rotation_period=720h`,
 ADR-025, ADR-089), and nothing else writes it. This runbook covers forcing a
-rotation ahead of schedule, what to watch while it propagates, and the manual
+rotation ahead of schedule, an [emergency rotation](#emergency-rotation-credential-exposed)
+when a password leaks, what to watch while it propagates, and the manual
 [migrator rotation](#rotate-a-migrator-password), which stays a KV write.
+
+Examples use product-db. For platform-db substitute namespace `platform`,
+cluster `platform-db`, pooler `platform-db-pooler-rw.platform:5432` (PgBouncer)
+and services `user`, `notification`, `shipping`, `review`.
 
 | | |
 |---|---|
-| **Scope** | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` on `product-db`; platform-db follows the same flow with its own Job and `vault_rotator` |
-| **Source of truth (runtime)** | OpenBAO `database/static-creds/<svc>-runtime` (rotated by `vault_rotator` through `database/config/product-db`) |
-| **Source of truth (migrator)** | OpenBAO `secret/local/databases/product-db/<svc>-migrator` (KV v2) |
+| **Scope** | product-db: `product`, `cart`, `order`, `payment`, `checkout`, `inventory`; platform-db: `user`, `notification`, `shipping`, `review` |
+| **Source of truth (runtime)** | OpenBAO `database/static-creds/<svc>-runtime`, rotated by the cluster's `vault_rotator` through `database/config/<cluster>` |
+| **Source of truth (migrator)** | OpenBAO `secret/local/databases/<cluster>/<svc>-migrator` (KV v2) |
 | **Consumers** | ESO (`refreshInterval: 15s`, store `openbao-db`) → Secret in `product` and the service namespace → the pod's mounted file (`DB_PASSWORD_FILE`, read on every new connection). The `DatabaseRole` has no `passwordSecret`; PgDog holds no copy (passthrough) |
 | **Design record** | [ADR-025](../../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) · [ADR-089](../../proposals/adr/ADR-089-postgresql-access-contract/) |
 
@@ -28,9 +33,12 @@ flowchart LR
 
 Open connections survive the change; a **new** connection fails
 authentication only in the window between the `ALTER ROLE` and the pod's file
-catching up (measured 19–47 s after rotation on platform-db, 2026-10-19). The
-pool keeps its connections for up to 30 minutes (`MaxConnLifetime`), so under
-normal load that window is not hit.
+catching up. Measured on Kind (2026-10-19): Secrets change within 8–16 s, pod
+files within 19–83 s on manual rotations, and a fresh PgBouncer connection
+failed for ~50 s on a scheduler-driven one (PgDog kept accepting the old
+password from its cache, so its clients saw no failure). The pool keeps its connections for up to 30 minutes (`MaxConnLifetime`),
+so under normal load the window is not hit; ADR-089 sets the error budget at
+zero failed requests.
 
 ## Force a rotation
 
@@ -77,23 +85,61 @@ normal load that window is not hit.
    No pod restart is needed or expected. A restart is only the recovery path
    when a pod's file never changes (ESO or the mount is broken).
 
+## Emergency rotation (credential exposed)
+
+A rotation changes the password; it does not end sessions that already
+authenticated, and each PgDog replica keeps accepting the old password until a
+client logs in there with the new one. When a runtime password has leaked:
+
+1. Force the rotation (step 1 above) and wait until the service's pod file
+   shows the new hash (step 2).
+2. **product-db only:** roll PgDog so no replica holds the old password in its
+   cache. It drains on restart (`preStop` 10 s), so pooled clients reconnect
+   with the new password:
+
+   ```bash
+   kubectl rollout restart deploy/pgdog-product -n product
+   kubectl rollout status deploy/pgdog-product -n product
+   ```
+
+   PgBouncer (platform-db) looks the password up in PostgreSQL on every login
+   and needs nothing.
+3. End the sessions that authenticated with the old password, on the primary:
+
+   ```bash
+   PRIMARY=$(kubectl get pod -n product -l cnpg.io/cluster=product-db,role=primary -o name)
+   kubectl exec -n product "$PRIMARY" -c postgres -- psql -U postgres -tAc \
+     "select count(*), pg_terminate_backend(pid) is not null from pg_stat_activity
+       where usename = '<svc>_runtime' and backend_start < now() - interval '1 minute' group by 2"
+   ```
+
+   The service's pool reconnects with the file's password. Expect a short burst
+   of retried requests, the same as a PgDog roll.
+4. Verify as in step 4 above, and record the rotation time and version metadata
+   on the incident, never the value.
+
 ## Rotate a migrator password
 
 `<svc>_migrator` has no `DatabaseRole`: the role catalog Job sets its password
 when the migrator can no longer log in with the Secret's value. No pooler is
 involved, and the `migrate` init container reads the Secret at its next start.
 
-1. Write `secret/local/databases/product-db/<svc>-migrator` as in step 1
-   (`username` stays `<svc>_migrator`).
-2. Force-sync `product-db-<svc>-migrator-secret` in `product` and in `<svc>`.
+1. Write `secret/local/databases/<cluster>/<svc>-migrator` with the staff OIDC
+   login (`infra-team`, [Add a secret to a live cluster](../../secrets/runbooks/add-secret-live-cluster.md)),
+   reading the value from stdin (`password=-`) so it never sits in the
+   command line; `username` stays `<svc>_migrator`.
+2. Force-sync `<cluster>-<svc>-migrator-secret` in the cluster's namespace and
+   in `<svc>` (`kubectl annotate externalsecret … force-sync=$(date +%s) --overwrite`).
 3. Run the catalog now instead of waiting up to 10 minutes:
 
    ```bash
    kubectl -n product create job --from=cronjob/product-db-authz authz-manual-$(date +%s)
+   # platform-db: kubectl -n platform create job --from=cronjob/platform-db-authz authz-manual-$(date +%s)
    ```
 
-4. Verify the migrator logs in with the new value (same `psql` check as step 6
-   with `user=<svc>_migrator`).
+4. Verify the migrator logs in with the new value: the same `psql` check as
+   step 4 above against `<cluster>-rw` (migrators go direct, never through the
+   pooler) with `user=<svc>_migrator`.
 
 ## One-time migration note (Opaque → basic-auth)
 
@@ -113,7 +159,9 @@ A fresh `make up` needs none of this — Secrets are born basic-auth.
 
 ## Rollback
 
-- Password itself: `bao kv rollback -version=<n>` on the OpenBAO path, then
-  re-run steps 2–5. Old cleartext values that once lived in Git history are
-  **not** a rollback path — they are burned.
+- Runtime password: there is no rollback. A static role only moves forward;
+  force another rotation if the new value is suspect.
+- Migrator password: `bao kv rollback -version=<n>` on the KV path, then
+  re-run migrator steps 2–3. Old cleartext values that once lived in Git
+  history are **not** a rollback path — they are burned.
 - Manifest changes: revert the PR; Flux converges.

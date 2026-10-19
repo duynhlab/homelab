@@ -26,7 +26,7 @@ governs **alert** runbooks only and does not apply here.
 | Add a new static secret synced by ESO | [Add ESO-managed secret](./add-eso-secret.md) |
 | Write a KV secret on a live cluster (staff OIDC login; ceremony = issuer-down fallback) | [Add or write a KV secret on a live cluster](./add-secret-live-cluster.md) |
 | Rotate a static OpenBAO KV v2 secret | [Rotate static secret](./rotate-static-secret.md) |
-| Put another service's DB password under OpenBAO rotation (ADR-025 pilot) | [Add service dynamic credentials](./add-service-dynamic-credentials.md) |
+| Put a new service's runtime DB password under OpenBAO rotation (ADR-025, ADR-089) | [Add service dynamic credentials](./add-service-dynamic-credentials.md) |
 | Revoke a token or credential after compromise | [Revoke compromised credential](./revoke-compromised-credential.md) |
 
 ## Troubleshooting
@@ -35,7 +35,7 @@ governs **alert** runbooks only and does not apply here.
 |---|---|
 | ExternalSecret or ClusterSecretStore is not ready | [ESO sync failure](./eso-sync-failure.md) |
 | ESO fails about one hour after bootstrap with `permission denied` | [Reviewer JWT auth failure](./reviewer-jwt-auth-failure.md) |
-| The `notification` static-role password stops syncing or rotating (ADR-025 pilot) | [Dynamic credentials debug](./dynamic-credentials-debug.md) |
+| A service runtime static-role password stops syncing or rotating (ADR-025, ADR-089) | [Dynamic credentials debug](./dynamic-credentials-debug.md) |
 
 ## Rules
 

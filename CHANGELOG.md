@@ -92,6 +92,8 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- Prepare the native VMRule migration with source labels and a selector that keeps chart rules staged; preserve all existing static and SLO evaluations.
+
 - **Query telemetry stores `application_name`, not `app`.** The ClickHouse
   schema Job pins clickhouse-ddl 2.0.0. The pg_stat_ch extension still inserts
   the client name as upstream's `app`, which is now an `EPHEMERAL` column, so

@@ -1,5 +1,7 @@
 # Alerting Strategy
 
+Migration procedure: [Native VMRule migration](vm-rules-migration.md).
+
 Two-layer alerting approach combining immediate threshold detection with SLO-based burn-rate alerts.
 
 Start with [Alert lifecycle and runbook engineering](alert-lifecycle-and-runbooks.md)

@@ -14,3 +14,8 @@ resources:
   - kyverno/
   - keda/
   - watchdog.yaml
+
+# Only these static sources participate in the native-VMRule cutover.
+labels:
+  - pairs:
+      rules.duynhlab.dev/source: manifests

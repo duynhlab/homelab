@@ -58,7 +58,7 @@ flowchart TB
     subgraph cluster["Kind cluster · homelab"]
         subgraph shared["cluster-wide clients"]
             pgr["pgroles operator · pgroles-system<br/>as db_authz → authz_admin"]:::platform
-            bao["OpenBAO database engine<br/>as vault_rotator"]:::platform
+            bao["OpenBAO database engine<br/>as each cluster's vault_rotator"]:::platform
             other["Temporal · Keycloak<br/>long-lived sessions (ADR-041)"]:::service
         end
         subgraph pside["platform-db"]
@@ -85,16 +85,17 @@ flowchart TB
         end
     end
 
-    ppod -->|"pooled · TLS, verify-full"| pooler -->|"same login"| prw
-    pmig --> prw
-    pjob --> prw
-    bao --> prw
-    other --> prw
-    rpod -->|"pooled · payment over TLS, verify-full"| pgdog -->|"same login"| rrw
-    rmig --> rrw
-    rjob --> rrw
-    pgr --> prw
-    pgr --> rrw
+    ppod -->|"pooled · TLS, verify-full"| pooler -->|"same login · TLS, verify-full"| prw
+    pmig -->|"verify-full"| prw
+    pjob -->|"verify-full"| prw
+    bao -->|"sslmode=require"| prw
+    other -->|"pg_hba host (#1296)"| prw
+    rpod -->|"pooled · TLS, verify-full"| pgdog -->|"same login · TLS, verify-full"| rrw
+    rmig -->|"verify-full"| rrw
+    rjob -->|"verify-full"| rrw
+    bao -->|"sslmode=require"| rrw
+    pgr -->|"sslMode require (#1306)"| prw
+    pgr -->|"sslMode require (#1306)"| rrw
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
@@ -102,8 +103,9 @@ flowchart TB
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-PgDog lists every product-db service under its `<svc>_runtime` login; the
-order and checkout workers use their service's runtime login. Every runtime
+Each product-db service logs in to PgDog as its `<svc>_runtime` login, which
+PgDog passes through to PostgreSQL (it holds no user list); the order and
+checkout workers use their service's runtime login. Every runtime
 reaches PgDog over client TLS (`sslmode=verify-full`;
 [poolers](poolers.md#tls)) and PgDog refuses plaintext. PgDog, `migrate` and
 the authz Job verify the primary too, so every product-db allow line is
@@ -127,13 +129,13 @@ converted services on both clusters.
 flowchart LR
     subgraph cluster["Kind cluster · homelab"]
         subgraph sec["credentials"]
-            kv["OpenBAO KV · openbao<br/>runtime, migrator, db_authz"]:::platform
-            dbe["OpenBAO database engine<br/>notification_runtime"]:::platform
+            kv["OpenBAO KV · openbao<br/>migrator, db_authz, vault_rotator"]:::platform
+            dbe["OpenBAO database engine<br/>ten &lt;svc&gt;_runtime static roles"]:::platform
             eso["External Secrets · external-secrets-system"]:::platform
             ks["Kubernetes Secrets<br/>cluster + service namespaces"]:::platform
         end
         subgraph writers["writers, one per object"]
-            cnpg["CNPG operator · cloudnative-pg<br/>runtime DatabaseRole, db_authz,<br/>Database, pg_hba"]:::platform
+            cnpg["CNPG operator · cloudnative-pg<br/>runtime DatabaseRole (no password),<br/>db_authz, vault_rotator, Database, pg_hba"]:::platform
             job["authz Job + CronJob, one per cluster<br/>owner, migrator, role=, memberships,<br/>review grants, schema_migrations"]:::platform
             pgr["pgroles operator<br/>grants of user, shipping, notification<br/>and the six product-db databases"]:::platform
         end
@@ -147,13 +149,13 @@ flowchart LR
     kv --> eso
     dbe --> eso
     eso --> ks
-    ks -->|"passwordSecret"| cnpg
+    ks -->|"passwordSecret<br/>db_authz, vault_rotator"| cnpg
     ks -->|"db_authz, migrator passwords"| job
     ks -->|"db_authz"| pgr
     cnpg --> cat
     job --> cat
     pgr --> cat
-    dbe -->|"rotates every 720 h"| cat
+    dbe -->|"ALTER ROLE as vault_rotator<br/>every 720 h"| cat
     cat -->|"read by"| exp --> vm
 
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;

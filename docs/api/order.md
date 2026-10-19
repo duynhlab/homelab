@@ -12,7 +12,7 @@ only writer of orders and the only place the fulfillment saga starts.
 | **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented | [gRPC API](#grpc-api) |
 | **gRPC clients** | shipping, payment, and inventory enrichment reads | Implemented | [Callers & dependencies](#callers--dependencies) |
 | **Worker** | `order-worker` · queue `order-fulfillment` | Implemented | [Temporal participation](#temporal-participation) |
-| **Temporal** | Orchestrates fulfillment and cancellation workflows | Implemented | [Temporal participation](#temporal-participation) · [registry](./workflows.md#order-fulfillment) |
+| **Temporal** | Orchestrates fulfillment and cancellation workflows | Implemented | [Temporal participation](#temporal-participation) · [registry](./workflows.md#registry) |
 | **Events** | None | None | — |
 
 Known gaps: [accepted cancellation and startup limits](#known-gaps).
@@ -36,7 +36,7 @@ Known gaps: [accepted cancellation and startup limits](#known-gaps).
 | **Task queue** | `order-fulfillment` (Temporal namespace `mop`) |
 | **Workflow ID** | `order-fulfillment-<orderID>`; cancellation episodes use `order-cancellation-<orderID>-v<epoch>` (epoch = observed `orders.version`, so a legally repeated episode gets a fresh id) |
 | **Start semantics** | Detached-context start after the order row commits (see [Saga handoff](#the-saga-handoff-start-after-commit)) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 

@@ -9,7 +9,7 @@ must be rotated again.
 | **Scope** | `vault_rotator` on `platform-db` (product-db has its own `vault_rotator`, KV `product-db/vault-rotator`, Job in ns `product`; follow the same steps with `product`/`product-db` substituted) |
 | **Source of truth** | OpenBAO KV v2 `secret/local/databases/platform-db/vault-rotator` |
 | **Consumers** | `DatabaseRole/platform-db-role-vault-rotator`; `Job/openbao-db-config` |
-| **Blast radius** | Notification password rotation pauses while PostgreSQL and OpenBAO hold different administrator passwords |
+| **Blast radius** | Rotation of the cluster's runtime passwords (platform-db: user, notification, shipping, review) pauses while PostgreSQL and OpenBAO hold different administrator passwords; the current passwords keep working |
 
 The credential previously appeared in Git. Treat it as compromised even after
 the literal disappears from the current tree; deleting text does not revoke a
@@ -23,19 +23,23 @@ Job updating OpenBAO's database connection.
 
 ```mermaid
 flowchart LR
-    Operator["Infra operator"] -->|"write random value first"| Bao[("OpenBAO KV v2")]
-    Bao -->|"ESO"| Secret["basic-auth Secret<br/>cnpg.io/reload=true"]
-    Secret -->|"passwordSecret"| Role["DatabaseRole<br/>ALTER ROLE"]
-    Secret -->|"Secret env; password via stdin"| Job["openbao-db-config Job"]
-    Job -->|"update database/config"| Engine["OpenBAO database engine"]
-    Role --> PG[("platform-db")]
-    Engine -->|"rotate notification"| PG
+    subgraph Kind["Kind cluster · homelab"]
+        Bao[("OpenBAO KV v2")] -->|"ESO"| Secret["basic-auth Secret<br/>cnpg.io/reload=true"]
+        Secret -->|"passwordSecret"| Role["DatabaseRole<br/>ALTER ROLE"]
+        Secret -->|"Secret env; password via stdin"| Job["openbao-db-config Job"]
+        Job -->|"update database/config"| Engine["OpenBAO database engine"]
+        Role --> PG[("platform-db")]
+        Engine -->|"rotate the four runtime logins<br/>sslmode=require"| PG
+    end
+    Operator["Infra operator"] -->|"write random value first"| Bao
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class Operator,Secret service;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+    class Operator external;
+    class Secret service;
     class Job worker;
     class Bao,Engine platform;
     class Role,PG data;

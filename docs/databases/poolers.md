@@ -33,13 +33,15 @@ not make concurrency free.
 
 ```mermaid
 flowchart LR
-    ProductClients["product / cart / order / checkout<br/>inventory / payment + 2 workers"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgDog["PgDog :6432"]
-    PgDog -->|"reads and writes"| ProductRW["product-db-rw :5432"]
-    PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432"]
+    subgraph Kind["Kind cluster · homelab"]
+        ProductClients["product / cart / order / checkout<br/>inventory / payment + 2 workers"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgDog["PgDog :6432"]
+        PgDog -->|"reads and writes<br/>TLS, verify_full"| ProductRW["product-db-rw :5432"]
+        PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432<br/>(planned profile)"]
 
-    PlatformClients["user / notification<br/>shipping / review"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgBouncer["PgBouncer :5432"]
-    PgBouncer -->|"TLS, verify-full"| PlatformRW["platform-db-rw :5432"]
-    Direct["Temporal / Keycloak"] -->|"direct"| PlatformRW
+        PlatformClients["user / notification<br/>shipping / review"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgBouncer["PgBouncer :5432"]
+        PgBouncer -->|"TLS, verify-full"| PlatformRW["platform-db-rw :5432"]
+        Direct["Temporal / Keycloak"] -->|"direct"| PlatformRW
+    end
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
@@ -150,9 +152,11 @@ outside the PgBouncer pilot.
 
 - CNPG PgBouncer follows the `platform-db-rw` service during failover. Password
   rotation is visible through live `auth_query` and needs no pooler reconcile.
-- PgDog has an explicit backend list and reads Secret values at Helm reconcile
-  time. Rotate the database role first, refresh the Secret, then reconcile the
-  HelmRelease so new clients do not use a stale pooler password.
+- PgDog lists backends, not users: with passthrough auth (ADR-025) a rotated
+  password reaches it with the client's next login, so a rotation needs no
+  reconcile or rollout. Each replica keeps accepting the old password until
+  that login; after a leak, roll PgDog
+  ([emergency rotation](./runbooks/rotate-cnpg-service-password.md#emergency-rotation-credential-exposed)).
 - Pooler restarts can cut in-flight transactions. PDBs and replica counts reduce
   availability risk but do not preserve a transaction owned by a terminating
   pod. PgDog drains first (a 10 s `preStop`, then up to 60 s for clients to

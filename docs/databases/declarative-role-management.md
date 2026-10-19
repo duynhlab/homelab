@@ -11,7 +11,7 @@ manifest.
 | **Operator** | CloudNativePG v1.30.1 (`DatabaseRole` CRD since 1.30) |
 | **Clusters** | `product-db` and `platform-db`; `product-db-replica` receives roles/databases through recovery, with no service CRs of its own |
 | **Triplet locations** | `kubernetes/infra/configs/databases/clusters/{product-db,platform-db}/services/<name>.yaml` |
-| **Credential flow** | OpenBAO → ESO → `kubernetes.io/basic-auth` Secret (`cnpg.io/reload: "true"`) |
+| **Credential flow** | Runtime: OpenBAO database-engine static role → ESO (`openbao-db`, 15 s) → `kubernetes.io/basic-auth` Secret mounted by the pod. Migrator: OpenBAO KV v2 → ESO (`openbao`, 1 h) → basic-auth Secret |
 
 ## Concept
 
@@ -52,41 +52,73 @@ entry — `DatabaseRole` has no `absent` equivalent).
 
 ## Architecture
 
-Per-service credential and reconcile flow:
+This diagram answers who writes each part of one service's login and database.
+CNPG owns the runtime role's attributes and the database; OpenBAO is the only
+writer of the runtime password (ADR-089); the role catalog Job creates the
+owner and migrator roles ([authorization](./authorization.md)).
 
 ```mermaid
 flowchart LR
-    OB[(OpenBAO<br/>single source)] -->|ESO sync 1h +<br/>cnpg.io/reload| S[Secret basic-auth<br/>product-db-&lt;svc&gt;-secret<br/>product uses product-db-secret]
-    S --> DR2[DatabaseRole &lt;svc&gt;]
-    DR2 -->|CREATE/ALTER ROLE<br/>SCRAM-encoded, log-suppressed| PG[(product-db)]
-    DB2[Database &lt;svc&gt;] -->|CREATE DATABASE<br/>OWNER &lt;svc&gt;| PG
-    S -->|same username/password| APP[service pod]
-    APP -->|SCRAM via pooler| PL[PgDog]
-    PL --> PG
-    PG -.->|WAL / object store| DRC[(product-db-replica)]
+    subgraph Kind["Kind cluster · homelab"]
+        SR["OpenBAO static role<br/>&lt;svc&gt;-runtime · 720 h"]:::platform
+        KV["OpenBAO KV v2<br/>&lt;cluster&gt;/&lt;svc&gt;-migrator"]:::platform
+        ESO["External Secrets"]:::platform
+        RS["Secret &lt;cluster&gt;-&lt;svc&gt;-runtime-secret<br/>basic-auth · refresh 15 s"]:::platform
+        MS["Secret &lt;cluster&gt;-&lt;svc&gt;-migrator-secret<br/>basic-auth · refresh 1 h"]:::platform
+        DR2["DatabaseRole &lt;cluster&gt;-role-&lt;svc&gt;-runtime<br/>attributes only, no passwordSecret"]:::platform
+        DB2["Database &lt;svc&gt;-database<br/>owner &lt;svc&gt;_owner"]:::platform
+        JOB["role catalog Job<br/>&lt;svc&gt;_owner + &lt;svc&gt;_migrator"]:::worker
+        APP["service pod<br/>reads DB_PASSWORD_FILE"]:::service
+        PL["PgDog / PgBouncer"]:::platform
+        PG[("product-db / platform-db")]:::data
+        DRC[("product-db-replica")]:::data
+    end
+
+    SR -->|"ALTER ROLE as vault_rotator"| PG
+    SR -->|"static-creds"| ESO
+    KV --> ESO
+    ESO --> RS
+    ESO --> MS
+    RS -->|"mounted file"| APP
+    MS -->|"migrator password"| JOB
+    JOB --> PG
+    DR2 -->|"CREATE/ALTER ROLE<br/>attributes"| PG
+    DB2 -->|"CREATE DATABASE"| PG
+    APP -->|"TLS, verify-full"| PL --> PG
+    PG -.->|"WAL / object store"| DRC
+
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
 Security notes on the write path: since 1.30 the operator SCRAM-SHA-256-encodes
 passwords *before* issuing `CREATE`/`ALTER ROLE` and suppresses statement
 logging around them, so cleartext never reaches PostgreSQL logs,
-`pg_stat_statements`, or `pgaudit`.
+`pg_stat_statements`, or `pgaudit`. That applies to the logins whose password
+CNPG still writes from a `passwordSecret` (`db_authz`, `vault_rotator`, the
+bootstrap `product` role); a runtime password is set by OpenBAO instead.
 
 ## How it works in this platform
 
 The `product-db` files demonstrate the common pattern in this order:
 
-1. **`ExternalSecret`** — renders `product-db-<svc>-secret` in namespace `product`
-   from OpenBAO path `secret/data/local/databases/product-db/<svc>` (product is
-   the exception: it reuses the initdb `product-db-secret`). Must be
-   `template.type: kubernetes.io/basic-auth` (CNPG requires basic-auth for
-   `passwordSecret`) and carry the `cnpg.io/reload: "true"` label. App pods in
-   other namespaces consume their own ESO copy of the same OpenBAO entry.
-2. **`DatabaseRole` `product-db-role-<svc>`** — all attributes explicit;
-   `validUntil` omitted on purpose (the operator then manages expiry to
-   `infinity`, correct for app identities); `login: true`; everything
-   privileged (`superuser`, `createdb`, `createrole`, `replication`,
-   `bypassrls`) explicitly `false`.
-3. **`Database` `<svc>-database`** — `owner: <svc>`, the extension list
+1. **`ExternalSecret`s** — the runtime one renders
+   `<cluster>-<svc>-runtime-secret` from `database/static-creds/<svc>-runtime`
+   through ClusterSecretStore `openbao-db` every 15 s; the migrator one renders
+   `<cluster>-<svc>-migrator-secret` from KV
+   `secret/data/local/databases/<cluster>/<svc>-migrator` through `openbao`
+   every 1 h. Both are `kubernetes.io/basic-auth`. The service namespace gets
+   its own copy of each from the same path (`secrets/`).
+2. **`DatabaseRole` `<cluster>-role-<svc>-runtime`** — the `<svc>_runtime`
+   login with all attributes explicit; `validUntil` omitted on purpose (the
+   operator then manages expiry to `infinity`, correct for app identities);
+   `login: true`; everything privileged (`superuser`, `createdb`, `createrole`,
+   `replication`, `bypassrls`) explicitly `false`. It has **no
+   `passwordSecret`**: OpenBAO's static role sets the password, and a second
+   writer would fight it (ADR-089).
+3. **`Database` `<svc>-database`** — `owner: <svc>_owner`, the extension list
    (`pgaudit`, `pg_stat_statements`, plus per-service extras), reclaim `retain`.
    Role first in the file: CNPG has no ordering guarantee between the two (a
    `Database` with a missing owner just retries). File order aids reading;
@@ -120,8 +152,9 @@ Replica behavior: roles and databases replicate through WAL to
 
 ## Operations
 
-- **Add a service database:** one new file in `services/` + an OpenBAO seed
-  entry + the app-namespace secret copy + a PgDog `databases` entry (product-db).
+- **Add a service database:** one new file in `services/` + a migrator KV seed
+  + a runtime static role ([add service dynamic credentials](../secrets/runbooks/add-service-dynamic-credentials.md))
+  + the app-namespace secret copies + a PgDog `databases` entry (product-db).
   Recipe: [add-service-database](./runbooks/add-service-database.md). Keep
   roles out of `instance.yaml`; adding the matching HBA allow rule there is
   still required before the terminal reject rule.
@@ -132,9 +165,10 @@ Replica behavior: roles and databases replicate through WAL to
   copy any memberships into `inRoles`, merge the CR and the removal of any
   inline entry in the same PR, then diff the snapshot after (`rolpassword`
   changes are expected — `ALTER ROLE` re-salts the SCRAM verifier).
-- **Rotate a password:** [runbook](./runbooks/rotate-cnpg-service-password.md). Short form: new
-  version in OpenBAO → force ESO sync → CNPG applies `ALTER ROLE` via reload
-  label → reconcile the PgDog HelmRelease → rollout-restart the app.
+- **Rotate a password:** [runbook](./runbooks/rotate-cnpg-service-password.md). Runtime
+  passwords rotate on their own (OpenBAO static role, 720h); to force one,
+  `bao write -f database/rotate-role/<svc>-runtime` — no DatabaseRole, pooler
+  or pod action follows. Migrators stay a KV write plus a catalog Job run.
 - **Watch:** `kubectl get databaseroles,databases -n product` and repeat for
   namespace `platform` — anything
   `applied: false` is a conflict (usually a leftover inline entry) or an error;

@@ -37,8 +37,11 @@ Around the engine sit four other actors:
 1. **Producers** — the microservices, Vector (pod logs), and Envoy Gateway
    (edge access logs) emit OpenTelemetry data. None of them speak to ClickHouse
    directly.
-2. **The OpenTelemetry Collector** — the single writer. It batches telemetry
-   and INSERTs it over the native protocol.
+2. **The OpenTelemetry Collector** — the writer of the `otel` database. It
+   batches telemetry and INSERTs it over the native protocol. The only other
+   writer is the `pg_stat_ch` extension in `product-db` and `platform-db`, which
+   INSERTs PostgreSQL query events into its own `pg_stat_ch` database
+   ([query telemetry](../../metrics/postgresql/query-telemetry.md)).
 3. **Keeper** — a three-member quorum service that replicas use to agree on
    what data exists. It stores metadata, never table rows
    ([chapter 06](06-keeper.md) owns it).
@@ -85,7 +88,7 @@ the cluster*. The layers are the ones ClickHouse's own architecture overview
 names (access, query processing, storage, orthogonal components, replication
 through Keeper), filled with what this deployment actually runs.
 
-<p align="center"><a href="../../../architecture/observability/clickhouse-engine.svg"><img src="../../../architecture/observability/clickhouse-engine.svg" alt="One ClickHouse replica: clients reach the access layer (native TCP 9000, HTTP 8123, Prometheus 9363); SQL flows through parser, planner and pipeline executor; the executor reads and writes the Replicated database otel on a hot local disk and an s3_cache cold disk backed by RustFS; parts replicate to replicas 0-1 and 0-2 over 9009 and the replication log lives in Keeper" width="960"></a></p>
+<p align="center"><a href="../../../architecture/observability/clickhouse-engine.svg"><img src="../../../architecture/observability/clickhouse-engine.svg" alt="One ClickHouse replica: clients (Grafana, the OTel Collector, the pg_stat_ch extension, kubelet, vmagent) reach the access layer (native TCP 9000, HTTP 8123, Prometheus 9363); SQL flows through parser, planner and pipeline executor; the executor reads and writes the Replicated databases otel and pg_stat_ch on a hot local disk and an s3_cache cold disk backed by RustFS; parts replicate to replicas 0-1 and 0-2 over 9009 and the replication log lives in Keeper" width="960"></a></p>
 <p align="center"><sub>Source <a href="../../../architecture/observability/clickhouse-engine.drawio"><code>observability/clickhouse-engine.drawio</code></a> · <a href="../../../architecture/observability/img/clickhouse-engine.png">PNG</a></sub></p>
 
 What the picture leaves out is as deliberate as what it shows: no Distributed
@@ -101,7 +104,7 @@ treats them as reference), and no backup mechanism is deployed. Every box is
 
 | Port | Protocol | Who uses it here |
 |---|---|---|
-| 9000 | Native TCP (binary, compressed) | Collector INSERTs, Grafana queries, `clickhouse-client` |
+| 9000 | Native TCP (binary, compressed) | Collector and `pg_stat_ch` INSERTs, Grafana queries, `clickhouse-client` |
 | 8123 | HTTP | Kubernetes liveness/readiness probes (`/ping`) |
 | 9009 | Interserver HTTP | The other two replicas, fetching data parts |
 | 9363 | HTTP `/metrics` | Prometheus scrapes via a PodMonitor |
@@ -153,7 +156,7 @@ flowchart LR
         envoy["Envoy Gateway<br/>(edge access logs)"]
     end
 
-    otelcol["OTel Collector<br/>single writer"]
+    otelcol["OTel Collector<br/>writes database otel"]
 
     subgraph ch ["ClickHouse cluster otel (monitoring ns)"]
         lb["Service<br/>clickhouse-clickhouse<br/>:9000 / :8123"]
@@ -166,7 +169,7 @@ flowchart LR
     rustfs[("RustFS<br/>S3 cold tier")]
     grafana["Grafana"]
 
-    svc -->|"OTLP gRPC :4317"| otelcol
+    svc -->|"OTLP HTTP :4318"| otelcol
     vector -->|"OTLP HTTP :4319"| otelcol
     envoy -->|"OTLP gRPC :4317"| otelcol
     otelcol -->|"native :9000 INSERT"| lb
@@ -191,7 +194,7 @@ flowchart LR
     class r0,r1,r2,rustfs data
 ```
 
-Legend: cyan = telemetry producers, amber = the collector (single writer),
+Legend: cyan = telemetry producers, amber = the collector (writer of `otel`),
 purple = platform plumbing (Service, Keeper, Grafana), green = data-bearing
 stores. Dotted edges are internal flows a client never sees: part fetches over
 interserver 9009, Keeper metadata sessions, and cold-tier movement to RustFS
@@ -202,9 +205,10 @@ interserver 9009, Keeper metadata sessions, and cold-tier movement to RustFS
 - Both the INSERT and the SELECT arrive through the **same Service**, and the
   Service spreads connections across all three replicas. The write path and
   read path differ in what happens *after* landing, not in how they enter.
-- The Collector is the **only writer**. Producers never hold a ClickHouse
-  connection, so ingestion pressure and query pressure meet the engine through
-  one predictable client each.
+- The Collector is the **only writer of `otel`**. Producers never hold a
+  ClickHouse connection, so ingestion pressure and query pressure meet the
+  engine through one predictable client each. (`pg_stat_ch` inserts into its
+  own database as an INSERT-only user; it is outside this map.)
 - Replication (dotted, 9009) and coordination (dotted, 2181) are separate
   channels: Keeper carries agreements about parts, the interserver port
   carries the parts themselves. Losing one is not losing the other.

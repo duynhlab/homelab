@@ -65,16 +65,16 @@ spec:
       - hostssl notification db_authz     all scram-sha-256
       - hostssl shipping     db_authz     all scram-sha-256
       - hostssl review       db_authz     all scram-sha-256
-      # Still `host`: Temporal and OpenBAO connect in plaintext and Keycloak
-      # does not verify (#1296).
+      # Still `host` (#1296): Temporal connects in plaintext, Keycloak and
+      # OpenBAO encrypt without verifying the server.
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
       # Keycloak connects direct to :5432 like temporal — its Agroal pool needs
       # long-lived connections + server-side prepared statements, which the
       # transaction pooler breaks (RFC-0022 OQ#8 / ADR-041).
       - host keycloak            keycloak all scram-sha-256
-      # RFC-0008 / ADR-025 pilot: OpenBAO's rotation admin connects to the
-      # notification DB to ALTER notification_runtime's password (static-role rotation).
+      # ADR-025: OpenBAO's rotation admin connects to the notification DB
+      # (sslmode=require) to ALTER the four runtime passwords.
       - host notification        vault_rotator all scram-sha-256
       - host all                 all      all reject
 

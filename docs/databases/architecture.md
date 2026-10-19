@@ -23,32 +23,32 @@ cross-region topology.
 
 ```mermaid
 flowchart TB
-    CNPG["CloudNativePG 1.30.1"]
+    subgraph Kind["Kind cluster · homelab"]
+        CNPG["CloudNativePG 1.30.1"]
 
-    subgraph PlatformClients["Platform database clients"]
-        PlatformApps["user / notification / shipping / review"]
-        DirectPlatform["Temporal / Keycloak"]
+        subgraph PlatformClients["Platform database clients"]
+            PlatformApps["user / notification / shipping / review"]
+            DirectPlatform["Temporal / Keycloak"]
+        end
+
+        subgraph ProductClients["Product database clients"]
+            ProductApps["product / cart / order / checkout<br/>inventory / payment + 2 workers"]
+        end
+
+        PgBouncer["CNPG PgBouncer<br/>platform-db-pooler-rw :5432"]
+        PgDog["PgDog<br/>pgdog-product :6432"]
+        Platform[("platform-db<br/>3 instances")]
+        Product[("product-db<br/>3 instances")]
+        DR[("product-db-replica<br/>1 instance")]
+        Store[("RustFS object storage")]
     end
-
-    subgraph ProductClients["Product database clients"]
-        ProductApps["product / cart / order / checkout / inventory"]
-        Payment["payment"]
-    end
-
-    PgBouncer["CNPG PgBouncer<br/>platform-db-pooler-rw :5432"]
-    PgDog["PgDog<br/>pgdog-product :6432"]
-    Platform[("platform-db<br/>3 instances")]
-    Product[("product-db<br/>3 instances")]
-    DR[("product-db-replica<br/>1 instance")]
-    Store[("RustFS object storage")]
 
     CNPG --> Platform
     CNPG --> Product
     CNPG --> DR
-    PlatformApps -->|"client TLS · verify-full"| PgBouncer --> Platform
-    DirectPlatform --> Platform
-    ProductApps --> PgDog --> Product
-    Payment -->|"client TLS · verify-full"| PgDog
+    PlatformApps -->|"client TLS · verify-full"| PgBouncer -->|"TLS · verify-full"| Platform
+    DirectPlatform -->|"direct · pg_hba host (#1296)"| Platform
+    ProductApps -->|"client TLS · verify-full"| PgDog -->|"TLS · verify-full"| Product
     Platform -->|"base backups + WAL"| Store
     Product -->|"base backups + WAL"| Store
     Store -->|"continuous recovery"| DR
@@ -57,7 +57,7 @@ flowchart TB
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class CNPG,PgBouncer,PgDog platform;
-    class PlatformApps,DirectPlatform,ProductApps,Payment service;
+    class PlatformApps,DirectPlatform,ProductApps service;
     class Platform,Product,DR,Store data;
 ```
 
@@ -65,7 +65,7 @@ The Draw.io view below answers the same question with the detail the Mermaid map
 leaves out:
 - the exact host each client group connects to;
 - the migration Jobs that always target the `-rw` services;
-- OpenBao rotating the `notification` password;
+- OpenBao rotating the ten runtime passwords on both clusters;
 - the WAL and base backups in RustFS that the DR replica recovers from.
 
 <p align="center">

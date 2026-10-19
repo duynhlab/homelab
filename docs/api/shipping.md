@@ -33,7 +33,7 @@ Known gaps: [no-caller route and unpersisted address](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `CreateShipment`, `CancelShipment` (compensation — also the `CancellationWorkflow`'s unwind step, and `GetShipmentByOrder` gates the cancel policy, RFC-0021 P5) |
 | **Idempotency** | order id — `UNIQUE (order_id)` + `ON CONFLICT` makes replays return the existing shipment |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 

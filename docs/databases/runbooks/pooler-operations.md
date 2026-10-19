@@ -44,8 +44,8 @@ backend.
 
 PgDog needs no action. Full procedure: [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md).
 
-1. Rotate in OpenBAO and let ESO and CNPG apply it (`ALTER ROLE`).
-2. Restart the app. Its first login with the new password on each replica replaces PgDog's cached copy (log line `auth: passthrough`); until then that replica still accepts the old password.
+1. OpenBAO rotates the runtime password itself (`ALTER ROLE` as `vault_rotator`, every 720 h, or now with `bao write -f database/rotate-role/<svc>-runtime`); ESO refreshes the Secret within 15 s and the pod's mounted file follows.
+2. No restart. The service's next new connection logs in with the new password, which replaces PgDog's cached copy on that replica (log line `auth: passthrough`); until then that replica still accepts the old password. After a leak, roll PgDog ([emergency rotation](rotate-cnpg-service-password.md#emergency-rotation-credential-exposed)).
 3. Verify: `kubectl logs deploy/pgdog-product -n product | grep -i 'is wrong'` stays quiet; `pgdog_errors_total` flattens.
 
 ## Rotate the client TLS certificate
@@ -102,7 +102,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `password for user … is wrong` about 5 s after connecting | Passthrough: PostgreSQL refused the password while PgDog tried it (`checkout_timeout`) | The app holds an old or wrong password: check the ESO Secret and restart the app |
+| `password for user … is wrong` about 5 s after connecting | Passthrough: PostgreSQL refused the password while PgDog tried it (`checkout_timeout`) | The app holds an old or wrong password: compare the ESO Secret with the pod's mounted file (`DB_PASSWORD_FILE`); restart only if the file never changed |
 | App migrations hang in Init | migrations connect **direct** to `<cluster>-rw:5432`, not the pooler — NetworkPolicy must admit the app namespace to 5432 | check the cluster namespace's netpol app-services rule |
 | A product-db service or worker cannot connect, TLS errors | Every runtime verifies PgDog (`sslmode=verify-full`) against `ca.crt` from `product-db-ca-trust` in its own namespace; PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` and refuses plaintext | Both Certificates must be Ready (`kubectl get certificate -n product pgdog-product-tls`, `-n <ns> product-db-ca-trust`). `does not match host name`: `db_host` must be one of the certificate's DNS names. `certificate verify failed`: the two are not from the same `homelab-ca`. `only TLS connections are allowed`: the client sent `sslmode=disable`. `make db-tls` checks every pooled hop. `migrate` goes direct to `product-db-rw:5432` |
 | `up{job=~"pgdog.*"}` empty | ServiceMonitor scrape broken | `kubectl get servicemonitor -n <ns>`; port 9090 must be admitted from the monitoring namespace in the netpol |

@@ -16,13 +16,13 @@ reconciliation loop that proves the books match the provider.
 | **Temporal** | Money-step gRPC participant | Implemented | [Temporal participation](#temporal-participation) |
 | **Events** | Transactional outbox + signed inbound mockpay webhooks | Implemented | [Ledger + outbox](#ledger--outbox-settle-once-tell-everyone-at-least-once) · [Webhook HMAC](#mockpay--webhook-hmac) |
 
-Known gaps: [pooler and reconciliation limits](#known-gaps).
+Known gaps: [reconciliation limits](#known-gaps).
 
 | Attribute | Value |
 |-----------|-------|
 | **Owns** | Payment/refund state, double-entry ledger, provider attempts, webhook records, and reconciliation reports |
 | **Does not own** | Orders, provider-side truth, inventory, or customer identity |
-| **Database** | `payment` on `product-db`: runtime as `payment_runtime` through PgDog (`pgdog-product.product:6432`, client TLS `sslmode=require`, not verified); `migrate` as `payment_migrator` direct to `product-db-rw.product:5432` (`sslmode=require`) |
+| **Database** | `payment` on `product-db`: runtime as `payment_runtime` through PgDog (`pgdog-product.product:6432`, client TLS `sslmode=verify-full` against `homelab-ca`); `migrate` as `payment_migrator` direct to `product-db-rw.product:5432` (`sslmode=verify-full`) |
 | **Cache** | None |
 | **Sensitive data** | Customer subject, financial ledger and provider references; only opaque `tok_` methods are accepted, never PAN data |
 | **Design records** | [RFC-0010](../proposals/rfc/RFC-0010/) · [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) · [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/) · [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) · [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
@@ -35,7 +35,7 @@ Known gaps: [pooler and reconciliation limits](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `Authorize`, `Capture` (steps); `Void`, `Refund` (compensations) |
 | **Idempotency** | Order-keyed: `order:<id>` (Authorize), `refund:order:<id>` (Refund); Capture/Void replay by state |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -434,10 +434,6 @@ mockpay posts its events back to payment's signed webhook,
 
 ## Known gaps
 
-- **DB TLS is encrypted, not verified** — payment reaches PgDog with
-  `sslmode=require`; `verify-full` against `homelab-ca` is an ADR-089 / RFC-0020
-  follow-up. The PgDog TLS hop and the reconciler's session lease through PgDog
-  were checked on Kind on 2026-10-16.
 - **Reconciliation limits (deliberate, tracked):** refund *amounts* aren't
   reconciled (the provider reports a refunded flag only — don't read a clean run
   as "refunds reconcile"); currency isn't carried on the report (single-currency
@@ -460,7 +456,7 @@ mockpay posts its events back to payment's signed webhook,
 
 ## Operations
 
-- **Key env:** `DB_*` (`DB_SSLMODE=require` on cluster), `OIDC_ISSUER`,
+- **Key env:** `DB_*` (`DB_SSLMODE=verify-full` with `PGSSLROOTCERT` on cluster; `DB_PASSWORD_FILE`, rotated by OpenBAO), `OIDC_ISSUER`,
   `OIDC_AUDIENCE`, `OIDC_JWKS_URL` (pkg v0.37.0 — empty derives
   `<issuer>/protocol/openid-connect/certs`), `GRPC_PORT`, `MOCKPAY_URL`, `MOCKPAY_WEBHOOK_SECRET`,
   `MOCKPAY_WEBHOOK_URL`, `AUTH_HOLD_TTL`, `IDEMPOTENCY_KEY_TTL`,

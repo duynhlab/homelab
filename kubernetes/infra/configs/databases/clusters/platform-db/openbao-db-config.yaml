@@ -100,29 +100,31 @@ spec:
               # list and OpenBAO command logs; bao reads it from stdin.
               until printf '%s' "$DB_ADMIN_PASSWORD" | bao write database/config/platform-db \
                   plugin_name=postgresql-database-plugin \
-                  allowed_roles="notification-runtime" \
-                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable&application_name=openbao" \
+                  allowed_roles="notification-runtime,user-runtime,shipping-runtime,review-runtime" \
+                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=require&application_name=openbao" \
                   username="$DB_ADMIN_USERNAME" \
                   password=- 2>/dev/null; do
                 n=$((n + 1)); [ "$n" -ge 60 ] && { echo "ERROR: database/config failed after 300s (platform-db unreachable / vault_rotator?)"; exit 1; }
                 echo "  platform-db not reachable yet, retry 5s..."; sleep 5
               done
 
-              echo "Writing static-role notification-runtime (rotate the fixed role's password)..."
-              # Retried for the same reason the config write above is: a leader
-              # election DURING this Job moves the active node, and the next write
-              # would hang rather than error. The address fix removes the
-              # steady-state race; this removes the mid-run one.
-              n=0
-              until bao write database/static-roles/notification-runtime \
-                db_name=platform-db \
-                username="notification_runtime" \
-                rotation_period="720h"; do
-                n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role notification-runtime failed after 60s"; exit 1; }
-                echo "  static-role write failed, retry 5s..."; sleep 5
+              # One static role per runtime login (ADR-089: OpenBAO is the only
+              # writer). Retried for the same reason the config write above is: a
+              # leader election DURING this Job moves the active node, and the next
+              # write would hang rather than error.
+              for SVC in notification user shipping review; do
+                echo "Writing static-role ${SVC}-runtime..."
+                n=0
+                until bao write "database/static-roles/${SVC}-runtime" \
+                  db_name=platform-db \
+                  username="${SVC}_runtime" \
+                  rotation_period="720h"; do
+                  n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role ${SVC}-runtime failed after 60s"; exit 1; }
+                  echo "  static-role write failed, retry 5s..."; sleep 5
+                done
               done
 
-              echo "openbao-db-config complete: static-role notification-runtime ready."
+              echo "openbao-db-config complete: 4 runtime static roles ready."
           resources:
             requests:
               cpu: 20m

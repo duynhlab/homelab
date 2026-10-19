@@ -293,14 +293,18 @@ could never converge", PGR-10), and without the wildcard `adopt` revokes the
 runtime's grants on every table a migration adds. The Job-owned `review` keeps
 the stricter shape. K3.8 encodes both (`scripts/db-authz-check.sh`).
 
-### The notification runtime and OpenBAO
+### Platform-db runtimes and OpenBAO
 
-OpenBAO's database engine rotates `notification_runtime`'s password (static role
-`notification-runtime`, ADR-025) through `vault_rotator`, which holds `ADMIN` on
-it (`t/f/f`, guarded by ADR-086). Both roles and that edge are bootstrap SQL in
-`instance.yaml`, because CNPG cannot express the edge's options; the runtime's
-`DatabaseRole` has no `passwordSecret`, and ESO reads
-`database/static-creds/notification-runtime` every minute.
+OpenBAO's database engine rotates the password of every platform-db runtime
+login (`notification_runtime`, `user_runtime`, `shipping_runtime`,
+`review_runtime`; static roles `<svc>-runtime`, ADR-025, ADR-089) through
+`vault_rotator`, which holds `ADMIN` on each (`t/f/f`, guarded by ADR-086).
+The roles and those edges are bootstrap SQL in `instance.yaml`, because CNPG
+cannot express the edges' options; `vault_rotator`'s `DatabaseRole` lists them
+in `inRoles` so CNPG does not revoke them. The runtimes' `DatabaseRole`s have no
+`passwordSecret`, and ESO reads `database/static-creds/<svc>-runtime` every 15
+seconds. On a cluster created before this change, the edges are granted once by
+hand (rotator credential runbook).
 
 ### The bootstrap database
 

@@ -255,7 +255,7 @@ are reserved for that future surface).
   (readiness; flips false during graceful shutdown, then drains
   `READINESS_DRAIN_DELAY` seconds before the listener stops). gRPC `:9090`
   serves the standard health service via `pkg/grpcx`.
-- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*`, `OIDC_ISSUER`,
+- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*` (`DB_PASSWORD_FILE` (mounted runtime Secret, read per new connection; on the cluster it replaces `DB_PASSWORD`, rotated by OpenBAO)), `OIDC_ISSUER`,
   `OIDC_AUDIENCE`, `OIDC_JWKS_URL` (pkg v0.37.0 — empty derives
   `<issuer>/protocol/openid-connect/certs`), `LOG_LEVEL`, `TRACING_ENABLED`,
   `OTEL_COLLECTOR_ENDPOINT`, `SHUTDOWN_TIMEOUT`.

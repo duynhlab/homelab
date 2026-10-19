@@ -211,6 +211,19 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **OpenBAO rotates every platform-db runtime password.** `user_runtime`,
+  `shipping_runtime` and `review_runtime` join `notification_runtime` on
+  OpenBAO static roles (720h, ADR-025, ADR-089): `vault_rotator` holds ADMIN
+  on each (bootstrap SQL, `inRoles`, drift guard), the ExternalSecrets read
+  `database/static-creds/<svc>-runtime` through `openbao-db`, the
+  DatabaseRoles drop `passwordSecret`, and the pods read the password from a
+  mounted file (`db_password_file`; images user 2.5.2, shipping 1.10.1,
+  review 2.6.1). With a password file the domain templates no longer set
+  `DB_PASSWORD` on the service container, notification included. Runtime
+  ExternalSecrets refresh every 15s instead of 1m, which shortens the window
+  in which a new connection still holds the old password. OpenBAO reaches
+  platform-db with `sslmode=require` (#1309).
+
 - **The DR cluster verifies and isolates like product-db.**
   `product-db-replica` serves a `homelab-ca` certificate
   (`product-db-replica-server-tls`) and carries product-db's `pg_hba`
@@ -439,6 +452,13 @@ Skeleton (copy what you need):
   confirms that `inherit: false` on a member makes CNPG create (and recreate)
   its owner edge as `ADMIN f / INHERIT f / SET t`, which the authorization
   conventions rely on.
+
+#### Secrets
+
+- **No literal passwords in the OpenBAO bootstrap.** The `temporal`,
+  `keycloak` and `product` (initdb) seeds are random per cluster, like every
+  other seed, and the KV seed loop no longer holds platform-db runtime
+  passwords (#1309).
 
 #### Local-stack
 

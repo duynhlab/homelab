@@ -149,10 +149,12 @@ run once and cannot add this path to an existing OpenBAO installation.
    PRIMARY="$(kubectl get pod -n platform \
      -l cnpg.io/cluster=platform-db,role=primary \
      -o jsonpath='{.items[0].metadata.name}')"
-   kubectl exec -n platform "$PRIMARY" -- psql -U postgres -d postgres \
-     -v ON_ERROR_STOP=1 -c \
-     "GRANT notification_runtime TO vault_rotator
-        WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;"
+   for R in notification user shipping review; do
+     kubectl exec -n platform "$PRIMARY" -- psql -U postgres -d postgres \
+       -v ON_ERROR_STOP=1 -c \
+       "GRANT ${R}_runtime TO vault_rotator
+          WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;"
+   done
    ```
 
 6. Only now resume Flux. The force annotation replaces the immutable completed

@@ -39,6 +39,9 @@ spec:
       # One absent() per guarded edge; each carries its member/parent labels.
       expr: |-
         absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="notification_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="user_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="shipping_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="review_runtime"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="review_migrator", parent="review_owner"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="user_migrator", parent="user_owner"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="shipping_migrator", parent="shipping_owner"})

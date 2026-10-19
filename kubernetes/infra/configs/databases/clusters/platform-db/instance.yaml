@@ -172,11 +172,14 @@ spec:
         - CREATE ROLE temporal WITH LOGIN
         - CREATE DATABASE temporal OWNER temporal
         - CREATE DATABASE temporal_visibility OWNER temporal
-        # ADR-025 pattern A: OpenBAO rotates notification_runtime's password
-        # through vault_rotator, which needs ADMIN OPTION on it (PG18). Both
-        # roles are created here so the GRANT can carry ADMIN; the DatabaseRole
-        # CRs then adopt them.
+        # ADR-025 pattern A: OpenBAO rotates every runtime password through
+        # vault_rotator, which needs ADMIN OPTION on each (PG18). The roles are
+        # created here so the GRANTs can carry ADMIN; the DatabaseRole CRs then
+        # adopt them.
         - CREATE ROLE notification_runtime WITH LOGIN
+        - CREATE ROLE user_runtime WITH LOGIN
+        - CREATE ROLE shipping_runtime WITH LOGIN
+        - CREATE ROLE review_runtime WITH LOGIN
         # Password and ordinary attributes converge through DatabaseRole from a
         # per-cluster OpenBAO value. SQL retains only the ADMIN OPTION that the
         # DatabaseRole API cannot express or audit.
@@ -185,6 +188,9 @@ spec:
         # deliberately false: the administrator rotates a credential but must
         # not inherit the runtime's data access or become it.
         - GRANT notification_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT user_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT shipping_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT review_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
         # Creator of every catalog role (ADR-088). Unmanaged by CNPG on purpose:
         # CNPG revokes undeclared memberships of the roles it manages, and this
         # role is a member of every role it creates. db_authz reaches it via SET

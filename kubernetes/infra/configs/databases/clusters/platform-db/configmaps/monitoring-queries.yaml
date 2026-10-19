@@ -421,6 +421,9 @@ data:
                 OR COALESCE(bool_or(m.inherit_option), false) <> e.want_inherit
                 OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
                FROM (VALUES ('vault_rotator', 'notification_runtime', true, false, false),
+                            ('vault_rotator', 'user_runtime', true, false, false),
+                            ('vault_rotator', 'shipping_runtime', true, false, false),
+                            ('vault_rotator', 'review_runtime', true, false, false),
                             ('review_migrator', 'review_owner', false, false, true),
                             ('user_migrator', 'user_owner', false, false, true),
                             ('shipping_migrator', 'shipping_owner', false, false, true),

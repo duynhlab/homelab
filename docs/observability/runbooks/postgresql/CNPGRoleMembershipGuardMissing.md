@@ -31,8 +31,8 @@ guard is not running. While this fires,
 
    A SQL error usually means an edited `VALUES` list. Run the query by hand on
    the primary (`psql -U postgres -d postgres`) to see the error.
-4. Was the edge renamed? The alert selects `member="vault_rotator",
-   parent="notification_runtime"`. When the guarded edge list changes, update the
+4. Was the edge renamed? The alert selects each guarded edge by `member` and
+   `parent` (for example `member="vault_rotator", parent="user_runtime"`). When the guarded edge list changes, update the
    `absent()` selector in the same PR.
 
 ## Mitigation

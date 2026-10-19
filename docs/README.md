@@ -353,7 +353,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 2. **[PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md)** - Backup and restore procedures (CNPG Barman)
 3. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 4. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
-5. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+5. **[Rotate a service database password](./databases/runbooks/rotate-cnpg-service-password.md)** - Automatic OpenBAO rotation, forcing it, emergency rotation, migrators
 6. **[Rotate the OpenBAO database administrator](./databases/runbooks/rotate-vault-rotator-credential.md)** - Pre-seed, converge, and prove revocation of `vault_rotator`
 6. **[Pooler operations](./databases/runbooks/pooler-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
@@ -515,7 +515,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md) - Backup and restore procedures
 - [Logging troubleshooting](./observability/logging/vector.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
-- [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
+- [Rotate a service database password](./databases/runbooks/rotate-cnpg-service-password.md) - Automatic, forced and emergency rotation
 
 ---
 
@@ -536,7 +536,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - VictoriaTraces + ClickHouse (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
-- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for the production edge (**planned** — no production cluster yet); self-signed `homelab-ca` signs the local (Kind) edge certificate and is distributed via trust-manager `homelab-ca-bundle`; internal TLS on it is **planned** (RFC-0020)
+- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for the production edge (**planned** — no production cluster yet); self-signed `homelab-ca` signs the local (Kind) edge certificate and is distributed via trust-manager `homelab-ca-bundle`; it also signs the PostgreSQL server and pooler certificates, which every service database hop verifies (ADR-089); other internal TLS on it is **planned** (RFC-0020)
 - **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster
 
 ---

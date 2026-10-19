@@ -399,3 +399,4 @@ Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS
   behind `tls_client_required`, with no `users[]` list and no password
   `valuesFrom`. The rest of this record keeps its status.
 - 2026-10-19 — Decision 2 (static, rotated login roles) and 5 (pattern A reload) extended from the notification pilot to every platform-db runtime: user, shipping and review (#1309).
+- 2026-10-19 — Decisions 2 and 5 cover every service runtime on both clusters; product-db relies on PgDog passthrough (decision 4) to follow the rotation without a pooler step (#1311).

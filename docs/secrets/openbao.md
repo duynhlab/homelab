@@ -429,17 +429,12 @@ role `product`.
 | `secret/local/databases/platform-db/keycloak` | `username`, `password` | Keycloak persistence role — RFC-0012 triplet in ns `platform` (`platform-db/services/keycloak.yaml`) + copy in ns `identity` (`platform-db-keycloak-secret-identity-ns.yaml`) |
 | `secret/local/databases/platform-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator — random per cluster; projected to `platform-db-vault-rotator-secret` for CNPG and the configurator Job |
 | `secret/local/databases/product-db/product` | `username`, `password` | bootstrap role `product` (NOLOGIN, no `pg_hba` line) — `product-db-secret`, CNPG `passwordSecret` only |
-| `secret/local/databases/product-db/product-runtime` | `username`, `password` | `product_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/product.yaml` |
+| `secret/local/databases/product-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator for product-db — random per cluster; projected to `product-db-vault-rotator-secret` for CNPG and the configurator Job |
 | `secret/local/databases/product-db/product-migrator` | `username`, `password` | `product_migrator` login (migrate init container, role catalog Job) — random per cluster |
-| `secret/local/databases/product-db/cart-runtime` | `username`, `password` | `cart_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/cart.yaml` + copy in ns `cart` (`product-db-cart-runtime-secret-cart-ns.yaml`) |
 | `secret/local/databases/product-db/cart-migrator` | `username`, `password` | `cart_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `cart` |
-| `secret/local/databases/product-db/order-runtime` | `username`, `password` | `order_runtime` login (service pods, through PgDog) — order-worker uses it too — random per cluster; `product-db/services/order.yaml` + copy in ns `order` (`product-db-order-runtime-secret-order-ns.yaml`) |
 | `secret/local/databases/product-db/order-migrator` | `username`, `password` | `order_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `order` |
-| `secret/local/databases/product-db/checkout-runtime` | `username`, `password` | `checkout_runtime` login (service pods, through PgDog) — checkout-worker uses it too — random per cluster; `product-db/services/checkout.yaml` + copy in ns `checkout` (`product-db-checkout-runtime-secret-checkout-ns.yaml`) |
 | `secret/local/databases/product-db/checkout-migrator` | `username`, `password` | `checkout_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `checkout` |
-| `secret/local/databases/product-db/payment-runtime` | `username`, `password` | `payment_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/payment.yaml` + copy in ns `payment` (`product-db-payment-runtime-secret-payment-ns.yaml`) |
 | `secret/local/databases/product-db/payment-migrator` | `username`, `password` | `payment_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `payment` |
-| `secret/local/databases/product-db/inventory-runtime` | `username`, `password` | `inventory_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/inventory.yaml` + copy in ns `inventory` (`product-db-inventory-runtime-secret-inventory-ns.yaml`) |
 | `secret/local/databases/product-db/inventory-migrator` | `username`, `password` | `inventory_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `inventory` |
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) — `payment-webhook-hmac` ExternalSecret, ns `payment` only (both workloads run there) |
 | `secret/local/auth/jwt-signing` | `private_key`, `public_key` | **orphaned** — zero consumers since auth-service retired (see note below); recorded cleanup candidate |
@@ -462,36 +457,39 @@ role `product`.
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
 > **✅ Deployed — pattern-A static roles on platform-db** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) records the pattern choice, [ADR-089](../proposals/adr/ADR-089-postgresql-access-contract/) the one-writer rule; [RFC-0008](../proposals/rfc/RFC-0008/) the roadmap).
-> The database secrets engine is **enabled** and rotates the four platform-db
-> runtime logins (notification, user, shipping, review). Everything below describing
-> *per-request dynamic* roles or the product-db services is still **planned** — those
-> stay on KV v2 static credentials.
+> The database secrets engine is **enabled** and rotates all ten service runtime
+> logins: four on platform-db and six on product-db. Everything below describing
+> *per-request dynamic* roles is still **planned**; migrators, `db_authz`, Temporal and
+> Keycloak stay on KV v2 static credentials.
 
 **What is deployed today.** The engine rotates the passwords of *fixed* PostgreSQL
 roles instead of minting per-request users:
 
 - The bootstrap pre-provisions the pieces the engine needs without root: the
   `db-configurator` policy + Kubernetes-auth role (bound to SA
-  `openbao-db-configurator`, ns `platform`) and `eso-read` grants on
-  `database/static-creds/{notification,user,shipping,review}-runtime`
+  `openbao-db-configurator` in ns `platform` and ns `product`) and `eso-read`
+  grants on `database/static-creds/<svc>-runtime` for all ten runtimes
   (`openbao-bootstrap/configmap.yaml`).
-- The `openbao-db-config` Job (`configs/databases/clusters/platform-db/openbao-db-config.yaml`)
-  runs in the **databases wave** — after `platform-db` is up, because
-  `database/config` validates the live PG connection, which the bootstrap (secrets
-  wave) cannot. It logs in via Kubernetes auth (no root token), enables the engine,
-  reads its PostgreSQL administrator credential from the ESO-managed
-  `platform-db-vault-rotator-secret`, writes `database/config/platform-db`
-  (postgresql plugin, `sslmode=require`, `allowed_roles` the four
-  `<svc>-runtime` roles), and creates one static role per runtime login with
-  `rotation_period=720h`. `vault_rotator` holds `ADMIN` on each runtime role
-  (bootstrap SQL in `instance.yaml`), which is all `ALTER ROLE … PASSWORD` needs.
+- One `openbao-db-config` Job per cluster
+  (`configs/databases/clusters/{platform-db,product-db}/openbao-db-config.yaml`),
+  each in its cluster's namespace so it reads its own `vault_rotator` Secret and
+  neither cluster can block the other. They run in the **databases wave** — after
+  the cluster is up, because `database/config` validates the live PG connection,
+  which the bootstrap (secrets wave) cannot. Each logs in via Kubernetes auth (no
+  root token), enables the engine, reads its PostgreSQL administrator credential
+  from the ESO-managed `<cluster>-vault-rotator-secret`, writes
+  `database/config/<cluster>` (postgresql plugin, `sslmode=require`,
+  `allowed_roles` its `<svc>-runtime` roles), and creates one static role per
+  runtime login with `rotation_period=720h`. `vault_rotator` holds `ADMIN` on
+  each runtime role (bootstrap SQL in `instance.yaml`), which is all
+  `ALTER ROLE … PASSWORD` needs.
 - ESO reads the rotated credential through a **second ClusterSecretStore `openbao-db`**
   (`configs/secrets/cluster-secret-store-db.yaml`): the default `openbao` store is
   pinned to the KV v2 mount, so this store uses `version: "v1"` with no `path` to read
   the raw engine path `database/static-creds/<svc>-runtime` verbatim (KV-v2 semantics
   would insert `/data/` and 403).
-- `platform-db-<svc>-runtime-secret` ExternalSecrets (ns `platform` and the service's
-  namespace, `refreshInterval: 15s`) materialise it. The service mounts the Secret as
+- `<cluster>-<svc>-runtime-secret` ExternalSecrets (the cluster's namespace and
+  the service's namespace, `refreshInterval: 15s`) materialise it. The service mounts the Secret as
   a directory and reads `DB_PASSWORD_FILE` on every new connection; its container has
   no `DB_PASSWORD` env. The `DatabaseRole` has no `passwordSecret`, so OpenBAO is the
   only writer.

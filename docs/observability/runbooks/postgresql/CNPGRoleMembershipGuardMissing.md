@@ -4,8 +4,8 @@
 |---|---|
 | **Severity** | warning |
 | **Source** | [`role-membership-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml) ([ADR-086](../../../proposals/adr/ADR-086-guard-membership-options/)) |
-| **Clusters** | `platform-db` |
-| **Custom query** | `pg_role_membership` ([`monitoring-queries.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml)) |
+| **Clusters** | `platform-db`, `product-db` |
+| **Custom query** | `pg_role_membership` ([platform-db](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml), [product-db](../../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml)) |
 
 ## Meaning
 

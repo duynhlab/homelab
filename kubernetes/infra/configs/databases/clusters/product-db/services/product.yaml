@@ -10,6 +10,9 @@
 # and the Database CR below hands the database to product_owner. The
 # DatabaseRole and bootstrap.initdb.secret keep pointing at the SAME Secret, or
 # two sources for one password would fight.
+# The runtime password belongs to OpenBAO's static role product-runtime
+# (ADR-025, ADR-089): vault_rotator rotates it, ESO reads it every 15s,
+# and the DatabaseRole has no passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -20,9 +23,9 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
-  refreshInterval: 1h
+  refreshInterval: 15s
   secretStoreRef:
-    name: openbao
+    name: openbao-db
     kind: ClusterSecretStore
   target:
     name: product-db-product-runtime-secret
@@ -35,18 +38,17 @@ spec:
           app.kubernetes.io/name: product-db-product-runtime-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
-          cnpg.io/reload: "true"
       data:
         username: "{{ .username }}"
         password: "{{ .password }}"
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/product-db/product-runtime
+        key: database/static-creds/product-runtime
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/product-db/product-runtime
+        key: database/static-creds/product-runtime
         property: password
 ---
 apiVersion: external-secrets.io/v1
@@ -107,8 +109,6 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: product-db-product-runtime-secret
   databaseRoleReclaimPolicy: retain
 ---
 # product-db-secret: bootstrap.initdb's owner credential (instance.yaml).

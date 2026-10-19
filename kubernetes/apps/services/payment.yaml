@@ -13,7 +13,7 @@ spec:
     # The API and order worker must support unknown payment outcomes before rollout.
     # The migration init container must use this image before the app starts.
     # Compatibility gates: docs/proposals/rfc/RFC-0021/cutover-rollback.md.
-    image_tag: "2.8.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    image_tag: "2.8.1" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -42,6 +42,9 @@ spec:
     db_migrator_secret: "product-db-payment-migrator-secret"
     db_sslmode: "verify-full"
     db_ca_secret: "product-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "25"
     # Internal gRPC server (:9090) — the order saga's money transport. The domain
     # template adds a grpc:9090 port to the payment Service.

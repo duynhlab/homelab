@@ -63,20 +63,43 @@ spec:
         podLabels:
           app.kubernetes.io/component: api
           platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
-        <<- if (index inputs "db_ca_secret") >>
-        # ADR-089: the CA that sslmode=verify-full checks the pooler and, from
-        # migrate, the primary against.
+        <<- if or (index inputs "db_password_file") (index inputs "db_ca_secret") >>
+        # RFC-0008 / ADR-025 pattern A: mount the DB Secret as a directory (never
+        # subPath, so kubelet refreshes it on rotation) and point DB_PASSWORD_FILE
+        # at it; the app reads the rotated password per connection.
+        # ADR-089: db-ca is the CA that sslmode=verify-full checks the pooler
+        # and, from migrate, the primary against. db-credentials mounts on the
+        # service container only.
         volumes:
+          <<- if (index inputs "db_password_file") >>
+          - name: db-credentials
+            secret:
+              # The runtime's Secret: only the service container reads the file.
+              <<- if (index inputs "db_runtime_secret") >>
+              secretName: << inputs.db_runtime_secret >>
+              <<- else >>
+              secretName: << inputs.db_secret >>
+              <<- end >>
+          <<- end >>
+          <<- if (index inputs "db_ca_secret") >>
           - name: db-ca
             secret:
               secretName: << inputs.db_ca_secret >>
               items:
                 - key: ca.crt
                   path: ca.crt
+          <<- end >>
         volumeMounts:
+          <<- if (index inputs "db_password_file") >>
+          - name: db-credentials
+            mountPath: /etc/db/secret
+            readOnly: true
+          <<- end >>
+          <<- if (index inputs "db_ca_secret") >>
           - name: db-ca
             mountPath: /etc/db/ca
             readOnly: true
+          <<- end >>
         <<- end >>
         env:
           - name: SERVICE_NAME
@@ -168,19 +191,29 @@ spec:
               secretKeyRef:
                 name: << inputs.db_runtime_secret >>
                 key: username
+          <<- if not (index inputs "db_password_file") >>
           - name: DB_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: << inputs.db_runtime_secret >>
                 key: password
+          <<- end >>
           <<- else >>
           - name: DB_USER
             value: << index inputs "db_user" | default inputs.name >>
+          <<- if not (index inputs "db_password_file") >>
           - name: DB_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: << inputs.db_secret >>
                 key: password
+          <<- end >>
+          <<- end >>
+          <<- if (index inputs "db_password_file") >>
+          # With a password file the env carries no password: the mounted file
+          # is the only copy, so a broken mount fails instead of falling back.
+          - name: DB_PASSWORD_FILE
+            value: /etc/db/secret/password
           <<- end >>
           - name: DB_SSLMODE
             value: << index inputs "db_sslmode" | default "require" >>

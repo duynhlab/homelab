@@ -62,11 +62,15 @@ authorization](../authorization.md)):
 
 `<cluster>` is `platform-db` or `product-db`.
 
-1. **OpenBAO:** seed `secret/local/databases/<cluster>/<svc>-runtime` and
-   `…/<svc>-migrator` (`username` = `<svc>_runtime` / `<svc>_migrator`, random
-   passwords; fresh clusters: the `openbao-bootstrap` loop).
-2. **`services/<svc>.yaml`** (copy `review.yaml` or `cart.yaml`): runtime and migrator
-   ExternalSecrets, the runtime `DatabaseRole`, and `Database` with
+1. **OpenBAO:** seed `secret/local/databases/<cluster>/<svc>-migrator`
+   (`username` = `<svc>_migrator`, random password; fresh clusters: the
+   `openbao-bootstrap` loop). The runtime password is **not** seeded: it is an
+   OpenBAO static role, set up per
+   [add-service-dynamic-credentials](../../secrets/runbooks/add-service-dynamic-credentials.md)
+   (static role, `eso-read`, `vault_rotator` ADMIN grant, `db_password_file`).
+2. **`services/<svc>.yaml`** (copy `review.yaml` or `cart.yaml`): runtime
+   (store `openbao-db`) and migrator (KV) ExternalSecrets, the runtime
+   `DatabaseRole` without `passwordSecret`, and `Database` with
    `owner: <svc>_owner`. No owner or migrator `DatabaseRole`: the catalog
    creates them, and CNPG retries the `Database` until the owner exists.
 3. **App-namespace copies** of both Secrets (`secrets/…-<svc>-ns.yaml`).

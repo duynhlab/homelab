@@ -51,7 +51,7 @@ expect_pairs() {
 # so it must be rejected everywhere, its own database included. db_authz
 # applies authorization from `postgres` and inside each service database.
 product_services=(product inventory cart order checkout payment)
-product_roles=(product db_authz)
+product_roles=(product vault_rotator db_authz)
 for svc in "${product_services[@]}"; do
   product_roles+=("${svc}_owner" "${svc}_migrator" "${svc}_runtime")
 done
@@ -62,6 +62,8 @@ for r in "${product_roles[@]}"; do
   done
 done
 expect_put "product/db_authz/postgres" allow
+# the OpenBAO rotation administrator (ADR-025) logs in to `product` only
+expect_put "product/vault_rotator/product" allow
 for svc in "${product_services[@]}"; do
   for p in "${svc}_runtime/$svc" "${svc}_migrator/$svc" "db_authz/$svc"; do
     expect_put "product/${p%%/*}/${p##*/}" allow

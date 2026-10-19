@@ -12,7 +12,7 @@ spec:
     name: checkout
     # Inventory is the sole availability authority; do not restore product fallback.
     # Keep storefront error handling compatible with docs/api/checkout.md.
-    image_tag: "0.13.2" # {"$imagepolicy": "flux-system:checkout:tag"}
+    image_tag: "0.13.3" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -33,6 +33,9 @@ spec:
     # plaintext.
     db_sslmode: "verify-full"
     db_ca_secret: "product-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "25"
     # Client-only gRPC: use the multi-port Services below, not the absent
     # <service>-grpc Services assumed by old application defaults.

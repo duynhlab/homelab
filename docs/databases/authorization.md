@@ -293,18 +293,19 @@ could never converge", PGR-10), and without the wildcard `adopt` revokes the
 runtime's grants on every table a migration adds. The Job-owned `review` keeps
 the stricter shape. K3.8 encodes both (`scripts/db-authz-check.sh`).
 
-### Platform-db runtimes and OpenBAO
+### Runtime logins and OpenBAO
 
-OpenBAO's database engine rotates the password of every platform-db runtime
-login (`notification_runtime`, `user_runtime`, `shipping_runtime`,
-`review_runtime`; static roles `<svc>-runtime`, ADR-025, ADR-089) through
-`vault_rotator`, which holds `ADMIN` on each (`t/f/f`, guarded by ADR-086).
-The roles and those edges are bootstrap SQL in `instance.yaml`, because CNPG
-cannot express the edges' options; `vault_rotator`'s `DatabaseRole` lists them
-in `inRoles` so CNPG does not revoke them. The runtimes' `DatabaseRole`s have no
-`passwordSecret`, and ESO reads `database/static-creds/<svc>-runtime` every 15
-seconds. On a cluster created before this change, the edges are granted once by
-hand (rotator credential runbook).
+OpenBAO's database engine rotates the password of every service runtime login
+on both clusters (static roles `<svc>-runtime`, ADR-025, ADR-089) through each
+cluster's `vault_rotator`, which holds `ADMIN` on its cluster's runtimes
+(`t/f/f`, guarded by ADR-086). The roles and those edges are bootstrap SQL in
+each `instance.yaml`, because CNPG cannot express the edges' options;
+`vault_rotator`'s `DatabaseRole` lists them in `inRoles` so CNPG does not
+revoke them. The runtimes' `DatabaseRole`s have no `passwordSecret`, and ESO
+reads `database/static-creds/<svc>-runtime` every 15 seconds. On product-db,
+`vault_rotator` logs in through `hostssl product vault_rotator`; on platform-db
+through `host notification vault_rotator` (#1296). On a cluster created before
+this change, the edges are granted once by hand (rotator credential runbook).
 
 ### The bootstrap database
 

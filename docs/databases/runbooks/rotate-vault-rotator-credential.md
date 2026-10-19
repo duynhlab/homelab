@@ -6,7 +6,7 @@ must be rotated again.
 
 | | |
 |---|---|
-| **Scope** | `vault_rotator` on `platform-db` |
+| **Scope** | `vault_rotator` on `platform-db` (product-db has its own `vault_rotator`, KV `product-db/vault-rotator`, Job in ns `product`; follow the same steps with `product`/`product-db` substituted) |
 | **Source of truth** | OpenBAO KV v2 `secret/local/databases/platform-db/vault-rotator` |
 | **Consumers** | `DatabaseRole/platform-db-role-vault-rotator`; `Job/openbao-db-config` |
 | **Blast radius** | Notification password rotation pauses while PostgreSQL and OpenBAO hold different administrator passwords |
@@ -149,7 +149,7 @@ run once and cannot add this path to an existing OpenBAO installation.
    PRIMARY="$(kubectl get pod -n platform \
      -l cnpg.io/cluster=platform-db,role=primary \
      -o jsonpath='{.items[0].metadata.name}')"
-   for R in notification user shipping review; do
+   for R in notification user shipping review; do   # product-db: product inventory cart order checkout payment
      kubectl exec -n platform "$PRIMARY" -- psql -U postgres -d postgres \
        -v ON_ERROR_STOP=1 -c \
        "GRANT ${R}_runtime TO vault_rotator

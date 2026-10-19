@@ -211,6 +211,19 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **OpenBAO rotates every product-db runtime password.** The six runtimes
+  (`product`, `inventory`, `cart`, `order`, `checkout`, `payment`) move to
+  OpenBAO static roles (720h) like platform-db's (#1310): product-db gets its
+  own `vault_rotator` (bootstrap SQL with ADMIN on each runtime, `inRoles`,
+  drift guard, `hostssl product vault_rotator` on the cluster and its DR
+  replica) and its own `openbao-db-config` Job in namespace `product`, so
+  neither cluster's Job depends on the other. The eleven runtime
+  ExternalSecrets read `database/static-creds/<svc>-runtime` every 15s, the
+  DatabaseRoles drop `passwordSecret`, and the pods and both workers read the
+  password from a mounted file with no `DB_PASSWORD` env (images product
+  1.16.3, inventory 0.9.2, cart 2.4.2, order 2.10.3, checkout 0.13.3, payment
+  2.8.1). Every runtime password on the platform now has one writer (#1311).
+
 - **OpenBAO rotates every platform-db runtime password.** `user_runtime`,
   `shipping_runtime` and `review_runtime` join `notification_runtime` on
   OpenBAO static roles (720h, ADR-025, ADR-089): `vault_rotator` holds ADMIN

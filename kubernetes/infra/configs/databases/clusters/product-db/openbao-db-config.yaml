@@ -1,0 +1,138 @@
+# openbao-db-config (product-db) — enable the OpenBAO database secrets engine
+# and the static roles that rotate the six product-db runtime passwords
+# (ADR-025 pattern A, ADR-089). One Job per cluster, each in its cluster's
+# namespace, so it reads its own vault_rotator Secret and a failure of one
+# cluster never blocks the other. Same shape as platform-db/openbao-db-config.yaml:
+# databases wave, Kubernetes auth (role db-configurator, no root), idempotent.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao-db-configurator
+  namespace: product
+  labels:
+    app.kubernetes.io/name: openbao-db-configurator
+    app.kubernetes.io/component: database
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-db-config
+  namespace: product
+  annotations:
+    # The Pod template is immutable; Flux must recreate the completed Job
+    # when it changes.
+    kustomize.toolkit.fluxcd.io/force: enabled
+  labels:
+    app.kubernetes.io/name: openbao-db-config
+    app.kubernetes.io/component: database
+spec:
+  backoffLimit: 5
+  # Deliberately retain the completed Job. If TTL deletes it, Flux recreates it
+  # every reconciliation; during an administrator rotation that can race ESO
+  # and write the previous Secret version back into OpenBAO. The rotation
+  # runbook deletes this Job only after CNPG observes the new Secret version.
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao-db-config
+        app.kubernetes.io/component: database
+    spec:
+      serviceAccountName: openbao-db-configurator
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: db-config
+          image: openbao/openbao:2.7.1
+          env:
+            - name: HOME
+              value: /tmp
+            - name: DB_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-vault-rotator-secret
+                  key: username
+            - name: DB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-vault-rotator-secret
+                  key: password
+            # MUST be the active node, not the round-robin `openbao` Service.
+            # This Job WRITES; `openbao` selects all three pods (no
+            # `openbao-active` label in its selector), so two requests in three
+            # land on a standby. A standby answers a write with a 307 to the
+            # active node's POD IP, which this client cannot follow — the request
+            # hangs to the context deadline instead of failing. Measured on Kind:
+            # `database/config/product-db` succeeded (lucky pod) and the
+            # `static-roles/notification-runtime` write immediately after it timed out,
+            # repeatedly, across three restarts. Same class as the bootstrap Job's
+            # standby hang (#793), which was fixed by pinning to a pod; this one
+            # was missed. `openbao-active` carries exactly one endpoint — the pod
+            # labelled `openbao-active: "true"`.
+            - name: BAO_ADDR
+              value: http://openbao-active.openbao.svc.cluster.local:8200
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Logging in to OpenBAO via k8s auth (db-configurator)..."
+              JWT="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              n=0
+              until BAO_TOKEN="$(bao write -field=token auth/kubernetes/login role=db-configurator jwt="$JWT" 2>/dev/null)"; [ -n "$BAO_TOKEN" ]; do
+                n=$((n + 1)); [ "$n" -ge 30 ] && { echo "ERROR: k8s-auth login failed after 150s"; exit 1; }
+                echo "  login not ready, retry 5s..."; sleep 5
+              done
+              export BAO_TOKEN
+
+              echo "Enabling database secrets engine..."
+              bao secrets enable -path=database database 2>/dev/null || echo "  already enabled"
+
+              echo "Configuring database/config/product-db (retry until product-db-rw is reachable)..."
+              n=0
+              # `password=-` keeps the credential out of the process argument
+              # list and OpenBAO command logs; bao reads it from stdin.
+              until printf '%s' "$DB_ADMIN_PASSWORD" | bao write database/config/product-db \
+                  plugin_name=postgresql-database-plugin \
+                  allowed_roles="product-runtime,inventory-runtime,cart-runtime,order-runtime,checkout-runtime,payment-runtime" \
+                  connection_url="postgresql://{{username}}:{{password}}@product-db-rw.product.svc.cluster.local:5432/product?sslmode=require&application_name=openbao" \
+                  username="$DB_ADMIN_USERNAME" \
+                  password=- 2>/dev/null; do
+                n=$((n + 1)); [ "$n" -ge 60 ] && { echo "ERROR: database/config failed after 300s (product-db unreachable / vault_rotator?)"; exit 1; }
+                echo "  product-db not reachable yet, retry 5s..."; sleep 5
+              done
+
+              # One static role per runtime login (ADR-089: OpenBAO is the only
+              # writer). Retried for the same reason the config write above is: a
+              # leader election DURING this Job moves the active node, and the next
+              # write would hang rather than error.
+              for SVC in product inventory cart order checkout payment; do
+                echo "Writing static-role ${SVC}-runtime..."
+                n=0
+                until bao write "database/static-roles/${SVC}-runtime" \
+                  db_name=product-db \
+                  username="${SVC}_runtime" \
+                  rotation_period="720h"; do
+                  n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role ${SVC}-runtime failed after 60s"; exit 1; }
+                  echo "  static-role write failed, retry 5s..."; sleep 5
+                done
+              done
+
+              echo "openbao-db-config complete: 6 product-db runtime static roles ready."
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

@@ -33,6 +33,15 @@ spec:
           port: 8000
         - protocol: TCP
           port: 5432
+    # OpenBAO database secrets engine (openbao ns) → product-db primary to
+    # rotate the runtime passwords (static roles, ADR-025 / ADR-089).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openbao
+      ports:
+        - protocol: TCP
+          port: 5432
     # pgroles operator (pgroles-system) → product-db primary to apply the
     # PostgresPolicies that own in-database grants (ADR-088).
     - from:

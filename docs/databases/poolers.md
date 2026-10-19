@@ -65,7 +65,9 @@ is refused without touching the cache, after PgDog's `checkout_timeout` (5 s)
 while it tries the password on Postgres. Each replica keeps its own cache, and
 a cached password is not re-checked: after `ALTER ROLE`, the old password keeps
 working on a replica until the first login there with the new one (measured
-on Kind, 2026-10-18). Every login is the service's
+on Kind, 2026-10-18). This is what makes OpenBAO rotation (ADR-025) work with
+no pooler step: the service's next login with the rotated password updates the
+cache on the replica it lands on. Every login is the service's
 `<svc>_runtime` login (RFC-0029 three-role split); migrators never go through
 PgDog, and every `migrate` init container connects to `product-db-rw:5432`
 directly. The order and checkout workers use their service's runtime login.

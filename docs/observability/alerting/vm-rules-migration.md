@@ -13,10 +13,9 @@ release owns 70 native VMRules; the separate Temporal release owns one and remai
 under temporal-config's dependency on the Temporal server. Sloth and the slo
 chart keep their PrometheusRules and converter path. Compose is unchanged.
 
-**Current repository stage: cleanup.** Static rule sources have been removed
-from Kustomize; VMAlert still excludes `source=manifests` while converter-owned
-objects are garbage-collected. Merge only after the cutover runtime gate passed. This document describes the subsequent
-stages as planned until their corresponding commits have been reconciled.
+**Current repository stage: finish.** Broad rule discovery is restored. Merge
+only after cleanup has reconciled and all old converted static VMRules are absent.
+The stages below remain the required rollout and rollback sequence.
 
 Apply the stages as separate GitOps changes, never squash all stages into one
 live reconciliation. Updating manifests in one commit does not impose an order

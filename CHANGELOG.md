@@ -92,6 +92,8 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- Restore broad VMAlert discovery after migrated converter-owned static rules have been garbage-collected.
+
 - Remove 71 migrated static PrometheusRule sources after native cutover, update runbook source links to chart bundles, and retain inactive CNPG/Tempo archives.
 
 - Select native chart VMRules while retaining unselected static PrometheusRules for rollback; keep SLO rule selection unchanged.

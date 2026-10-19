@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay` > 300 s, `max by (replica)`, from `:9363` |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (3 series at 0 seconds) |
 | **Dashboard** | ClickHouse → Server engine (replication row) |

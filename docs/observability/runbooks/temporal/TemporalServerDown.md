@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | workflow |
-| **Source** | `kubernetes/infra/configs/temporal/prometheusrule.yaml` |
+| **Source** | [bundles/temporal/prometheusrule.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/temporal/prometheusrule.yaml) |
 | **Metrics** | `up{job=~".*temporal.*"} == 0` |
 | **Status** | active |
 | **Dashboard** | Temporal → Server · Temporal Web (`temporal.duynh.me`) |

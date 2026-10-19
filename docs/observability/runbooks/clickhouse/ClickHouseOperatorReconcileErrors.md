@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `clickhouse_operator_host_reconciles_errors` — operator control plane (`op-metrics`) |
 | **Status** | active |
 | **Dashboard** | ClickHouse → Server engine |

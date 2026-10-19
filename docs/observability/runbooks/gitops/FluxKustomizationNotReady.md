@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | gitops |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/gitops/flux-alerts.yaml` |
+| **Source** | [bundles/gitops/flux-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/gitops/flux-alerts.yaml) |
 | **Metrics** | `gotk_resource_info{customresource_kind="Kustomization", ready="False"}` — exported by **kube-state-metrics**, not by the Flux controllers |
 | **Status** | active |
 | **Dashboard** | Flux web UI (`flux.duynh.me`) · Observability → GitOps |

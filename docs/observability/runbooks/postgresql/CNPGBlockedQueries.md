@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Source** | deep-signal ([`deep-signals-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml)) |
+| **Source** | deep-signal ([`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml)) |
 | **Clusters** | `platform-db`, `product-db` |
 | **Custom queries** | `pg_blocking_queries`, `pg_locks_count`, `pg_stat_activity_count` |
 | **Grafana** | pg-maintenance (Locks & Blocking row) |

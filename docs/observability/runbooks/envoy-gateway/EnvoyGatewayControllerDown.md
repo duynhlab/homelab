@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability / control plane |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `up{job="envoy-gateway-controller"}` ([`servicemonitors/envoy-gateway-controller.yaml`](../../../../kubernetes/infra/configs/observability/metrics/servicemonitors/envoy-gateway-controller.yaml)) |
 
 ## Meaning

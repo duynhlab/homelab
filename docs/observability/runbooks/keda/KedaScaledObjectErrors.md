@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | platform |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/keda/alerts.yaml` |
+| **Source** | [bundles/keda/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/keda/alerts.yaml) |
 | **Metrics** | `keda_scaled_object_errors_total` |
 | **Status** | active |
 | **Dashboard** | Workflows / Async → KEDA — Worker Autoscaling (panel "ScaledObject errors") |

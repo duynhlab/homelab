@@ -500,7 +500,7 @@ allowed source. Enforcement is unaffected — see the Reports bullet under
   match this platform's Grafana `instanceSelector`; it lands in the **GitOps**
   folder. No vendored JSON, so nothing to drift — the same reasoning as
   cert-manager's chart-native ServiceMonitor.
-- **Alerts**: 4, in [`prometheusrules/kyverno/alerts.yaml`](../../kubernetes/infra/configs/observability/metrics/prometheusrules/kyverno/alerts.yaml),
+- **Alerts**: 4, in [`prometheusrules/kyverno/alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kyverno/alerts.yaml),
   catalogued at [`alert-catalog.md` § 6b](../observability/alerting/alert-catalog.md#6b-kyverno-admission)
   with one runbook each under [`runbooks/kyverno/`](../observability/runbooks/kyverno/README.md).
 - **Logs**: nothing to wire. Vector tails every pod that does not carry

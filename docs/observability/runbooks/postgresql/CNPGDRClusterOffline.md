@@ -10,7 +10,7 @@ silently disappeared; this alert names that loss directly.
 | **Cluster** | `product/product-db-replica` |
 | **Metric** | `cnpg_collector_up` |
 | **Threshold** | zero collector targets for 5 minutes |
-| **Source** | `prometheusrules/postgres/dr-cluster-offline.yaml` |
+| **Source** | [bundles/postgres/dr-cluster-offline.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/dr-cluster-offline.yaml) |
 | **Dashboard** | Databases → PostgreSQL / CloudNativePG |
 
 ## Meaning

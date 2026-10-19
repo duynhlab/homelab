@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | workflow |
-| **Source** | `kubernetes/infra/configs/temporal/prometheusrule.yaml` |
+| **Source** | [bundles/temporal/prometheusrule.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/temporal/prometheusrule.yaml) |
 | **Metrics** | `temporal_worker_task_slots_available` — **Go SDK** gauge |
 | **Status** | active |
 | **Dashboard** | Temporal → Workers |

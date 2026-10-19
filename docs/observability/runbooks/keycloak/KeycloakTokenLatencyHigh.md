@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | latency |
-| **Source** | [`keycloak/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/keycloak/alerts.yaml) |
+| **Source** | [bundles/keycloak/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/keycloak/alerts.yaml) |
 | **Metrics** | `http_server_requests_seconds_bucket{job="keycloak", uri=~".*/token"}` |
 | **Status** | active |
 | **Local-stack** | vendored in [`vmalert/rules/keycloak.yaml`](../../../../local-stack/observability/vmalert/rules/keycloak.yaml) — same labels, no rewrite |

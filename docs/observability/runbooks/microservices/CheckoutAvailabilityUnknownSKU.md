@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | correctness (data) |
-| **Manifest** | [`checkout-availability.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/checkout-availability.yaml) |
+| **Manifest** | [`checkout-availability.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/checkout-availability.yaml) |
 | **Metrics** | `checkout_availability_check_total{result="unknown_sku"}` |
 | **Applies to** | checkout **0.9.0+** (0.6.0–0.8.0 answered a retryable 503 here) · inventory **0.4.0+** (pkg `v0.35.0` added `unknown_sku_ids`) |
 

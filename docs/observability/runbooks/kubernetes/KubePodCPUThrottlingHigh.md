@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | resources |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/pod-resources-alerts.yaml` |
+| **Source** | [bundles/kubernetes/pod-resources-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/pod-resources-alerts.yaml) |
 | **Metrics** | `container_cpu_cfs_throttled_periods_total`, `container_cpu_cfs_periods_total` (cAdvisor) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmsingle-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmsingle-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmsingle-alerts.yaml) |
 | **Metrics** | `vm_free_disk_space_bytes`, `vm_data_size_bytes` |
 | **Status** | active · currently ~321 GB free |
 | **Dashboard** | VictoriaMetrics → VMSingle |

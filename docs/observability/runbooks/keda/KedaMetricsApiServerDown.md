@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | platform |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/keda/alerts.yaml` |
+| **Source** | [bundles/keda/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/keda/alerts.yaml) |
 | **Metrics** | `up{job=~".*keda.*metrics-apiserver.*"}` **or `absent()` of it** (the chart's ServiceMonitor for `keda-operator-metrics-apiserver`) |
 | **Status** | active |
 | **Dashboard** | Workflows / Async → KEDA — Worker Autoscaling (row "KEDA health", stat "Metrics adapter up") |

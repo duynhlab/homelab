@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `absent(up{job="clickhouse-server"} == 1)` — the per-pod `:9363` scrape |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (3 targets at `up=1`) |
 | **Dashboard** | ClickHouse → Server engine (every `ClickHouseMetrics_*` panel goes blank together) |

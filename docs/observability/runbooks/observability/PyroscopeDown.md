@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/pyroscope-alerts.yaml` |
+| **Source** | [bundles/observability/pyroscope-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/pyroscope-alerts.yaml) |
 | **Metrics** | `up{job=~".*pyroscope.*"} == 0` — 2 targets (pyroscope + its alloy) |
 | **Status** | active |
 | **Dashboard** | Observability → Profiling |

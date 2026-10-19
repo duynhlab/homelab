@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `envoy_cluster_membership_healthy` == 0 while `envoy_cluster_membership_total` > 0, per `envoy_cluster_name` |
 | **Status** | active — VERIFY-AT-KIND (added 2026-09-08, not yet run in both forms) |
 | **Dashboard** | Gateway → Envoy Clusters (membership row) |

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `chi_clickhouse_metric_PartsActive > 300` |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (62–86 after seeded traffic) |
 | **Dashboard** | ClickHouse → Data analysis |

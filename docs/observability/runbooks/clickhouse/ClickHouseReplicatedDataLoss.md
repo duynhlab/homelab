@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `increase(ClickHouseProfileEvents_ReplicatedDataLoss[10m]) > 0`, `max by (replica)`, from `:9363` |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (3 ProfileEvent series at 0) |
 | **Dashboard** | ClickHouse → Server engine (replication row) |

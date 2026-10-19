@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | availability |
-| **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
+| **Manifest** | [`rfc0021-write-migration.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_reconciler_repairs_total{action="unreadable"}` |
 
 ## Meaning

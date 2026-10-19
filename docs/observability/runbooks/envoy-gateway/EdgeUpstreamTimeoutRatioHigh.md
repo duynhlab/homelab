@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | latency |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `envoy_cluster_upstream_rq_timeout` / `envoy_cluster_upstream_rq_completed`, per `envoy_cluster_name`, with a >0.05 req/s traffic guard |
 | **Status** | active — VERIFY-AT-KIND (added 2026-09-08; confirm the timeout counter exists per cluster at rest) |
 | **Dashboard** | Gateway → Envoy Clusters (upstream latency P95 per cluster) |

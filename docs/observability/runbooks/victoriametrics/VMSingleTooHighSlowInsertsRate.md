@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmsingle-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmsingle-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmsingle-alerts.yaml) |
 | **Metrics** | `vm_slow_row_inserts_total` / `vm_rows_inserted_total` |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → VMSingle |

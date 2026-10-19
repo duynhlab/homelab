@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `chi_clickhouse_metric_fetch_errors` — the **Altinity metrics-exporter's** view, 3 hostnames × 7 `fetch_type` = 21 series |
 | **Status** | active |
 | **Dashboard** | ClickHouse → Server engine · ClickHouse → Overview |

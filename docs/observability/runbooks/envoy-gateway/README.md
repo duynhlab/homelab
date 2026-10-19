@@ -6,8 +6,8 @@ because the investigation is identical and only the urgency differs.
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`prometheusrules/envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
-| Recording rules | [`prometheusrules/envoy-gateway/recording-rules.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/recording-rules.yaml) |
+| Alert rules | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
+| Recording rules | [bundles/envoy-gateway/recording-rules.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/recording-rules.yaml) |
 | Data-plane scrape | [`podmonitors/envoy-gateway-proxy.yaml`](../../../../kubernetes/infra/configs/observability/metrics/podmonitors/envoy-gateway-proxy.yaml) — `job="envoy-gateway"` |
 | Control-plane scrape | [`servicemonitors/envoy-gateway-controller.yaml`](../../../../kubernetes/infra/configs/observability/metrics/servicemonitors/envoy-gateway-controller.yaml) — `job="envoy-gateway-controller"` |
 | Alert catalog | [§ Envoy Gateway edge](../../alerting/alert-catalog.md) |

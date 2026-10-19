@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `chi_clickhouse_metric_DiskFreeBytes{disk="default"} / chi_clickhouse_metric_DiskTotalBytes{disk="default"} < 0.05` — the hot disk only; on Kind the cold tier (RustFS) lives on the same node filesystem, so moving parts cold frees nothing here |
 | **Status** | active |
 | **Dashboard** | ClickHouse → Data analysis · ClickHouse → Server engine |

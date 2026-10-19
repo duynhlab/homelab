@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | correctness |
-| **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
+| **Manifest** | [`rfc0021-write-migration.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_fulfillment_start_outbox_failed` |
 | **Applies to** | All builds. `PARTICIPANT_UNSERVABLE` exists from order **1.13.0** (RFC-0021 P4) |
 

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `max by (replica) (rate(ClickHouseErrorMetric_S3_ERROR{job="clickhouse-server"}[5m])) > 0` |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (3 exact `_S3_ERROR` series at 0) |
 | **Dashboard** | ClickHouse → Server engine (`system.errors` top-N table) |

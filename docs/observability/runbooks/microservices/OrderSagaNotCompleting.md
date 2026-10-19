@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability / cutover |
-| **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
+| **Manifest** | [`rfc0021-write-migration.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_fulfillment_start_participant_total`, `order_saga_outcome_total` |
 
 ## Meaning

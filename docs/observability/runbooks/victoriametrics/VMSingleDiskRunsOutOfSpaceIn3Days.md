@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmsingle-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmsingle-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmsingle-alerts.yaml) |
 | **Metrics** | `predict_linear` over `vm_free_disk_space_bytes` |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → VMSingle |

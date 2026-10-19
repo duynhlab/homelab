@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/otel-collector-alerts.yaml` |
+| **Source** | [bundles/observability/otel-collector-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/otel-collector-alerts.yaml) |
 | **Metrics** | `up{job=~".*otel-collector.*"} == 0` |
 | **Status** | active |
 | **Dashboard** | Observability → OTel Collector |

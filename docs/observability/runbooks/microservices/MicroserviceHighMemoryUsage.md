@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
+| **Manifest** | [`alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 
 ## Meaning
 Container working-set memory exceeds 90% of its memory limit for 15 minutes.

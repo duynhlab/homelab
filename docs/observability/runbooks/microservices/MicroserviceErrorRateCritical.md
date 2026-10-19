@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | errors |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml` |
+| **Source** | [bundles/microservices/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 | **Metrics** | `http_server_request_duration_seconds_count` (5xx share) |
 | **Status** | active |
 | **Dashboard** | Microservices → the service RED board |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
+| **Manifest** | [`alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 
 ## Meaning
 `pgxpool_acquired_connections` has stayed ≥80% of `pgxpool_max_connections` for 5 minutes (`min_over_time` — sustained, not a spike).

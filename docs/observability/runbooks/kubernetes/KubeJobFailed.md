@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | workloads |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/workload-alerts.yaml` |
+| **Source** | [bundles/kubernetes/workload-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/workload-alerts.yaml) |
 | **Metrics** | `kube_job_status_failed` (kube-state-metrics) |
 | **Identity label** | `exported_namespace` is the Job namespace; `namespace` is the scrape target |
 | **Status** | active |

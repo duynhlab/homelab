@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | errors |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/valkey/alerts.yaml` |
+| **Source** | [bundles/valkey/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/valkey/alerts.yaml) |
 | **Metrics** | `redis_rejected_connections_total` |
 | **Status** | active |
 | **Dashboard** | Cache → Redis |

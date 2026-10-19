@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `rate(ClickHouseProfileEvents_FailedInsertQuery[5m]) > 0`, `max by (replica)`, from `:9363` |
 | **Status** | active · `predicate-exercised` on Kind 2026-09-10 with an isolated failed INSERT |
 | **Dashboard** | ClickHouse → Server engine (inserts row, top-N errors table) |

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmagent-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmagent-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmagent-alerts.yaml) |
 | **Metrics** | `vm_promscrape_scrapes_failed_total` |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → VMAgent |

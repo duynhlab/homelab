@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmagent-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmagent-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmagent-alerts.yaml) |
 | **Metrics** | `vmagent_remotewrite_send_duration_seconds_total` vs wall time |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → VMAgent |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
+| **Manifest** | [`alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 
 ## Meaning
 5xx error rate exceeds 5% of total traffic for 5 minutes.

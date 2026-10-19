@@ -147,7 +147,7 @@ deliberately observed only naturally occurring behavior.
 
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
-| Alert-to-layer mapping | 23 alert rules in group `observability-clickhouse`, each with a runbook, covering every layer in the tree | [Alert rules](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml); [runbook index](../../runbooks/clickhouse/README.md) | Repository fact |
+| Alert-to-layer mapping | 23 alert rules in group `observability-clickhouse`, each with a runbook, covering every layer in the tree | [Alert rules](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml); [runbook index](../../runbooks/clickhouse/README.md) | Repository fact |
 | Read-only detection | `ClickHouseReadonlyReplica` on `ReadonlyReplica > 0` for 5m | Same rules file | Repository fact |
 | Lag detection | `ClickHouseReplicationLag` on max absolute delay > 300s for 10m | Same rules file | Repository fact |
 | Parts-pressure detection | `ClickHouseTooManyParts*` at 300 — a tenth of the upstream delay threshold, so the alert leads the engine's own throttle by design | Same rules file; [upstream defaults](https://clickhouse.com/docs/reference/settings/merge-tree-settings/parts-to) | Repository fact + upstream invariant |

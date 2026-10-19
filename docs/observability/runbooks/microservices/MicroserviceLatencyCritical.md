@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning (demoted from critical) |
-| **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
+| **Manifest** | [`alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 
 ## Meaning
 P95 latency exceeds 2 seconds for 5 minutes.

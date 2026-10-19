@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | critical |
-| **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
+| **Manifest** | [`alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 
 ## Meaning
 A previously seen `go_goroutine_count` heartbeat disappears while the pod

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | nodes |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/node-alerts.yaml` |
+| **Source** | [bundles/kubernetes/node-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/node-alerts.yaml) |
 | **Metrics** | `kube_node_spec_unschedulable` (kube-state-metrics) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

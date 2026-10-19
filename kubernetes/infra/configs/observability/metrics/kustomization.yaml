@@ -19,8 +19,7 @@ resources:
   - podmonitors/envoy-gateway-proxy.yaml
   # ClickHouse server pods (engine-native :9363, per replica) — RFC-0028
   - podmonitors/clickhouse-server.yaml
-  # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
-  - prometheusrules/
+  # Static rules are owned by the pinned vm-rules chart.
   - rule-bundles/
 # RFC-0027 / ADR-059: the Tempo ServiceMonitor retired with Tempo (*.yaml.bak).
 # It was also the only scrape producing job=~".*tempo.*", which TempoDown alerted on.

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | traffic |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `edge:rq_429_ratio:rate5m` (local rate-limit `rate_limited` counter) |
 
 ## Meaning

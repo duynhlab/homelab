@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | correctness / money — ledger vs provider drift |
-| **Manifest** | [`rfc0021-phase6.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) |
+| **Manifest** | [`rfc0021-phase6.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-phase6.yaml) |
 | **Metrics** | `payment_reconciliation_discrepancies_total{class}` |
 
 ## Meaning

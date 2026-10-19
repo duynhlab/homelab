@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | platform |
-| **Source** | `kubernetes/infra/configs/temporal/prometheusrule.yaml` |
+| **Source** | [bundles/temporal/prometheusrule.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/temporal/prometheusrule.yaml) |
 | **Metrics** | `approximate_backlog_count` — **Temporal server** gauge (matching service), scraped through the chart's ServiceMonitors |
 | **Status** | active |
 | **Dashboard** | Temporal → Server (panel "Task-queue backlog (server view)") |

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `ClickHouseAsyncMetrics_MaxPartCountForPartition` > 300, `max by (replica)`, from `:9363` |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (3 series at 5; guards 1,000/3,000) |
 | **Dashboard** | ClickHouse → Server engine (parts and merges row) |

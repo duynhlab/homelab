@@ -9,7 +9,7 @@ the 90-day OTel TTL an observable lifecycle invariant.
 | **Metric** | `chi_clickhouse_table_partitions{database="otel",active="1"}` |
 | **Threshold** | more than 93 active daily partitions for 6 hours |
 | **Tables** | `otel_logs`, `otel_traces`, `otel_traces_trace_id_ts` |
-| **Source** | `prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Local-stack** | not present — no Altinity table exporter |
 
 ## Meaning and impact

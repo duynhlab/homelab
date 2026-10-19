@@ -7,7 +7,7 @@ Covers `EdgeCertExpiringSoon` (warning, < 7 days) and `EdgeCertExpired`
 |---|---|
 | **Severity** | warning at `< 7` days / critical at `< 1` day |
 | **Category** | availability |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `min(envoy_server_days_until_first_cert_expiring{job="envoy-gateway"})` |
 | **Status** | active — VERIFY-AT-KIND (added 2026-09-08; confirm the gauge tracks the SDS cert, expected 75–90 on a fresh Kind) |
 | **Dashboard** | Gateway → Envoy Global (server row) |

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/policy-reporter-alerts.yaml` |
+| **Source** | [bundles/observability/policy-reporter-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/policy-reporter-alerts.yaml) |
 | **Metrics** | `up{job=~".*policy-reporter.*"} == 0` |
 | **Status** | active |
 | **Dashboard** | Security → Kyverno / Policy Reporter |

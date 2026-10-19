@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability / money — the detector has stopped |
-| **Manifest** | [`rfc0021-phase6.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) |
+| **Manifest** | [`rfc0021-phase6.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-phase6.yaml) |
 | **Metrics** | `payment_reconciliation_watermark_age_seconds`, `payment_reconciliation_runs_total` |
 
 ## Meaning

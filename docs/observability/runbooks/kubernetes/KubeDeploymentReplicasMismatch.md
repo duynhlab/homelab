@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | workloads |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/workload-alerts.yaml` |
+| **Source** | [bundles/kubernetes/workload-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/workload-alerts.yaml) |
 | **Metrics** | `kube_deployment_spec_replicas`, `kube_deployment_status_replicas_ready` (kube-state-metrics) — note the word order: `..._status_replicas_ready`. This rule used `..._status_ready_replicas` until 2026-09-06, a name KSM does not publish, so it matched nothing and could never fire |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

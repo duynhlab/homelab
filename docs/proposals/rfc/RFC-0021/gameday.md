@@ -246,7 +246,7 @@ round-trips the attempt log does not distinguish.
 **Claim.** From the alert this drill had to explain, firing since 09:11:15 with a
 real `payment_reconciliation_discrepancies_total{kind="missing_internal"} = 1`:
 
-> [`rfc0021-phase6.yaml:141-145`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) — "Parked payments are excluded from the report by design … so anything counted here is real drift"
+> [`rfc0021-phase6.yaml:141-145`](https://github.com/duynhlab/homelab/blob/66bc9a56a688c8418892a683a466083210a074f5/kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) — "Parked payments are excluded from the report by design … so anything counted here is real drift"
 
 > [`PaymentReconciliationDiscrepancy.md:58-60`](../../../observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md) — "Drive corrections **through the service**: a capture retry, a void, or a refund posts the ledger legs and the outbox event together. Direct SQL changes the row and leaves the ledger asserting the opposite."
 

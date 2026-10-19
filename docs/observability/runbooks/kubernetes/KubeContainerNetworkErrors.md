@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | network |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/network-rules.yaml` |
+| **Source** | [bundles/kubernetes/network-rules.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/network-rules.yaml) |
 | **Metrics** | `container_network_receive_errors_total`, `container_network_transmit_errors_total` (cAdvisor) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

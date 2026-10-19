@@ -118,7 +118,7 @@ without the parent and the delete size is bounded.
 |---|---|---|---|
 | Schema ownership | Service repositories own business DDL; migration Jobs run against the `-rw` service, never through poolers | [databases hub](../README.md); [application delivery](../../platform/application-delivery.md) | Repository fact |
 | DDL audit trail | `pgaudit.log: ddl, write` records every migration statement | [`instance.yaml` pgaudit block](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| Lock-wait visibility during migrations | `log_lock_waits on` plus the blocked-queries metric and alert | same GUC block; [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
+| Lock-wait visibility during migrations | `log_lock_waits on` plus the blocked-queries metric and alert | same GUC block; [`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml) | Repository fact |
 | Declarative roles and databases | CNPG `Database`/role objects own who may write which schema | [declarative role management](../declarative-role-management.md) | Repository fact |
 | PG 18 virtual generated columns / temporal keys | Available on 18.1; no service schema is declared to use them yet | [Release 18](https://www.postgresql.org/docs/18/release-18.html) | Reference — not deployed |
 

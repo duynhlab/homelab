@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | availability |
-| **Source** | [`keycloak/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/keycloak/alerts.yaml) |
+| **Source** | [bundles/keycloak/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/keycloak/alerts.yaml) |
 | **Metrics** | `kube_pod_container_status_restarts_total{namespace="identity", container="keycloak"}` |
 | **Status** | active |
 | **Local-stack** | **not present locally** — reads kube-state-metrics, which the compose stack does not run |

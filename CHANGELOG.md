@@ -92,6 +92,8 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- Remove 71 migrated static PrometheusRule sources after native cutover, update runbook source links to chart bundles, and retain inactive CNPG/Tempo archives.
+
 - Select native chart VMRules while retaining unselected static PrometheusRules for rollback; keep SLO rule selection unchanged.
 
 - Stage vm-rules 0.2.0 through platform-rules and temporal-rules HelmReleases; keep native rules excluded until the explicit selector cutover.

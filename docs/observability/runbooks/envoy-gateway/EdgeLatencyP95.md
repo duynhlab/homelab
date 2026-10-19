@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning (>1000 ms) · critical (>2000 ms) |
 | **Category** | latency |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `edge:latency_ms:p95_5m` (histogram quantile over `envoy_http_downstream_rq_time`) |
 
 ## Meaning

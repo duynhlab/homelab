@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Source** | [`role-membership-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml) ([ADR-088](../../../proposals/adr/ADR-088-platform-owns-database-authorization/)) |
+| **Source** | [`role-membership-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/role-membership-alerts.yaml) ([ADR-088](../../../proposals/adr/ADR-088-platform-owns-database-authorization/)) |
 | **Clusters** | `platform-db` |
 | **Custom queries** | `pg_role_config`, `pg_default_privileges` ([`monitoring-queries.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml)) |
 

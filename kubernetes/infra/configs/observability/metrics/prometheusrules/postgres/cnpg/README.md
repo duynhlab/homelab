@@ -1,4 +1,9 @@
-# CNPG Prometheus rules (chart baseline)
+# Archived CNPG rule notes
+
+Active rules now live in the vm-rules chart `bundles/cnpg/` and are parameterized
+for product-db and platform-db. This directory only retains the inactive files.
+The render instructions and upstream mapping below describe the original import,
+not the active GitOps ownership. See the native VMRule migration runbook.
 
 Upstream source: [cloudnative-pg/charts — `charts/cluster/prometheus_rules/`](https://github.com/cloudnative-pg/charts/tree/main/charts/cluster/prometheus_rules). Those paths contain **Helm template fragments**, not apply-ready Kubernetes YAML. This directory stores **`PrometheusRule` CRs** split **one file per upstream fragment** (same basename, e.g. `cluster-offline.yaml`) for review parity with the chart.
 

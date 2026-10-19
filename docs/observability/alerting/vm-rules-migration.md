@@ -13,9 +13,9 @@ release owns 70 native VMRules; the separate Temporal release owns one and remai
 under temporal-config's dependency on the Temporal server. Sloth and the slo
 chart keep their PrometheusRules and converter path. Compose is unchanged.
 
-**Current repository stage: cutover.** VMAlert selects native chart rules and
-excludes the old static sources. The old PrometheusRules remain available for
-rollback. Merge only after the staging readiness and parity gates passed. This document describes the subsequent
+**Current repository stage: cleanup.** Static rule sources have been removed
+from Kustomize; VMAlert still excludes `source=manifests` while converter-owned
+objects are garbage-collected. Merge only after the cutover runtime gate passed. This document describes the subsequent
 stages as planned until their corresponding commits have been reconciled.
 
 Apply the stages as separate GitOps changes, never squash all stages into one
@@ -95,3 +95,14 @@ new local definitions without changing bundled Prometheus annotation templates.
 Disabled/replaced CNPG files and retired Tempo files stay inactive. Do not enable
 them through the migration. Preserve their operational rationale in the catalog
 and CNPG notes; new expressions or threshold changes require a separate review.
+
+## Migration test evidence
+
+2026-10-20, disposable Kind Kubernetes 1.37.0, VM Operator 0.75.0 (chart 0.68.1),
+VMAlert 1.152.0: each baseline/stage/cutover/rollback/cleanup snapshot held 319
+rules (315 original plus four test sentinels), all health=ok. The selector canary
+proved source changes; old converted VMRules were garbage-collected. The SLO
+sentinel kept its activeAt and the recording sentinel returned 7. This test used
+an isolated datasource and does not replace the original Kind behavioral audit.
+The test cluster was removed and Podman stopped. Reproduce using the chart's
+Kind integration script; CI runs the same gate on Kubernetes 1.35.8.

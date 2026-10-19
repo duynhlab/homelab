@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | capacity |
-| **Source** | `.../prometheusrules/kubernetes/controlplane-alerts.yaml` |
+| **Source** | [bundles/kubernetes/controlplane-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/controlplane-alerts.yaml) |
 | **Metrics** | `kubelet_running_pods` / `kubelet_node_config_assigned_pod_cidr_max_pods` |
 | **Status** | 💤 **inert on Kind** — the denominator has **0 series** |
 | **Dashboard** | Observability → Kubernetes cluster overview |

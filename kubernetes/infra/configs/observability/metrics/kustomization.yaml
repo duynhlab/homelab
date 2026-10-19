@@ -21,5 +21,6 @@ resources:
   - podmonitors/clickhouse-server.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
   - prometheusrules/
+  - rule-bundles/
 # RFC-0027 / ADR-059: the Tempo ServiceMonitor retired with Tempo (*.yaml.bak).
 # It was also the only scrape producing job=~".*tempo.*", which TempoDown alerted on.

@@ -1,0 +1,63 @@
+# Staged native rules: VMAlert excludes source=chart until the cutover commit.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: platform-rules
+  namespace: monitoring
+spec:
+  interval: 10m
+  timeout: 5m
+  dependsOn:
+  - name: victoria-metrics-operator
+    namespace: monitoring
+  chartRef:
+    kind: OCIRepository
+    name: vm-rules-chart-oci
+    namespace: flux-system
+  releaseName: platform-rules
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    defaultRules:
+      enabled: false
+    bundles:
+      kubernetes:
+        enabled: true
+      microservices:
+        enabled: true
+      envoy-gateway:
+        enabled: true
+      keycloak:
+        enabled: true
+      victoriametrics:
+        enabled: true
+      observability:
+        enabled: true
+      valkey:
+        enabled: true
+      gitops:
+        enabled: true
+      kyverno:
+        enabled: true
+      keda:
+        enabled: true
+      postgres:
+        enabled: true
+      watchdog:
+        enabled: true
+    cnpg:
+      clusters:
+        product-db:
+          namespace: product
+          haExcludedJob: product/product-db-replica
+        platform-db:
+          namespace: platform
+      operator:
+        enabled: true
+        namespace: cloudnative-pg
+    ruleSelectorLabels:
+      rules.duynhlab.dev/source: chart

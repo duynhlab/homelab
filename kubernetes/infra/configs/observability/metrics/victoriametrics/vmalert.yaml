@@ -8,14 +8,8 @@ metadata:
   name: victoria-metrics
   namespace: monitoring
 spec:
-  # Native chart rules are active; exclude old static sources until cleanup completes.
-  # Keep all namespaces selected: CNPG also lives in product/platform/cloudnative-pg.
-  ruleNamespaceSelector: {}
-  ruleSelector:
-    matchExpressions:
-      - key: rules.duynhlab.dev/source
-        operator: NotIn
-        values: [manifests]
+  # Restore broad discovery only after old converted static rules are gone.
+  selectAllByDefault: true
 
   evaluationInterval: "15s"
 

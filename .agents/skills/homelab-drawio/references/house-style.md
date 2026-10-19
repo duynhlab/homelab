@@ -113,6 +113,10 @@ stays one system:
 `request` / `storage` / `scaling` remain for hand-authored diagrams. The
 `planned` edge style is what a `status: planned` edge of any type becomes.
 
+Edges are drawn at `strokeWidth=1` (solid and dashed alike) and `replication`
+at `1.5`, one step lighter than the cards' `1.5` border, so the boxes carry the
+structure and dense views stay readable (owner, 2026-10-19).
+
 ## Top-down layout
 
 The default for every generated diagram (`scripts/generate.py`), and the

@@ -5,10 +5,18 @@
 # kubernetes/apps/services/*.yaml + domains/*-rs.yaml (the *_GRPC_ADDR inputs, domain
 # labels, authmw), apps/{order-worker,checkout-worker,mockpay}.yaml,
 # configs/envoy-gateway/{routes,policies}/*.yaml.
+# Re-verified 2026-10-19: services/*.yaml *_grpc_addr + mockpay_url, order-worker.yaml
+# env (inventory/shipping/notification/payment gRPC + CART_SERVICE_URL), mockpay
+# MOCKPAY_WEBHOOK_URL, checkout-worker.yaml (no east-west address: DB + Temporal only,
+# so not drawn), domain labels, staffauthmw (/protected set) and routes/api.yaml.
+# Every edge holds. Fixed: scope no longer says "grouped by domain" (the domain is in
+# each label; frames were dropped, see below); note names checkout-worker; o_ship's
+# label moved off the horizontal run it collided with. Crossings: 8 is the floor of
+# ~100 random peer orderings (pinned 15, worker on its own tier 9).
 diagram:
   id: platform-api
   title: "duynhlab homelab — Platform API topology"
-  scope: "Who calls whom, over which protocol, grouped by domain: the SPAs through the gateway, the gRPC calls between services and the order worker's activities. Workflow starts and task queues are the Temporal diagram; stores are the database diagram."
+  scope: "Who calls whom, over which protocol, each box labelled with its domain: the SPAs through the gateway, the gRPC calls between services and the order worker's activities. Workflow starts and task queues are the Temporal diagram; stores are the database diagram."
   question: domain-topology
   level: L2
   animate: [traffic]
@@ -71,7 +79,7 @@ edges:
   - {id: p_review, source: product, target: review, type: traffic, label: "GetProductReviews"}
   - {id: p_avail, source: product, target: inventory, type: traffic, label: "BatchGetAvailability"}
 
-  - {id: o_ship, source: order, target: shipping, type: traffic, label: "GetShipmentByOrder"}
+  - {id: o_ship, source: order, target: shipping, type: traffic, label: "GetShipmentByOrder", label_pos: -0.3}
   - {id: o_pay, source: order, target: payment, type: traffic, label: "GetPayment"}
   - {id: o_res, source: order, target: inventory, type: traffic, label: "GetReservation"}
 
@@ -90,4 +98,4 @@ notes:
     text: "The gateway reaches every service on HTTP :8080 through its route set on gateway.duynh.me: /public and /private for the storefront (customer realm JWT), /protected for the back-office on product, inventory, order, payment, shipping and user (staff realm JWT). Inventory exposes only /protected over HTTP. Every service also verifies tokens itself against Keycloak's JWKS (pkg/authmw), which is not drawn."
   - id: note_scope
     title: "Elsewhere"
-    text: "checkout starts AbandonedCheckoutWorkflow and the order API starts OrderFulfillmentWorkflow and CancellationWorkflow on Temporal; the order worker's calls above are that workflow's activities (workflows/temporal-keda). mockpay posts its webhook to payment in-cluster; the gateway's webhook route is used by local-stack only. Databases and the Valkey cache are databases/topology."
+    text: "checkout starts AbandonedCheckoutWorkflow and the order API starts OrderFulfillmentWorkflow and CancellationWorkflow on Temporal; the order worker's calls above are that workflow's activities (workflows/temporal-keda). checkout-worker runs the abandoned-checkout workflow against its database only and calls no service, so it is not drawn. mockpay posts its webhook to payment in-cluster; the gateway's webhook route is used by local-stack only. Databases and the Valkey cache are databases/topology."

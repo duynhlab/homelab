@@ -5,9 +5,17 @@
 # the PgDog HelmRelease (primary only, ADR-089) and PgBouncer Pooler,
 # configs/databases/clusters/*/authz/ (role catalog Job + CronJob, pgroles policies),
 # controllers/keycloak/deployment.yaml, controllers/temporal/helmrelease.yaml and
-# platform-db/{openbao-db-config,vault-rotator}.yaml. 2026-10-16 (RFC-0029 wave 2):
-# payment's runtime goes through PgDog with
-# client TLS (product-db/poolers/certificate.yaml, sslmode=require).
+# platform-db/{openbao-db-config,vault-rotator}.yaml.
+# Re-verified 2026-10-19 (ADR-089, after #1312) against apps/services/*.yaml
+# (db_sslmode verify-full, db_ca_secret), */server-tls.yaml, */poolers/
+# (pooler.yaml clientTLSSecret + client_tls_sslmode require; PgDog helmrelease
+# tlsClientRequired, passthroughAuth, tlsVerify verify_full),
+# {platform,product}-db/{openbao-db-config,vault-rotator}.yaml (sslmode=require,
+# 4 + 6 static roles, rotation_period 720h), */services/*.yaml (ExternalSecrets on
+# openbao-db every 15s, DatabaseRoles without passwordSecret) and */secrets/
+# (the service-namespace copies).
+# Visual review 2026-10-19: e_mig_product label moved (label_pos) off the crowded
+# entry into product-db; content unchanged.
 diagram:
   id: databases
   title: "duynhlab homelab — Database connection and recovery paths"
@@ -39,21 +47,20 @@ boundaries:
 
 nodes:
   # Listed in the order dot starts from: the fewest crossings of ~600
-  # orderings measured with validate.py on 2026-09-28. With payment on PgDog,
-  # all 5040 client orders were measured (2026-10-16): 14 crossings is the
-  # floor, and this is that order.
+  # orderings measured with validate.py on 2026-09-28. Payment joined the
+  # product-db services' box on 2026-10-19 (same pooler, same TLS mode); all 720
+  # client orders were then measured: 15 crossings is the floor, and this is that order.
+  - {id: c_migrate, label: "Migration Jobs\nevery service, before rollout\nverify-full", role: worker, layer: clients, parent: f_clients}
+  - {id: c_keycloak, label: "Keycloak (identity)\nJDBC, long-lived pool", role: platform, layer: clients, parent: f_clients, icon: keycloak}
+  - {id: c_platform, label: "user · notification\nshipping · review", role: service, layer: clients, parent: f_clients, icon: go}
+  - {id: c_product, label: "product · cart · order\ncheckout · inventory · payment", role: service, layer: clients, parent: f_clients, icon: go}
   - {id: c_temporal, label: "Temporal server (temporal)\ntemporal · temporal_visibility", role: platform, layer: clients, parent: f_clients, icon: temporal}
   - {id: c_authz, label: "Authorization executors\nauthz Job + CronJob per cluster\npgroles · as db_authz", role: platform, layer: clients, parent: f_clients}
-  - {id: c_migrate, label: "Migration Jobs\nevery service, before rollout", role: worker, layer: clients, parent: f_clients}
-  - {id: c_platform, label: "user · notification\nshipping · review", role: service, layer: clients, parent: f_clients, icon: go}
-  - {id: c_keycloak, label: "Keycloak (identity)\nJDBC, long-lived pool", role: platform, layer: clients, parent: f_clients, icon: keycloak}
-  - {id: c_product, label: "product · cart · order\ncheckout · inventory", role: service, layer: clients, parent: f_clients, icon: go}
-  - {id: c_payment, label: "payment\nsslmode=require", role: service, layer: clients, parent: f_clients, icon: go}
 
-  - {id: openbao, label: "OpenBao database engine\nvault_rotator · static role", role: platform, layer: poolers, parent: f_cluster, icon: openbao}
-  - {id: pgbouncer, label: "platform-db-pooler-rw\nPgBouncer ×2 · transaction", role: data, layer: poolers, parent: f_platform}
+  - {id: openbao, label: "OpenBao database engine\nvault_rotator per cluster\n10 runtime static roles", role: platform, layer: poolers, parent: f_cluster, icon: openbao}
+  - {id: pgbouncer, label: "platform-db-pooler-rw\nPgBouncer ×2 · transaction\nclient TLS required", role: data, layer: poolers, parent: f_platform}
   - {id: cnpg, label: "CloudNativePG operator\n+ barman-cloud plugin", role: platform, layer: poolers, parent: f_cnpg, icon: cloudnativepg}
-  - {id: pgdog, label: "pgdog-product ×3 :6432\nprimary only (ADR-089)", role: data, layer: poolers, parent: f_product, icon: pgdog}
+  - {id: pgdog, label: "pgdog-product ×3 :6432\nprimary only · TLS required\npassthrough auth (ADR-089)", role: data, layer: poolers, parent: f_product, icon: pgdog}
 
   - {id: productdb, label: "product-db ×3 · sync any 1\nproduct · cart · order · payment\ncheckout · inventory", role: data, layer: clusters, parent: f_product, shape: datastore, icon: postgresql}
   - {id: platformdb, label: "platform-db ×3 · sync any 1\nuser · notification · shipping · review\nkeycloak · temporal · temporal_visibility", role: data, layer: clusters, parent: f_platform, shape: datastore, icon: postgresql}
@@ -63,20 +70,20 @@ nodes:
   - {id: replica, label: "product-db-replica ×1\nDR: designated primary\n(3 on promotion)", role: data, layer: dr, parent: f_product, shape: datastore, icon: postgresql}
 
 edges:
-  - {id: e_platform, source: c_platform, target: pgbouncer, type: data, label: ":5432"}
-  - {id: e_product, source: c_product, target: pgdog, type: data, label: ":6432"}
-  - {id: e_payment, source: c_payment, target: pgdog, type: data, label: ":6432 TLS (require)"}
+  - {id: e_platform, source: c_platform, target: pgbouncer, type: data, label: ":5432 verify-full"}
+  - {id: e_product, source: c_product, target: pgdog, type: data, label: ":6432 verify-full"}
   - {id: e_keycloak, source: c_keycloak, target: platformdb, type: data, label: "direct"}
   - {id: e_temporal, source: c_temporal, target: platformdb, type: data, label: "direct"}
   - {id: e_mig_platform, source: c_migrate, target: platformdb, type: dependency, label: "platform-db-rw"}
-  - {id: e_mig_product, source: c_migrate, target: productdb, type: dependency, label: "product-db-rw"}
+  - {id: e_mig_product, source: c_migrate, target: productdb, type: dependency, label: "product-db-rw", label_pos: -0.6}
   - {id: e_authz_platform, source: c_authz, target: platformdb, type: control, label: "roles + grants"}
   - {id: e_authz_product, source: c_authz, target: productdb, type: control, label: "roles + grants"}
 
-  - {id: e_pgbouncer, source: pgbouncer, target: platformdb, type: data, label: "primary"}
-  - {id: e_pgdog, source: pgdog, target: productdb, type: data, label: "-rw"}
+  - {id: e_pgbouncer, source: pgbouncer, target: platformdb, type: data, label: "primary · verify-full"}
+  - {id: e_pgdog, source: pgdog, target: productdb, type: data, label: "-rw · verify-full"}
 
-  - {id: e_rotate, source: openbao, target: platformdb, type: control, label: "rotates notification_runtime (720 h)"}
+  - {id: e_rotate, source: openbao, target: platformdb, type: control, label: "rotates 4 runtimes (720 h)"}
+  - {id: e_rotate_product, source: openbao, target: productdb, type: control, label: "rotates 6 runtimes (720 h)"}
   - {id: e_cnpg_platform, source: cnpg, target: platformdb, type: control, label: manages}
   - {id: e_cnpg_product, source: cnpg, target: productdb, type: control, label: manages}
   - {id: e_cnpg_replica, source: cnpg, target: replica, type: control, label: manages}
@@ -88,7 +95,7 @@ edges:
 notes:
   - id: note_creds
     title: "Credentials"
-    text: "Each login's password is a Kubernetes Secret rendered by External Secrets from OpenBao KV and reloaded by CNPG: secret/local/databases/<cluster>/<service>-runtime and -migrator for every service (RFC-0029 roles), <cluster>/<name> for Temporal and Keycloak. notification_runtime is the exception: its password is owned by the OpenBao database engine, which rotates it every 720 h, and External Secrets reads database/static-creds/notification-runtime every minute. PgDog takes the product-db role secrets through its HelmRelease valuesFrom; backups authenticate to RustFS with pg-backup-rustfs-credentials."
+    text: "All ten <service>_runtime passwords belong to the OpenBao database engine: one static role per runtime, rotated every 720 h by that cluster's vault_rotator (one openbao-db-config Job per cluster). External Secrets reads database/static-creds/<service>-runtime through the openbao-db store every 15 s into a Secret in the cluster namespace and in the service namespace; pods mount it and read DB_PASSWORD_FILE, and the DatabaseRoles carry no passwordSecret. OpenBao KV (store openbao, hourly) holds the migrators, db_authz, vault_rotator, Temporal and Keycloak. Neither pooler holds a password: PgDog passes each login through to product-db, PgBouncer looks it up with auth_query over a client certificate. Every service, worker, migration and authz hop verifies the homelab-ca server certificate (verify-full); Keycloak, Temporal, OpenBao and pgroles do not yet (#1296, #1306). Backups authenticate to RustFS with pg-backup-rustfs-credentials."
   - id: note_dr
     title: "Why the DR replica reads from RustFS"
     text: "product-db-replica never connects to the primary: it bootstraps from product-db's base backup and then replays its WAL archive from the bucket, so it survives the loss of the product-db pods. Its designated primary keeps its own archive and a daily backup in product-db-replica/ (7 d). Migrations always target the -rw service directly, never a pooler."

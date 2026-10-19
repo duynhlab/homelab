@@ -2,6 +2,16 @@
 #   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/platform/topology.ir.yaml
 # Verified against kubernetes/ (HTTPRoute hostnames, apps/services db_host,
 # configs/databases/clusters, controllers/keycloak + temporal) on 2026-09-28.
+# Re-verified 2026-10-19 (repository review, not a runtime test): db_host and
+# db_sslmode in apps/services/*.yaml (6 services on PgDog, 4 on the platform-db
+# PgBouncer Pooler, all verify-full), DB_HOST of apps/order-worker.yaml and
+# apps/checkout-worker.yaml (PgDog; both are Temporal WorkerDeployments),
+# Keycloak/Temporal connectAddr (platform-db-rw direct), ClusterSecretStore
+# openbao-db (database/static-creds), OTel Collector exporters and retention
+# (vlsingle/vmsingle/vtsingle 7d, Pyroscope 168h, ClickHouse DDL 90d).
+# Fixed: SQL edge labels named the wrong domains (review is catalog but on
+# platform-db; inventory is fulfillment on PgDog); added the missing
+# workers -> PgDog edge; OpenBao now also serves the rotated DB credentials.
 diagram:
   id: topology
   title: "duynhlab homelab — Request-path topology"
@@ -24,12 +34,12 @@ boundaries:
   - {id: f_obs, label: "Observability", parent: f_cluster}
 
 nodes:
-  # Listed in the order dot starts from: the fewest crossings of ~1000
-  # orderings measured with validate.py on 2026-09-28.
+  # Listed in the order dot starts from: the fewest crossings (9) of ~320
+  # orderings and three re-tiers measured with validate.py on 2026-10-19.
   - {id: browser, label: "Browser", role: external, layer: client}
 
-  - {id: keycloak, label: "Keycloak\nid.duynh.me · OIDC", role: platform, layer: edge, parent: f_cluster, icon: keycloak}
   - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me · TLS · JWT · CORS", role: edge, layer: edge, parent: f_cluster, icon: envoy}
+  - {id: keycloak, label: "Keycloak\nid.duynh.me · OIDC", role: platform, layer: edge, parent: f_cluster, icon: keycloak}
   - {id: openbao, label: "OpenBao\nHA Raft", role: platform, layer: edge, parent: f_sec, icon: openbao}
 
   - {id: spa, label: "Storefront SPA\nlocal.duynh.me", role: service, layer: apps, parent: f_apps}
@@ -40,17 +50,17 @@ nodes:
   - {id: wk, label: "Temporal workers\ncheckout-worker · order-worker", role: worker, layer: workflow, parent: f_flow, icon: go}
   - {id: tmp, label: "Temporal server", role: platform, layer: workflow, parent: f_flow, icon: temporal}
 
+  - {id: pgdog, label: "PgDog pooler\nproduct-db", role: data, layer: pooling, parent: f_data, icon: pgdog}
   - {id: otel, label: "OTel Collector\nOTLP · traces · logs · metrics", role: collector, layer: pooling, parent: f_obs, icon: opentelemetry}
-  - {id: valkey, label: "Valkey cache", role: data, layer: pooling, parent: f_data, icon: valkey}
   - {id: cnpg, label: "CloudNativePG operator", role: platform, layer: pooling, parent: f_data, icon: cloudnativepg}
   - {id: cnpgpool, label: "CNPG Pooler (PgBouncer)\nplatform-db", role: data, layer: pooling, parent: f_data}
-  - {id: pgdog, label: "PgDog pooler\nproduct-db", role: data, layer: pooling, parent: f_data, icon: pgdog}
+  - {id: valkey, label: "Valkey cache", role: data, layer: pooling, parent: f_data, icon: valkey}
 
-  - {id: pyro, label: "Pyroscope\nprofiles · 7 d", role: profile, layer: data, parent: f_obs, icon: pyroscope}
-  - {id: vm, label: "VictoriaMetrics · VictoriaLogs · VictoriaTraces\nvmagent ingest · 7 d", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
-  - {id: ch, label: "ClickHouse\notel_logs · otel_traces · 90 d", role: data, layer: data, parent: f_obs, icon: clickhouse}
   - {id: productdb, label: "product-db\nHA + DR replica", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
+  - {id: vm, label: "VictoriaMetrics · VictoriaLogs · VictoriaTraces\nvmagent ingest · 7 d", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
   - {id: platformdb, label: "platform-db\nHA", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
+  - {id: pyro, label: "Pyroscope\nprofiles · 7 d", role: profile, layer: data, parent: f_obs, icon: pyroscope}
+  - {id: ch, label: "ClickHouse\notel_logs · otel_traces · 90 d", role: data, layer: data, parent: f_obs, icon: clickhouse}
 
   - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_obs, icon: grafana}
 
@@ -64,8 +74,9 @@ edges:
   - {id: e_tmp, source: svc, target: tmp, type: traffic, label: "starts workflows"}
   - {id: e_wk, source: wk, target: tmp, type: traffic, label: "polls task queue"}
   - {id: e_cache, source: svc, target: valkey, type: data, label: "cache-aside"}
-  - {id: e_pgdog, source: svc, target: pgdog, type: data, label: "catalog · checkout SQL"}
-  - {id: e_cnpg, source: svc, target: cnpgpool, type: data, label: "identity · comms SQL"}
+  - {id: e_pgdog, source: svc, target: pgdog, type: data, label: "SQL · 6 services"}
+  - {id: e_cnpg, source: svc, target: cnpgpool, type: data, label: "SQL · 4 services"}
+  - {id: e_wkdb, source: wk, target: pgdog, type: data, label: "SQL"}
   - {id: e_prod, source: pgdog, target: productdb, type: data, label: "pooled SQL"}
   - {id: e_plat, source: cnpgpool, target: platformdb, type: data, label: "pooled SQL"}
   - {id: e_kcdb, source: keycloak, target: platformdb, type: data, label: "direct SQL"}
@@ -74,7 +85,7 @@ edges:
   - {id: e_cnpg2, source: cnpg, target: platformdb, type: control, label: manages}
 
   - {id: e_sec, source: eso, target: svc, type: control, label: "syncs Secrets"}
-  - {id: e_bao, source: openbao, target: eso, type: data, label: "KV, read by ESO"}
+  - {id: e_bao, source: openbao, target: eso, type: data, label: "KV + rotated DB creds\nread by ESO"}
 
   - {id: e_otlp_edge, source: envoy, target: otel, type: telemetry, label: "OTLP spans"}
   - {id: e_otlp_svc, source: svc, target: otel, type: telemetry, protocol: OTLP, label_pos: -0.4}
@@ -86,6 +97,9 @@ edges:
   - {id: e_gf_vm, source: vm, target: grafana, type: data, label: queried}
   - {id: e_gf_ch, source: ch, target: grafana, type: data, label: queried}
   - {id: e_gf_pyro, source: pyro, target: grafana, type: data, label: queried}
+
+notes:
+  - {id: n_sql, title: "Database access", text: "PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology."}
 
 tests:
   - {rule: no-public-datastore}

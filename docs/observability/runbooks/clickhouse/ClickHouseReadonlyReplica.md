@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `ClickHouseMetrics_ReadonlyReplica` — the server's own `:9363` endpoint, **per pod** |
 | **Status** | active |
 | **Dashboard** | ClickHouse → Server engine |

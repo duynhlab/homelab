@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmalert-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmalert-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmalert-alerts.yaml) |
 | **Metrics** | `vmalert_alerting_rules_errors_total` |
 | **Status** | active · 814 rules evaluating, 0 lastError at last audit |
 | **Dashboard** | VictoriaMetrics → VMAlert |

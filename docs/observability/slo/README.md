@@ -179,7 +179,7 @@ could never fire on the platform's only stock authority. They were replaced by
 two gRPC SLOs with RFC-0021's targets (availability 99.9%, `Reserve` p95 <
 250 ms). The chart's third SLO (4xx+5xx) has no honest gRPC analogue: the
 closest thing is a business refusal, which already has precise named alerts in
-[`checkout-availability.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/checkout-availability.yaml).
+[`checkout-availability.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/checkout-availability.yaml).
 
 **Adding a gRPC-only service:** set `slo_disabled: "true"` on its
 `ResourceSetInputProvider` and add a hand-written `PrometheusServiceLevel` in

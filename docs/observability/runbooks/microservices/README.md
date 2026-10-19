@@ -5,11 +5,11 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`prometheusrules/microservices/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
-| Recording rules | [`prometheusrules/microservices/recording-rules.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml) |
+| Alert rules | [bundles/microservices/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
+| Recording rules | [bundles/microservices/recording-rules.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/recording-rules.yaml) |
 | Metrics reference | [`metrics-apps.md`](../../metrics/metrics-apps.md) |
 | Alert catalog | [§1 Microservices](../../alerting/alert-catalog.md#1-microservices-red-metrics) |
-| Recording rules | [`prometheusrules/microservices/recording-rules.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml) |
+| Recording rules | [bundles/microservices/recording-rules.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/recording-rules.yaml) |
 | Alerting strategy | [2-layer architecture](../../alerting/README.md) (threshold + SLO burn-rate) |
 
 ## Index
@@ -39,7 +39,7 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 
 ### RFC-0021 stock migration (write path)
 
-Rules: [`prometheusrules/microservices/rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) ·
+Rules: [bundles/microservices/rfc0021-write-migration.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-write-migration.yaml) ·
 catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-overhaul-stock-migration)
 
 These cover a failure class the RED alerts above cannot see: an order and its stock
@@ -65,7 +65,7 @@ can disagree while every service reports perfectly healthy.
 
 ### Inventory stock authority
 
-Rules: [`prometheusrules/microservices/inventory.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/inventory.yaml)
+Rules: [bundles/microservices/inventory.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/inventory.yaml)
 
 Inventory is the stock authority on the money path — these watch its
 reservation outcomes and gRPC surface directly.
@@ -78,7 +78,7 @@ reservation outcomes and gRPC surface directly.
 
 ### RFC-0021 phase 5 (order aggregate)
 
-Rules: [`prometheusrules/microservices/rfc0021-phase5.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase5.yaml) ·
+Rules: [bundles/microservices/rfc0021-phase5.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-phase5.yaml) ·
 catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-overhaul-stock-migration)
 
 Two order states mean **somebody is owed work**, and neither is visible to a RED
@@ -98,7 +98,7 @@ true.
 
 ### RFC-0021 phase 6 (payment doubt)
 
-Rules: [`prometheusrules/microservices/rfc0021-phase6.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) ·
+Rules: [bundles/microservices/rfc0021-phase6.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-phase6.yaml) ·
 catalog: [§9b RFC-0021 phase 6](../../alerting/alert-catalog.md#9b-rfc-0021-phase-6-payment-doubt)
 
 Payment can now record that it does **not know** what the provider did. These

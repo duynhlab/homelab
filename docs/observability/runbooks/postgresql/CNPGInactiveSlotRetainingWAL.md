@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Source** | deep-signal ([`deep-signals-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml)) |
+| **Source** | deep-signal ([`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml)) |
 | **Clusters** | `platform-db`, `product-db` |
 | **Metrics** | `cnpg_pg_replication_slots_pg_wal_lsn_diff`, `cnpg_pg_replication_slots_active`, `cnpg_pg_replication_in_recovery` |
 | **Grafana** | CloudNativePG cluster board |

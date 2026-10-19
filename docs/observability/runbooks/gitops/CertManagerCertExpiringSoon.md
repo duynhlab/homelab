@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | gitops |
-| **Source** | `.../prometheusrules/gitops/cert-manager-alerts.yaml` |
+| **Source** | [bundles/gitops/cert-manager-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/gitops/cert-manager-alerts.yaml) |
 | **Metrics** | `certmanager_certificate_expiration_timestamp_seconds` |
 | **Status** | active |
 | **Dashboard** | GitOps → cert-manager |

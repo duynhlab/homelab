@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | resources |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/pod-resources-alerts.yaml` |
+| **Source** | [bundles/kubernetes/pod-resources-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/pod-resources-alerts.yaml) |
 | **Metrics** | `container_memory_working_set_bytes` (cAdvisor), `kube_pod_container_resource_limits` (kube-state-metrics) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

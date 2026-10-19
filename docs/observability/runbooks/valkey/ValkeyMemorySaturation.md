@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | saturation |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/valkey/alerts.yaml` |
+| **Source** | [bundles/valkey/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/valkey/alerts.yaml) |
 | **Metrics** | `redis_memory_used_bytes`, `redis_memory_max_bytes` |
 | **Status** | active |
 | **Dashboard** | Cache → Redis |

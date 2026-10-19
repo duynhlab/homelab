@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | critical |
-| **Source** | `prometheusrules/postgres/replication-health.yaml` (homelab-authored) |
+| **Source** | [bundles/postgres/replication-health.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/replication-health.yaml) (homelab-authored) |
 | **Metrics** | `cnpg_pg_replication_in_recovery`, `cnpg_pg_replication_is_wal_receiver_up` |
 | **Clusters** | `platform-db`, `product-db`, `product-db-replica` (DR) — every instance whose role is `replica`. The **designated primary** of the DR cluster is excluded: it is in recovery for the life of the cluster and replays from the object-store WAL archive, so it has no WAL receiver by design. |
 | **Grafana** | CloudNativePG Cluster Overview |

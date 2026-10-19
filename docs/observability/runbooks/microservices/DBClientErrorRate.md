@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | database |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml` |
+| **Source** | [bundles/microservices/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/alerts.yaml) |
 | **Metrics** | `db_client_operation_errors_total` (otelpgx) |
 | **Status** | active |
 | **Dashboard** | Microservices → the service RED board |

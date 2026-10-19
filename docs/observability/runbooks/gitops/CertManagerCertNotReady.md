@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | gitops |
-| **Source** | `.../prometheusrules/gitops/cert-manager-alerts.yaml` |
+| **Source** | [bundles/gitops/cert-manager-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/gitops/cert-manager-alerts.yaml) |
 | **Metrics** | `certmanager_certificate_ready_status{condition="False"} == 1` |
 | **Status** | active · 24 certificate series on this cluster |
 | **Dashboard** | GitOps → cert-manager |

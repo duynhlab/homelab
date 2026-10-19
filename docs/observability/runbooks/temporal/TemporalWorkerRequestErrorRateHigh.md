@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | workflow |
-| **Source** | `kubernetes/infra/configs/temporal/prometheusrule.yaml` |
+| **Source** | [bundles/temporal/prometheusrule.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/temporal/prometheusrule.yaml) |
 | **Metrics** | `temporal_request_failure_total`, `temporal_request_total` — **Go SDK** client metrics |
 | **Status** | active |
 | **Dashboard** | Temporal → Workers |

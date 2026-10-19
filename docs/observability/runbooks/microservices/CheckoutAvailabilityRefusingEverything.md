@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | correctness |
-| **Manifest** | [`checkout-availability.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/checkout-availability.yaml) |
+| **Manifest** | [`checkout-availability.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/checkout-availability.yaml) |
 | **Metrics** | `checkout_availability_check_total{result}` |
 | **Applies to** | checkout **0.5.0+** |
 

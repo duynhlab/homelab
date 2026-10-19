@@ -11,7 +11,7 @@ alert name; the schedule-to-start warning/critical pair shares one file.
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`configs/temporal/prometheusrule.yaml`](../../../../kubernetes/infra/configs/temporal/prometheusrule.yaml) — outside `prometheusrules/`, which is why the catalog's count command misses this group |
+| Alert rules | [bundles/temporal/prometheusrule.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/temporal/prometheusrule.yaml) — included in the native chart migration baseline |
 | Alert catalog | [§8 Temporal / Pyroscope / Watchdog](../../alerting/alert-catalog.md#8-temporal--pyroscope--watchdog) |
 | Scaler | [`apps/order-fulfillment-scaler.yaml`](../../../../kubernetes/apps/order-fulfillment-scaler.yaml), [`apps/checkout-abandon-scaler.yaml`](../../../../kubernetes/apps/checkout-abandon-scaler.yaml) — one `ScaledObject` per running worker version ([ADR-055](../../../proposals/adr/ADR-055-keda-worker-autoscaling/)) |
 | Template | [`_TEMPLATE.md`](../_TEMPLATE.md) |

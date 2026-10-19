@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | availability / identity |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `envoy_http_jwt_authn_jwks_fetch_failed` |
 
 ## Meaning

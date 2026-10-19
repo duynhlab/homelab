@@ -27,7 +27,7 @@ every service from the 2026-10-18 release does.
   `hostssl product vault_rotator`; the same line sits on `product-db-replica`.)
 - Drift guard: one row in `configmaps/monitoring-queries.yaml`
   (`('vault_rotator', '<svc>_runtime', true, false, false)`) and one `absent(...)`
-  line in `observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml`.
+  line in [bundles/postgres/role-membership-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/role-membership-alerts.yaml).
 
 ## 2. Add the static role to the engine-config Job
 

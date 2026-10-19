@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | availability |
-| **Source** | `.../prometheusrules/kubernetes/controlplane-alerts.yaml` |
+| **Source** | [bundles/kubernetes/controlplane-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/controlplane-alerts.yaml) |
 | **Metrics** | `coredns_dns_responses_total{rcode="SERVFAIL"}` over all responses |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

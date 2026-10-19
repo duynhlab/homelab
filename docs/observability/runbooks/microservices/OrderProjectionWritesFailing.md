@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | UX / observability |
-| **Manifest** | [`rfc0021-phase5.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase5.yaml) |
+| **Manifest** | [`rfc0021-phase5.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-phase5.yaml) |
 | **Metrics** | `order_projection_write_failures_total`, `order_saga_complete_failures_total` |
 
 ## Meaning

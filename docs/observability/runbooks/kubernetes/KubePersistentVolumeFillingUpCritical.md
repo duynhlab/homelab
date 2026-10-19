@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | storage |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/workload-alerts.yaml` |
+| **Source** | [bundles/kubernetes/workload-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/workload-alerts.yaml) |
 | **Metrics** | `kubelet_volume_stats_available_bytes`, `kubelet_volume_stats_capacity_bytes` (kubelet) |
 | **Status** | inactive on Kind — local-path CSI reports no kubelet VolumeStats |
 | **Dashboard** | Observability → Kubernetes cluster overview |

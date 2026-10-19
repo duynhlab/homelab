@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/apiserver-alerts.yaml` |
+| **Source** | [bundles/kubernetes/apiserver-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/apiserver-alerts.yaml) |
 | **Metrics** | `up{job="apiserver"}` (kube-apiserver ServiceMonitor scrape) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

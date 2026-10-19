@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | critical |
-| **Source** | chart ([`cluster-high_connection-critical.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg/cluster-high_connection-critical.yaml)) |
+| **Source** | chart ([`cluster-high_connection-critical.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/cnpg/cluster-high_connection-critical.yaml)) |
 | **Clusters** | `platform-db`, `product-db` |
 | **Custom queries** | — (built-in `cnpg_backends_total` + `cnpg_pg_settings_setting{name="max_connections"}`) |
 | **Grafana** | CloudNativePG Cluster Overview, pg-maintenance |

@@ -7,7 +7,7 @@ product-path latency, not hard downtime. One file per alert name.
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`prometheusrules/valkey/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/valkey/alerts.yaml) |
+| Alert rules | [bundles/valkey/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/valkey/alerts.yaml) |
 | Alert catalog | [§3 Valkey cache](../../alerting/alert-catalog.md#3-valkey-cache) |
 | Platform hub | [docs/caching/README.md](../../../caching/README.md) |
 | App contract | [docs/api/caching.md](../../../api/caching.md) |

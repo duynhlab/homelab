@@ -324,7 +324,7 @@ platform-wide call graph is in
   `inventory.<operation>` with bounded `operation`/`outcome` attributes only (no
   sku/order/reservation/warehouse ids on telemetry). Recording rules + symptom
   alerts (`InventoryReservationInfraErrors`, `InventoryGrpcErrorRatio`) ship in
-  [`prometheusrules/microservices/inventory.yaml`](../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/inventory.yaml);
+  [`prometheusrules/microservices/inventory.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/inventory.yaml);
   until phase 2 wires callers, every rate reads ~0 by design.
 - **Smoke test (gRPC, inside the network):**
 

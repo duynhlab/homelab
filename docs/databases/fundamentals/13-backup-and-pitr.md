@@ -149,7 +149,7 @@ stateDiagram-v2
 | `restore_command` loop | Continuous on `product-db-replica` (owned by [chapter 12](12-replication-and-slots.md)); on demand for PITR restore clusters | [`product-db-replica/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db-replica/instance.yaml) | Repository fact |
 | PITR to a target | A separate restore Cluster bootstrapped with `recovery` + `externalClusters`; hand-applied example manifest exists, not wired into any kustomization | `product-db/restore-cluster-example.yaml`; procedure in the [backup-restore runbook](../runbooks/backup-restore.md) | Repository fact |
 | Measured restore cost | PITR drill completed in 2 m 12 s | [Reliability targets](../reliability-targets.md) | Repository fact (their evidence) |
-| Archive health signals | `CNPGWALArchiveFailing`, `PostgresBackupTooOld`, `PostgresBackupFailed` | [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) · [`backup-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/backup-alerts.yaml) | Repository fact |
+| Archive health signals | `CNPGWALArchiveFailing`, `PostgresBackupTooOld`, `PostgresBackupFailed` | [`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml) · [`backup-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/backup-alerts.yaml) | Repository fact |
 
 Why it matters here: retention math is recovery math. With 30-day object-store
 retention and 6-hourly base backups, any point in the last 30 days is

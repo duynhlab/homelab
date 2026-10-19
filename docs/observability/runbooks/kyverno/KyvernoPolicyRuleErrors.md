@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | errors |
-| **Source** | [`kyverno/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/kyverno/alerts.yaml) |
+| **Source** | [bundles/kyverno/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kyverno/alerts.yaml) |
 | **Metrics** | `kyverno_policy_results_total{rule_result="error"}` |
 | **Status** | active — **arms when emitted**: the live label set on 2026-08-21 was `rule_result={pass,fail,skip}` only |
 | **Dashboard** | GitOps → Kyverno |

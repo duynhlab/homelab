@@ -4,15 +4,5 @@ kind: Kustomization
 # Config half of Temporal — the chart is controllers/temporal.
 resources:
   - clusterconnection.yaml
-  - prometheusrule.yaml
   - rules-helmrelease.yaml
   - search-attributes-job.yaml
-
-patches:
-  - target:
-      kind: PrometheusRule
-      name: temporal-alerts
-    patch: |-
-      - op: add
-        path: /metadata/labels/rules.duynhlab.dev~1source
-        value: manifests

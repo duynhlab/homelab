@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | traffic |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `envoy_http_downstream_rq_total` rate, guarded by "had traffic in the last hour" and "fleet is up" |
 
 ## Meaning

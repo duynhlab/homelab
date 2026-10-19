@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/health-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/health-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/health-alerts.yaml) |
 | **Metrics** | `vm_missing_tsids_for_metric_id_total` |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → Health |

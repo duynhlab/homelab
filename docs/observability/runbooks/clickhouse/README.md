@@ -10,7 +10,7 @@ alert name.
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`prometheusrules/observability/clickhouse-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml) |
+| Alert rules | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | Alert catalog | [§8b ClickHouse](../../alerting/alert-catalog.md#8b-clickhouse-otel-olap-engine) |
 | Platform hub | [docs/observability/clickhouse/README.md](../../clickhouse/README.md) — deployed schema, retention, playground |
 | Engine learning | [internals learning path](../../clickhouse/internals/README.md) · [fundamentals.md](../../clickhouse/fundamentals.md) · [parts/merges/TTL](../../clickhouse/parts-merges-and-ttl.md) · [schema-and-queries.md](../../clickhouse/schema-and-queries.md) |

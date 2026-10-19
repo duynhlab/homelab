@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability |
-| **Source** | `.../prometheusrules/kubernetes/controlplane-alerts.yaml` |
+| **Source** | [bundles/kubernetes/controlplane-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/controlplane-alerts.yaml) |
 | **Metrics** | `absent(up{job="kube-dns"} == 1)` — 2 targets on this cluster |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

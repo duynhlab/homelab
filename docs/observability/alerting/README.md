@@ -30,7 +30,8 @@ flowchart TD
     end
 
     subgraph rules ["3. Alert Rule Definitions"]
-        PR["PrometheusRule<br/>(microservices, postgres,<br/>backup alerts)"]
+        PR["PrometheusRule<br/>(Sloth + request SLOs)"]
+        ChartRules["vm-rules Helm chart<br/>(static alerts + recording rules)"]
         PSL["PrometheusServiceLevel<br/>(SLO definitions)"]
         Sloth["Sloth Operator"]
         VMOp["VM Operator"]
@@ -38,6 +39,7 @@ flowchart TD
 
         PSL -->|generates| Sloth
         Sloth -->|"burn-rate<br/>PrometheusRule"| PR
+        ChartRules -->|native resources| VMRule
         PR -->|auto-convert| VMOp
         VMOp -->|creates| VMRule
     end
@@ -75,7 +77,7 @@ flowchart TD
     class Apps service;
     class OTEL collector;
     class VMAgent,VMSingle metric;
-    class PR,PSL,VMRule data;
+    class PR,PSL,VMRule,ChartRules data;
     class Sloth,VMOp,VMAlert,VMAM,Karma,Grafana platform;
     class Infra,Slack external;
     class PagerDuty planned;
@@ -92,7 +94,9 @@ flowchart TD
 
 ## VictoriaMetrics vs Prometheus: Terminology Mapping
 
-This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operator auto-converts Prometheus CRDs, so you write standard Prometheus resources but they run on VM components.
+This project uses the **VictoriaMetrics stack**. Static rules are native VMRules
+from the vm-rules chart. VM Operator still converts Prometheus resources for
+SLOs and scrape discovery.
 
 | Prometheus Ecosystem | VictoriaMetrics Equivalent | What It Does | Deployed? |
 |---|---|---|---|

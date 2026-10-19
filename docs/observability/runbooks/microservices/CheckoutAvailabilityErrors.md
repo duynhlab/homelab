@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability |
-| **Manifest** | [`checkout-availability.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/checkout-availability.yaml) |
+| **Manifest** | [`checkout-availability.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/checkout-availability.yaml) |
 | **Metrics** | `checkout_availability_check_total{result}` |
 | **Applies to** | checkout **0.5.0+** (RFC-0021 P4 made inventory the only availability authority). Earlier builds could fall back to product's stock column and this metric does not exist |
 

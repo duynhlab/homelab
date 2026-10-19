@@ -170,7 +170,7 @@ risk ([chapter 07](07-vacuum-and-freezing.md)).
 |---|---|---|---|
 | Cumulative statistics + timing | `track_io_timing on`; `pg_stat_statements.track all`, `.max 10000` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) parameters | Repository fact |
 | Exporter over custom SQL | Identical ConfigMap on both operational clusters; 15 s scrape with instance-role label | [`monitoring-queries.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml); PodMonitors per cluster | Repository fact |
-| Alerts over the series | Deep-signals group (blocked queries, deadlocks, autovacuum, cache hit, temp spill, checkpoint pressure, wraparound, slots, archive, long transactions) | [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
+| Alerts over the series | Deep-signals group (blocked queries, deadlocks, autovacuum, cache hit, temp spill, checkpoint pressure, wraparound, slots, archive, long transactions) | [`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml) | Repository fact |
 | Plan evidence at runtime | `auto_explain` ≥ 1 s, `ANALYZE on`, JSON format parsed by Vector into the log pipeline | Same manifest, `auto_explain.*`; format rationale in its comment | Repository fact |
 | Historical plan regressions | Investigated from logs/traces, not fabricated live | [Plan-regression runbook](../../observability/runbooks/postgresql/plan-regression-investigation.md) | Repository fact |
 

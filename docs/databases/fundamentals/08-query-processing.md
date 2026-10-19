@@ -130,7 +130,7 @@ workers — deployed caps are `max_parallel_workers_per_gather 4` within
 | Statistics resolution | `default_statistics_target 100` (upstream default) declared explicitly | same GUC block | Repository fact |
 | Plan capture for slow statements | `auto_explain.log_min_duration 1s`, `log_analyze on`, `log_format json` — Vector parses the JSON payload into the log pipeline | [`instance.yaml` auto_explain block](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Workload history | `pg_stat_statements.track all`, `max 10000`, exported by the monitoring ConfigMap | [`monitoring-queries.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
-| Temp-file spill visibility | `log_temp_files 0` + `CNPGTempFileSpill` alert | [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
+| Temp-file spill visibility | `log_temp_files 0` + `CNPGTempFileSpill` alert | [`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml) | Repository fact |
 
 The `auto_explain` JSON format is load-bearing: Vector's parser reads the
 payload after `plan:` as JSON, so the upstream default `text` format would

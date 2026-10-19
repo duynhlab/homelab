@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | errors |
-| **Source** | [`kyverno/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/kyverno/alerts.yaml) |
+| **Source** | [bundles/kyverno/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kyverno/alerts.yaml) |
 | **Metrics** | `kyverno_admission_requests_total{request_allowed="false"}` |
 | **Status** | active |
 | **Dashboard** | GitOps → Kyverno |

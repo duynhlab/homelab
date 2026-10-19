@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/vmagent-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/vmagent-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/vmagent-alerts.yaml) |
 | **Metrics** | `vmagent_remotewrite_packets_dropped_total` |
 | **Status** | active · queue currently 0 bytes pending |
 | **Dashboard** | VictoriaMetrics → VMAgent |

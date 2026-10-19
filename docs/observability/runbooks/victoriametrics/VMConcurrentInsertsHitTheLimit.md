@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/health-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/health-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/health-alerts.yaml) |
 | **Metrics** | `vm_concurrent_insert_limit_reached_total` |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → Health |

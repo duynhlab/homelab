@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | database / correctness |
-| **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
+| **Manifest** | [`rfc0021-write-migration.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_reconciler_backlog` |
 | **Applies to** | order **1.13.0+** (RFC-0021 P4 removed the product stock branch). On 1.12.x and earlier the resolver fell back to the process's `ORDER_STOCK_PARTICIPANT` and started the saga anyway — the pre-P4 notes below still apply there |
 

@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | correctness / money — unverified state |
-| **Manifest** | [`rfc0021-phase6.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) |
+| **Manifest** | [`rfc0021-phase6.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-phase6.yaml) |
 | **Metrics** | `payment_attempt_write_failures_total` |
 
 ## Meaning

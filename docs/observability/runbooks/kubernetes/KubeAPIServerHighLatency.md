@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | latency |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/apiserver-alerts.yaml` |
+| **Source** | [bundles/kubernetes/apiserver-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/apiserver-alerts.yaml) |
 | **Metrics** | `apiserver_request_duration_seconds_bucket` (kube-apiserver) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

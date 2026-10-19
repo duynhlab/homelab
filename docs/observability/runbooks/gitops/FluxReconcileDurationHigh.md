@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | gitops |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/gitops/flux-alerts.yaml` |
+| **Source** | [bundles/gitops/flux-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/gitops/flux-alerts.yaml) |
 | **Metrics** | `gotk_reconcile_duration_seconds_bucket` — exported by the Flux controllers themselves |
 | **Status** | active |
 | **Dashboard** | Flux web UI (`flux.duynh.me`) · Observability → GitOps |

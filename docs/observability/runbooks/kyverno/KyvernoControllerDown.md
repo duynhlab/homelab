@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | availability |
-| **Source** | [`kyverno/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/kyverno/alerts.yaml) |
+| **Source** | [bundles/kyverno/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kyverno/alerts.yaml) |
 | **Metrics** | `up{job=~"kyverno-.*-metrics\|kyverno-svc-metrics"}`, `kyverno_info` — from the chart's per-controller ServiceMonitors ([`kyverno/helmrelease.yaml`](../../../../kubernetes/infra/controllers/kyverno/helmrelease.yaml)) |
 | **Status** | active |
 | **Dashboard** | GitOps → Kyverno |

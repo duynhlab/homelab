@@ -9,7 +9,7 @@ off the firing alert first: it says whether the wait is on **workflow** tasks or
 |---|---|
 | **Severity** | warning at p99 > 200 ms for 10m; critical at p99 > 1 s for 5m — each for both task kinds |
 | **Category** | platform |
-| **Source** | `kubernetes/infra/configs/temporal/prometheusrule.yaml` |
+| **Source** | [bundles/temporal/prometheusrule.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/temporal/prometheusrule.yaml) |
 | **Metrics** | `temporal_workflow_task_schedule_to_start_latency_seconds_bucket` and `temporal_activity_schedule_to_start_latency_seconds_bucket` — **Go SDK** histograms via OTLP, selected by the `task_kind` label on the alert |
 | **Status** | active |
 | **Dashboard** | Temporal → Workflows (panel "Workflow task schedule-to-start latency") |

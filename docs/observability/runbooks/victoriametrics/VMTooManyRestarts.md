@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/victoriametrics/health-alerts.yaml` |
+| **Source** | [bundles/victoriametrics/health-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/victoriametrics/health-alerts.yaml) |
 | **Metrics** | `changes(process_start_time_seconds{...}[15m])` |
 | **Status** | active |
 | **Dashboard** | VictoriaMetrics → Health |

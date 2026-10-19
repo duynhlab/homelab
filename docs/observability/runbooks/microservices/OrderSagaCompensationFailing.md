@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | correctness |
-| **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
+| **Manifest** | [`rfc0021-write-migration.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_saga_compensation_total{step,result}` |
 
 ## Meaning

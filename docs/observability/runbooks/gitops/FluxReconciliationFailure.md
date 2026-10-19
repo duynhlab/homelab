@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | gitops |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/gitops/flux-alerts.yaml` |
+| **Source** | [bundles/gitops/flux-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/gitops/flux-alerts.yaml) |
 | **Metrics** | `gotk_resource_info{ready="False"}` — via **kube-state-metrics** |
 | **Status** | active |
 | **Dashboard** | Flux web UI (`flux.duynh.me`) · Observability → GitOps |

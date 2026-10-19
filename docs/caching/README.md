@@ -190,7 +190,7 @@ Valkey metrics are scraped via the chart's **ServiceMonitor** (redis_exporter):
 - `redis_keyspace_hits_total`: Cache hits
 - `redis_keyspace_misses_total`: Cache misses
 
-Recording rules: [`kubernetes/infra/configs/observability/metrics/prometheusrules/valkey/recording-rules.yaml`](../../kubernetes/infra/configs/observability/metrics/prometheusrules/valkey/recording-rules.yaml)
+Recording rules: [`kubernetes/infra/configs/observability/metrics/prometheusrules/valkey/recording-rules.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/valkey/recording-rules.yaml)
 (`valkey:memory:usage_ratio`, `valkey:keyspace:hit_ratio5m`, `valkey:evictions:rate5m`, …).
 
 **Cache hit rate (instance-wide):**

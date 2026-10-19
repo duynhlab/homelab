@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | errors / identity |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `envoy_http_jwt_authn_denied`, `envoy_http_jwt_authn_allowed` (verified live 2026-08-20) |
 | **Local-stack** | same metrics on `job="envoy"` (cluster data plane is `job="envoy-gateway"`) |
 

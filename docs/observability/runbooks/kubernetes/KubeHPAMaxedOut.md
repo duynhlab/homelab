@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | saturation |
-| **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/kubernetes/workload-alerts.yaml` |
+| **Source** | [bundles/kubernetes/workload-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kubernetes/workload-alerts.yaml) |
 | **Metrics** | `kube_horizontalpodautoscaler_status_current_replicas`, `kube_horizontalpodautoscaler_spec_max_replicas` (kube-state-metrics) |
 | **Status** | active |
 | **Dashboard** | Observability → Kubernetes cluster overview |

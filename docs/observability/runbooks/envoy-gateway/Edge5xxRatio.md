@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning (>5%) · critical (>15%) |
 | **Category** | errors |
-| **Source** | [`envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| **Source** | [bundles/envoy-gateway/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/envoy-gateway/alerts.yaml) |
 | **Metrics** | `edge:rq_5xx_ratio:rate5m` (recording rule over `envoy_http_downstream_rq_xx`) |
 
 ## Meaning

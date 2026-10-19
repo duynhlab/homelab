@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
+| **Source** | [bundles/observability/clickhouse-alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/observability/clickhouse-alerts.yaml) |
 | **Metrics** | `ClickHouseMetrics_ZooKeeperSession` < 1, `max by (replica)`, from `:9363` — the `job=` filter is load-bearing |
 | **Status** | active · `live-signal` on Kind 2026-09-10 (3 series at exactly 1) |
 | **Dashboard** | ClickHouse → Server engine (Keeper row) |

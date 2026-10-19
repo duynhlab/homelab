@@ -10,7 +10,7 @@ them and ignored them.
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`prometheusrules/kyverno/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/kyverno/alerts.yaml) |
+| Alert rules | [bundles/kyverno/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/kyverno/alerts.yaml) |
 | Scrape | chart-native, one `serviceMonitor` per controller in [`kyverno/helmrelease.yaml`](../../../../kubernetes/infra/controllers/kyverno/helmrelease.yaml) — four jobs, `:8000` |
 | Dashboard | chart-native `GrafanaDashboard` CR (`grafana.grafanaDashboard.create`) → **GitOps → Kyverno** |
 | Policies | [`configs/kyverno/cluster-policies/`](../../../../kubernetes/infra/configs/kyverno/cluster-policies/) |

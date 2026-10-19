@@ -14,7 +14,7 @@ workers is alerted on the Temporal side
 
 | Quick facts | |
 |---|---|
-| Alert rules | [`prometheusrules/keda/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/keda/alerts.yaml) |
+| Alert rules | [bundles/keda/alerts.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/keda/alerts.yaml) |
 | Alert catalog | [§8c KEDA autoscaling](../../alerting/alert-catalog.md#8c-keda-autoscaling) |
 | Dashboard | Kubernetes → **KEDA — Worker Autoscaling** (as-code, [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) `deploy/dashboards/grafanamanifest-keda.yaml`) |
 | Install | [`controllers/keda/helmrelease.yaml`](../../../../kubernetes/infra/controllers/keda/helmrelease.yaml), wave `keda-local` |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | critical |
-| **Source** | `prometheusrules/postgres/replication-health.yaml` (homelab-authored; replaced the chart rule 2026-09-06) |
+| **Source** | [bundles/postgres/replication-health.yaml](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/replication-health.yaml) (homelab-authored; replaced the chart rule 2026-09-06) |
 | **Clusters** | `platform-db`, `product-db` |
 | **Grafana** | CloudNativePG Cluster Overview |
 

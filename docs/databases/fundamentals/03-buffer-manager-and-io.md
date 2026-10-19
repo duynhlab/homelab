@@ -121,7 +121,7 @@ A read miss on PostgreSQL 18, in causal order:
 | Readahead hinting | `effective_io_concurrency 200` (SSD-tuned); in 18 this feeds the AIO depth rather than only `fadvise` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [release notes](https://www.postgresql.org/docs/18/release-18.html) | Repository fact |
 | I/O timing visibility | `track_io_timing on`, so `pg_stat_io` `*_time` columns carry real milliseconds | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Per-backend-type I/O accounting | The `pg_stat_io` custom query exports reads/writes/hits/evictions/reuses with PG 18 `read_bytes`/`write_bytes` | [`monitoring-queries.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
-| Cache-effectiveness alerting | `CNPGLowCacheHitRatio` fires below 90 % hit rate under real load | [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
+| Cache-effectiveness alerting | `CNPGLowCacheHitRatio` fires below 90 % hit rate under real load | [`deep-signals-alerts.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/vm-rules/bundles/postgres/deep-signals-alerts.yaml) | Repository fact |
 | Buffer-content inspection | `pg_buffercache` is **not installed** | [Extensions](../extensions.md) | Repository fact — disposable lab only |
 
 256MB of shared buffers under a 1Gi pod limit is a deliberate small-pool

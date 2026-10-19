@@ -616,6 +616,23 @@ service rollup in `docs/api/README.md`, the Admin consumer index
 `docs/api/admin.md`, the cross-service topology in `docs/api/api.md`, and the
 relevant feature ownership in `docs/api/microservices.md`.
 
+## Implementation tracking
+
+Start with the [Linux handoff index #1266](https://github.com/duynhlab/homelab/issues/1266).
+Each accepted ADR has its own tracking issue; native Task sub-issues own gates
+and blocked-by relationships. Historical Mac evidence stays in #1266 and does
+not qualify later commits or a pooled-source deployment.
+
+| Decision | Tracking |
+|---|---|
+| ADR-066 | [#1313](https://github.com/duynhlab/homelab/issues/1313) |
+| ADR-067 | [#1319](https://github.com/duynhlab/homelab/issues/1319) |
+| ADR-068 | [#1325](https://github.com/duynhlab/homelab/issues/1325) |
+| ADR-069 | [#1331](https://github.com/duynhlab/homelab/issues/1331) |
+
+[CDC access #1305](https://github.com/duynhlab/homelab/issues/1305) remains owned
+by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
+
 ## Implementation history
 
 - 2026-10-18 — Owner aligned the source-access target with RFC-0029: snapshot

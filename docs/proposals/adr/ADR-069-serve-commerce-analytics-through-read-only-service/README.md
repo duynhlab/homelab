@@ -18,7 +18,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0030 dark-launch and consumer rollout |
+| **Implementation tracking** | [#1331](https://github.com/duynhlab/homelab/issues/1331) — native Task sub-issues and tradeoff log |
 | **Adoption** | Not started |
 
 ## Context
@@ -175,11 +175,11 @@ the least controllable tier.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Implement the bounded service contract and validation | `analytics-service` | RFC-0030 dark launch | Contract, unit, integration, and negative authorization tests pass |
-| Provision read-only serving access and network path | Platform / ClickHouse | RFC-0030 analytical-storage gate | Identity cannot read raw objects or perform writes |
-| Add deployment, protected route, and observability | Platform / Observability | RFC-0030 dark launch | Resources, probes, policies, RED metrics, alerts, and runbook pass validation |
-| Add the Admin analytics page after dark-launch gates | `admin-service` | RFC-0030 consumer rollout | Loading, empty, stale, unavailable, keyboard, and responsive states pass |
-| Publish the as-built contract and topology | Platform docs | RFC-0030 close-out | `docs/api/analytics.md`, rollup, Admin index, ownership map, and call graph match deployment |
+| Implement the bounded service contract and validation | `analytics-service` | [#1332](https://github.com/duynhlab/homelab/issues/1332) | Contract, unit, integration, and negative authorization tests pass |
+| Provision read-only serving access and network path | Platform / ClickHouse | [#1333](https://github.com/duynhlab/homelab/issues/1333) | Identity cannot read raw objects or perform writes |
+| Add deployment, protected route, and observability | Platform / Observability | [#1334](https://github.com/duynhlab/homelab/issues/1334) | Resources, probes, policies, RED metrics, alerts, and runbook pass validation |
+| Add the Admin analytics page after dark-launch gates | `admin-service` | [#1335](https://github.com/duynhlab/homelab/issues/1335) | Loading, empty, stale, unavailable, keyboard, and responsive states pass |
+| Publish the as-built contract and topology | Platform docs | [#1336](https://github.com/duynhlab/homelab/issues/1336) | `docs/api/analytics.md`, rollup, Admin index, ownership map, and call graph match deployment |
 
 ## Validation and compliance
 

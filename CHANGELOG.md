@@ -344,6 +344,9 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Link RFC-0030's four accepted ADRs to dedicated tracking issues and native
+  obligation tasks; retain the Linux handoff as an index and historical evidence.
+
 - Align RFC-0030 and ADR-066 source access with RFC-0029: CDC uses a qualified
   primary-only pooler profile with verified TLS on both hops. Keep direct
   Compose evidence explicitly separate and block rollout until lifecycle gates pass.

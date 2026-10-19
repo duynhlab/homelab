@@ -19,7 +19,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0030 source-safety and correctness gates |
+| **Implementation tracking** | [#1319](https://github.com/duynhlab/homelab/issues/1319) — native Task sub-issues and tradeoff log |
 | **Adoption** | Not started |
 
 ## Context
@@ -138,11 +138,11 @@ the transport and reconciliation problem before PeerDB even starts.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Declare the three publications and source roles | Platform / Database | RFC-0030 source-safety gate | CNPG reports `status.applied=true` at the observed generation |
-| Apply exact object grants and deny broad grants | Source owners | RFC-0030 source DDL | Positive selected-table tests and negative cross-table/DDL tests pass |
-| Maintain matching PeerDB exclusions | Platform | RFC-0030 mirror configuration | Snapshot and CDC contain only the approved v1 columns |
-| Inspect every egress layer | Security / Platform | RFC-0030 correctness gate | Forbidden-column scan passes in staging, raw tables, logs, and traces |
-| Add credential rotation and leak response procedures | Platform / Security | RFC-0030 close-out | Rotation and pause/purge drills pass |
+| Declare the three publications and source roles | Platform / Database | [#1320](https://github.com/duynhlab/homelab/issues/1320) | CNPG reports `status.applied=true` at the observed generation |
+| Apply exact object grants and deny broad grants | Source owners | [#1321](https://github.com/duynhlab/homelab/issues/1321) | Positive selected-table tests and negative cross-table/DDL tests pass |
+| Maintain matching PeerDB exclusions | Platform | [#1322](https://github.com/duynhlab/homelab/issues/1322) | Snapshot and CDC contain only the approved v1 columns |
+| Inspect every egress layer | Security / Platform | [#1323](https://github.com/duynhlab/homelab/issues/1323) | Forbidden-column scan passes in staging, raw tables, logs, and traces |
+| Add credential rotation and leak response procedures | Platform / Security | [#1324](https://github.com/duynhlab/homelab/issues/1324) | Rotation and pause/purge drills pass |
 
 ## Validation and compliance
 

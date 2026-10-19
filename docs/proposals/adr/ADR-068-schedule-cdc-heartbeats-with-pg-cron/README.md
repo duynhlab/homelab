@@ -19,7 +19,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0030 extension-safety and freshness gates |
+| **Implementation tracking** | [#1325](https://github.com/duynhlab/homelab/issues/1325) — native Task sub-issues and tradeoff log |
 | **Adoption** | Not started |
 
 ## Context
@@ -161,11 +161,11 @@ custom image, restore, worker-capacity, or promotion proof fails.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Build, scan, and pin the compatible system image | Platform / Database | RFC-0030 prototype | Artifact and `pg_available_extensions` checks pass on the exact digest |
-| Prove image and preload lifecycle | Platform / Database | RFC-0030 extension-safety gate | Replica-first rollout, restart, restore, rollback, switchover, and failover pass |
-| Reconcile extension, role, tables, jobs, and cleanup | Platform / Database | RFC-0030 source-safety gate | Desired objects and exact ACLs exist once and survive reconciliation |
-| Add scheduler and capacity telemetry | Observability | RFC-0030 close-out | Job result, duration, last completion, history growth, and worker headroom are visible |
-| Write the failure runbook | Platform / Database | RFC-0030 close-out | On-call can distinguish scheduler, worker, CDC, staging, and target failures |
+| Build, scan, and pin the compatible system image | Platform / Database | [#1326](https://github.com/duynhlab/homelab/issues/1326) | Artifact and `pg_available_extensions` checks pass on the exact digest |
+| Prove image and preload lifecycle | Platform / Database | [#1327](https://github.com/duynhlab/homelab/issues/1327) | Replica-first rollout, restart, restore, rollback, switchover, and failover pass |
+| Reconcile extension, role, tables, jobs, and cleanup | Platform / Database | [#1328](https://github.com/duynhlab/homelab/issues/1328) | Desired objects and exact ACLs exist once and survive reconciliation |
+| Add scheduler and capacity telemetry | Observability | [#1329](https://github.com/duynhlab/homelab/issues/1329) | Job result, duration, last completion, history growth, and worker headroom are visible |
+| Write the failure runbook | Platform / Database | [#1330](https://github.com/duynhlab/homelab/issues/1330) | On-call can distinguish scheduler, worker, CDC, staging, and target failures |
 
 ## Validation and compliance
 

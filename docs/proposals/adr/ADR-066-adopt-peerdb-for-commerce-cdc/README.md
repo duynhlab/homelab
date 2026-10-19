@@ -18,7 +18,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0030 rollout and acceptance gates |
+| **Implementation tracking** | [#1313](https://github.com/duynhlab/homelab/issues/1313) — native Task sub-issues and tradeoff log |
 | **Adoption** | Not started |
 
 ## Context
@@ -164,11 +164,11 @@ and RFC-0029; the existing direct Compose baseline is not pooled-access evidence
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Pin and review a compatible PeerDB core and deployment artifact | Platform | RFC-0030 prototype | Digests and licence decision recorded; clean install passes |
-| Declare isolated catalog, workflow, staging, secrets, and network paths | Platform | RFC-0030 rollout | No PeerDB identity can access adjacent platform state |
-| Size slots, WAL senders, retained WAL, storage, and resource floor | Platform / Database | RFC-0030 source-safety gate | Measured thresholds and finite WAL cap are committed |
-| Prove three mirrors and recovery | Platform | RFC-0030 correctness gate | Snapshot and CDC tests pass through restart, outage, and resync |
-| Add alerts, dashboard, and runbook | Platform / Observability | RFC-0030 close-out | Lag, slot, staging, dependency, and resync paths are operable |
+| Pin and review a compatible PeerDB core and deployment artifact | Platform | [#1314](https://github.com/duynhlab/homelab/issues/1314) | Digests and licence decision recorded; clean install passes |
+| Declare isolated catalog, workflow, staging, secrets, and network paths | Platform | [#1315](https://github.com/duynhlab/homelab/issues/1315) | No PeerDB identity can access adjacent platform state |
+| Size slots, WAL senders, retained WAL, storage, and resource floor | Platform / Database | [#1316](https://github.com/duynhlab/homelab/issues/1316) | Measured thresholds and finite WAL cap are committed |
+| Prove three mirrors and recovery | Platform | [#1317](https://github.com/duynhlab/homelab/issues/1317) | Snapshot and CDC tests pass through restart, outage, and resync |
+| Add alerts, dashboard, and runbook | Platform / Observability | [#1318](https://github.com/duynhlab/homelab/issues/1318) | Lag, slot, staging, dependency, and resync paths are operable |
 
 ## Validation and compliance
 

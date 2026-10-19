@@ -9,6 +9,7 @@ resources:
   # Service workloads (duynh) and their request SLOs (slo).
   - oci/duynh-chart-oci.yaml
   - oci/slo-chart-oci.yaml
+  - oci/vm-rules-chart-oci.yaml
   - oci/grafana-dashboards-as-code-oci.yaml
   - oci/grafana-operator-oci.yaml
   - oci/pgroles-operator-oci.yaml

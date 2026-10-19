@@ -1,0 +1,14 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: vm-rules-chart-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/duynhlab/helm-charts/vm-rules
+  ref:
+    # Exact version: rule changes need an explicit parity review.
+    tag: "0.2.0"

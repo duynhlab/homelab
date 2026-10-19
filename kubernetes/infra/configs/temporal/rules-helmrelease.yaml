@@ -1,0 +1,31 @@
+# Staged native rules: VMAlert excludes source=chart until the cutover commit.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: temporal-rules
+  namespace: monitoring
+spec:
+  interval: 10m
+  timeout: 5m
+  dependsOn:
+  - name: victoria-metrics-operator
+    namespace: monitoring
+  chartRef:
+    kind: OCIRepository
+    name: vm-rules-chart-oci
+    namespace: flux-system
+  releaseName: temporal-rules
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    defaultRules:
+      enabled: false
+    bundles:
+      temporal:
+        enabled: true
+    ruleSelectorLabels:
+      rules.duynhlab.dev/source: chart

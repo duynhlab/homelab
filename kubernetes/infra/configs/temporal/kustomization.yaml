@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - clusterconnection.yaml
   - prometheusrule.yaml
+  - rules-helmrelease.yaml
   - search-attributes-job.yaml
 
 patches:

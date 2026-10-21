@@ -12,7 +12,7 @@ spec:
     name: checkout
     # Inventory is the sole availability authority; do not restore product fallback.
     # Keep storefront error handling compatible with docs/api/checkout.md.
-    image_tag: "0.13.3" # {"$imagepolicy": "flux-system:checkout:tag"}
+    image_tag: "0.13.4" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

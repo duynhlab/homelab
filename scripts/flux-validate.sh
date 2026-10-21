@@ -482,7 +482,7 @@ validate_databases_substitution_scope() {
     grep -v '^Cluster/' <<<"${kinds}" >&2
     exit 1
   fi
-  vars=$(grep -oE '\$\{[^}]*\}' <<<"${render}" | sort -u | paste -sd' ' || true)
+  vars=$(grep -oE '\$\{[^}]*\}' <<<"${render}" | sort -u | paste -sd' ' - || true)
   if [[ "${vars}" != '${PG_STAT_CH_CLICKHOUSE_PASSWORD}' ]]; then
     echo "ERROR - ${dir}: substituted objects must reference only \${PG_STAT_CH_CLICKHOUSE_PASSWORD}, found: ${vars:-<none>}" >&2
     exit 1

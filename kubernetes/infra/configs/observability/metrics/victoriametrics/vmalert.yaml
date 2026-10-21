@@ -8,8 +8,14 @@ metadata:
   name: victoria-metrics
   namespace: monitoring
 spec:
-  # Discover VMRule resources in all namespaces
-  selectAllByDefault: true
+  # Stage native chart rules without evaluating them alongside converted rules.
+  # Keep all namespaces selected: CNPG also lives in product/platform/cloudnative-pg.
+  ruleNamespaceSelector: {}
+  ruleSelector:
+    matchExpressions:
+      - key: rules.duynhlab.dev/source
+        operator: NotIn
+        values: [chart]
 
   evaluationInterval: "15s"
 

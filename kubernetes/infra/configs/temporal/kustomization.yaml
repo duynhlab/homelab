@@ -6,3 +6,12 @@ resources:
   - clusterconnection.yaml
   - prometheusrule.yaml
   - search-attributes-job.yaml
+
+patches:
+  - target:
+      kind: PrometheusRule
+      name: temporal-alerts
+    patch: |-
+      - op: add
+        path: /metadata/labels/rules.duynhlab.dev~1source
+        value: manifests

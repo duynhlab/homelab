@@ -1,5 +1,7 @@
 # Documentation Index
 
+Migration procedure: [Native VMRule migration](observability/alerting/vm-rules-migration.md).
+
 Documentation for the **duynhlab microservices platform** — 10 Go services + a React storefront + a back-office portal (Keycloak as the identity provider), with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
 
 ---

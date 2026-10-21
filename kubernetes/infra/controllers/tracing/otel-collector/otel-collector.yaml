@@ -396,7 +396,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: otel/opentelemetry-collector-contrib
-      tag: 0.161.0
+      tag: 0.163.2
     livenessProbe:
       httpGet:
         path: /

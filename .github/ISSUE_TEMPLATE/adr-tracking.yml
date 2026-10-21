@@ -1,13 +1,14 @@
 name: ADR implementation tracking
 description: Open the one tracking issue for an accepted ADR. Each obligation becomes a sub-issue; tradeoffs met along the way are logged here as comments.
-title: "ADR-NNN: "
+title: "[ADR-NNN] "
+type: adr
 labels:
   - area/adr
 body:
   - type: markdown
     attributes:
       value: |
-        One issue per ADR, opened when the ADR reaches **Accepted**. Set the issue type to **ADR** (`gh issue create --type ADR`) and link it from the ADR's `Implementation tracking` row. The ADR keeps the decision; this issue keeps the working log. Process: `docs/proposals/adr/README.md` § Process.
+        One issue per ADR, opened when the ADR reaches **Accepted**. Set the issue type to **adr** (`gh issue create --type adr`) and link it from the ADR's `Implementation tracking` row. The ADR keeps the decision; this issue keeps the working log. Process: `docs/proposals/adr/README.md` § Process.
   - type: input
     id: adr
     attributes:

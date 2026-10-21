@@ -720,6 +720,9 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Standardize issue title prefixes and native types in the issue forms and
+  contribution guidance; align RFC-0030 tracking without changing its gates.
+
 - Remove accumulated editorial footers from docs; keep unique historical
   verification evidence beside its owning claims and preserve RFC/ADR metadata.
   Align the edge 429 catalog with the deployed `enforced` counter.

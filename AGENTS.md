@@ -150,12 +150,36 @@ of truth for their conventions.
 - **Never push to `main`.** Branch → PR → squash-merge.
 - **PR body** follows `.github/pull_request_template.md`: `Part of #<sub-issue>`
   (or `Closes #N`), the tradeoffs made, and the gate evidence as counts. Work
-  under an ADR hangs off that ADR's tracking issue (issue type `ADR`, one
+  under an ADR hangs off that ADR's tracking issue (issue type `adr`, one
   sub-issue per obligation); tradeoffs the ADR did not settle go on that
   issue, not only in the PR
   ([`docs/proposals/adr/README.md` § Working log](docs/proposals/adr/README.md#working-log)).
 - `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
   for PRs.
+
+### Issue naming
+
+Use one bracketed prefix and an English title when creating or renaming issues:
+
+| Work | Title | GitHub issue type |
+|------|-------|-------------------|
+| Failure | `[Bug] <component and symptom>` | `Bug` |
+| Implementation, operations or audit | `[Task] <action and outcome>` | `Task` |
+| Documentation or research | `[Docs] <action and subject>` | `Task` |
+| Accepted ADR implementation tracker | `[ADR-NNN] <decision title>` | `adr` |
+| RFC implementation index | `[RFC-NNNN] <tracking purpose>` | `Task` |
+
+Use the matching [issue form](.github/ISSUE_TEMPLATE/); its title is a default,
+not an enforcement rule. Replace the ADR number placeholder. An RFC index uses
+`Task` and links its ADR trackers; it does not replace them or approve a design.
+ADR documentation obligations remain native `Task` sub-issues with the `[Docs]`
+prefix and the task form's acceptance and verification sections.
+
+The prefix helps readers scan titles; the native type supports filtering.
+Labels describe affected areas and other attributes. Retain existing workflow
+labels (`bug`, `task`, `documentation`, `area/adr`); add relevant `area/*` labels
+without stacking more title prefixes. Track dependencies with native parent,
+sub-issue and blocked-by relationships rather than status flags in titles.
 
 ## Docs conventions
 

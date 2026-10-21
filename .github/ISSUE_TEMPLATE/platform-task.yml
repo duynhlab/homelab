@@ -1,6 +1,7 @@
 name: Platform task or small change
 description: Propose bounded maintenance, operational work, or a small platform change that does not need an RFC.
-title: "task: "
+title: "[Task] "
+type: Task
 labels:
   - task
 body:

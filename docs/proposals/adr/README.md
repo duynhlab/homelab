@@ -120,7 +120,7 @@ flowchart LR
 4. Create one ADR per decision at **`Proposed`** (copy [`ADR-0000-template/`](ADR-0000-template/)).
 5. On architecture approval: RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**
    (Adoption stays **`Not started`** until code lands). Open the ADR's
-   **tracking issue** (issue type `ADR`, template *ADR implementation
+   **tracking issue** (issue type `adr`, template *ADR implementation
    tracking*) and link it from the ADR's `Implementation tracking` row. Every
    obligation becomes a **sub-issue** (`gh issue create --parent <issue>`);
    work that is deferred becomes a sub-issue too, so debt has a number.
@@ -135,6 +135,9 @@ flowchart LR
 9. Add or update **runbooks** when the topic has meaningful operational failure
    modes (observability, databases, or other area — not a single root path).
 
+For tracker and sub-issue titles, follow the repository
+[issue naming convention](../../../AGENTS.md#issue-naming).
+
 ### Working log
 
 The three records do not repeat each other:
@@ -142,7 +145,7 @@ The three records do not repeat each other:
 | Record | Holds | Changes |
 |---|---|---|
 | ADR | the decision, its alternatives and consequences | rarely; one History line per landed PR |
-| Tracking issue (type `ADR`) + sub-issues | obligations, blockers, owner-only steps, the **tradeoff log** | throughout implementation |
+| Tracking issue (type `adr`) + sub-issues | obligations, blockers, owner-only steps, the **tradeoff log** | throughout implementation |
 | PR | the diff, its gate evidence, the tradeoffs made in that PR | once |
 
 A tradeoff log entry is a comment on the tracking issue:

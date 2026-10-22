@@ -1480,10 +1480,10 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   server carries the trace id.
   ```bash
   VM=http://localhost:8428   # port-forward svc/vmsingle (or the Grafana datasource)
-  for m in analytics_source_lag_seconds analytics_source_state analytics_freshness_last_success_time_seconds; do
+  for m in analytics_source_lag_seconds analytics_source_state_ratio analytics_freshness_last_success_time_seconds; do
     curl -s "$VM/api/v1/query?query=count($m{service_name=\"analytics\"})%20by%20(k8s_pod_name)"; echo
   done
-  curl -s "$VM/api/v1/query?query=sum(analytics_source_state{service_name=\"analytics\"})%20by%20(k8s_pod_name,analytics_source_name)"   # every value 1
+  curl -s "$VM/api/v1/query?query=sum(analytics_source_state_ratio{service_name=\"analytics\"})%20by%20(k8s_pod_name,analytics_source_name)"   # every value 1
   curl -s "$VM/api/v1/query?query=count(db_client_operation_duration_seconds_count{service_name=\"analytics\",db_system_name=\"clickhouse\"})"
   ```
   Then scale `analytics` to 2 and repeat: two `k8s_pod_name` values per gauge,

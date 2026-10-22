@@ -76,8 +76,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "analytics_source_state{service_name=\"analytics\"}",
-          "legendFormat": "{{analytics_source_name}} / {{analytics_source_state}} / {{k8s_pod_name}}"
+          "expr": "analytics_source_state_ratio{service_name=\"analytics\"}",
+          "legendFormat": "{{analytics_source_name}} / {{analytics_source_state_ratio}} / {{k8s_pod_name}}"
         }
       ],
       "fieldConfig": {

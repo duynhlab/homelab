@@ -7,7 +7,7 @@ tests:
   input_series:
   - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="stale"}
+  - series: analytics_source_state_ratio{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state_ratio="stale"}
     values: 1+0x3 0+0x6
   alert_rule_test:
   - eval_time: 1m
@@ -17,7 +17,7 @@ tests:
         service_name: analytics
         k8s_pod_name: analytics-1
         analytics_source_name: order
-        analytics_source_state: stale
+        analytics_source_state_ratio: stale
         severity: warning
       exp_annotations:
         summary: Analytics source heartbeat is stale
@@ -30,7 +30,7 @@ tests:
   input_series:
   - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unavailable"}
+  - series: analytics_source_state_ratio{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state_ratio="unavailable"}
     values: 1+0x3 0+0x6
   alert_rule_test:
   - eval_time: 1m
@@ -40,7 +40,7 @@ tests:
         service_name: analytics
         k8s_pod_name: analytics-1
         analytics_source_name: order
-        analytics_source_state: unavailable
+        analytics_source_state_ratio: unavailable
         severity: critical
       exp_annotations:
         summary: Analytics source heartbeat is older than 300 seconds
@@ -53,7 +53,7 @@ tests:
   input_series:
   - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unknown"}
+  - series: analytics_source_state_ratio{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state_ratio="unknown"}
     values: 1+0x3 0+0x6
   alert_rule_test:
   - eval_time: 1m
@@ -63,7 +63,7 @@ tests:
         service_name: analytics
         k8s_pod_name: analytics-1
         analytics_source_name: order
-        analytics_source_state: unknown
+        analytics_source_state_ratio: unknown
         severity: warning
       exp_annotations:
         summary: Analytics cannot certify source freshness
@@ -76,7 +76,7 @@ tests:
   input_series:
   - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="healthy"}
+  - series: analytics_source_state_ratio{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state_ratio="healthy"}
     values: _ _ _ _ 1+0x6
   alert_rule_test:
   - eval_time: 1m

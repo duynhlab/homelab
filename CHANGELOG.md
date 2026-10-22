@@ -145,6 +145,14 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`PgxPoolConnectFailures` alert** (#1338). dbx v0.39.0 counts every
+  connection a service fails to open in `pgx_pool_connect_failures_total`,
+  labelled with the SQLSTATE (`28P01`, `57P01`, `53300`) or `connect`; pgxpool
+  never retries one. The alert fires when failures continue in every 5-minute
+  window for 10 minutes, so the short `28P01` burst of a password rotation does
+  not page. Runbook, alert catalog and the metrics docs list it with
+  `pgx_pool_acquire_evictions_total`.
+
 - **Authorization guards beyond membership options (ADR-088).** New CNPG
   queries `pg_role_config` (each migrator's `role=`) and
   `pg_default_privileges` (each Job-owned database's owner defaults), the
@@ -702,6 +710,14 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **A PgDog roll no longer fails requests with `57P01`** (#1338,
+  duynhlab/pkg#124). dbx v0.39.0 checks each pooled connection before handing
+  it out and replaces one the pooler has already closed. Measured on Kind
+  (2 orders/s for 180 s through the edge, `rollout restart deploy/pgdog-product`):
+  0 `57P01` (was 5), 39 connections replaced. The roll still costs about 21
+  requests (24 5xx against 3 at baseline): checkout queries time out when each
+  old PgDog pod receives SIGINT (#1350).
+
 - **mockpay runs without a CPU limit** (was 50m), as the rest of the platform.
 
 #### Local-stack
@@ -794,6 +810,13 @@ Skeleton (copy what you need):
   grace of 65 s to match the 60 s shutdown timeout. Every `pgdog_*` metric
   the dashboards and alerts read still exists. Upstream breaking changes
   in this range touch sharding, plugins and 2PC, none of which are used.
+
+#### Services
+
+- **Ten services on `pkg/dbx` v0.39.0** (#1338): user 2.5.3, product 1.16.4,
+  inventory 0.9.3, cart 2.4.3, order 2.10.4, review 2.6.2, shipping 1.10.2,
+  notification 2.4.2, payment 2.8.2 (mockpay with it, up from 2.8.0) and
+  checkout 0.13.4; both workers follow their service.
 
 ## [2.0.0] - 2026-10-05
 

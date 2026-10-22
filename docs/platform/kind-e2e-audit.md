@@ -1101,7 +1101,7 @@ breaks a command copied from the Compose audit:
   reads **Delayed data** after ~2.5 min and the **unavailable** state with
   Retry after ~5.5 min, fresh again within a minute of scaling it back;
   `duyne-viewer` lands on `/forbidden`. Same shape as compose B11, against
-  `https://admin.duynh.me`.
+  `https://backoffice.duynh.me`.
   **FAIL:** a figure shown while the API answers 503, or a rendered page for
   the role-less account.
 

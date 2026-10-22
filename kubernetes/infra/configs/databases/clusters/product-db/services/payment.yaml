@@ -1,25 +1,56 @@
-# payment — per-service database triplet (RFC-0012, ADR-013).
-#
-# One file per service: ExternalSecret (credentials from OpenBAO) +
-# DatabaseRole (the service identity) + Database (owned by that role).
-# Role is declared before Database: CNPG documents no ordering guarantee
-# between the two, but role-first makes the happy path deterministic
-# (a Database whose owner does not exist yet fails and retries).
-#
-# ExternalSecret for product-db payment database credentials — product namespace.
-# OpenBAO path: secret/data/local/databases/product-db/payment
-#
-# Rendered as kubernetes.io/basic-auth (not Opaque like the older cart/order
-# copies): this secret doubles as the passwordSecret for the DatabaseRole
-# below, and CNPG requires basic-auth there. The username/password keys stay
-# compatible with app-style secretKeyRef use.
+# payment — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# payment_owner and payment_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; its pgroles policy
+# (../authz/policies/payment.yaml) owns the grants; CNPG keeps the runtime
+# login and the Database. Conventions: docs/databases/authorization.md.
+# The runtime password belongs to OpenBAO's static role payment-runtime
+# (ADR-025, ADR-089): vault_rotator rotates it, ESO reads it every 15s,
+# and the DatabaseRole has no passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: product-db-payment-secret
+  name: product-db-payment-runtime-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: product-db-payment-secret
+    app.kubernetes.io/name: product-db-payment-runtime-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: openbao-db
+    kind: ClusterSecretStore
+  target:
+    name: product-db-payment-runtime-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-payment-runtime-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: database/static-creds/payment-runtime
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: database/static-creds/payment-runtime
+        property: password
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-payment-migrator-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-payment-migrator-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -28,14 +59,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: product-db-payment-secret
+    name: product-db-payment-migrator-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: product-db-payment-secret
+          app.kubernetes.io/name: product-db-payment-migrator-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -45,29 +76,23 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/product-db/payment
+        key: secret/data/local/databases/product-db/payment-migrator
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/product-db/payment
+        key: secret/data/local/databases/product-db/payment-migrator
         property: password
 ---
-# The service's PostgreSQL identity. Written out IN FULL: creating a
-# DatabaseRole for an existing role ADOPTS it — the operator alters every
-# attribute to match the manifest, including attributes the manifest omits
-# (omitted memberships are revoked, omitted connectionLimit resets to -1,
-# omitted validUntil becomes infinity). validUntil is omitted on purpose:
-# app identities never expire.
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: product-db-role-payment
+  name: product-db-role-payment-runtime
   namespace: product
 spec:
   cluster:
     name: product-db
-  name: payment
-  comment: "payment-service application role (RFC-0012)"
+  name: payment_runtime
+  comment: "payment: the service; CRUD only"
   login: true
   superuser: false
   createdb: false
@@ -77,13 +102,10 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: product-db-payment-secret
-  # retain: deleting this CR must never DROP a production role.
   databaseRoleReclaimPolicy: retain
 ---
-# Payment Database — created declaratively (the cluster predates payment, so
-# postInitSQL cannot create it) with the same baseline extensions.
+# payment_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema. CNPG retries until the catalog Job creates it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -91,7 +113,7 @@ metadata:
   namespace: product
 spec:
   name: payment
-  owner: payment
+  owner: payment_owner
   cluster:
     name: product-db
   extensions:

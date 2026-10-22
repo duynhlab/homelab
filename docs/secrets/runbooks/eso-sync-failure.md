@@ -1,13 +1,15 @@
 # ESO Sync Failure
 
-Use this when an `ExternalSecret`, `ClusterExternalSecret`, or `ClusterSecretStore/openbao` is not Ready.
+Use this when an `ExternalSecret`, `ClusterExternalSecret`, or a
+`ClusterSecretStore` (`openbao` for KV, `openbao-db` for the runtime database
+passwords) is not Ready.
 
 ```mermaid
 flowchart TD
-    ES[ExternalSecret not Ready] --> CSS[Check ClusterSecretStore openbao]
+    ES[ExternalSecret not Ready] --> CSS["Check its ClusterSecretStore<br/>openbao (KV) or openbao-db (static-creds)"]
     CSS --> BAO[Check OpenBAO health]
     BAO --> AUTH[Test Kubernetes auth]
-    AUTH --> PATH[Verify KV path and policy]
+    AUTH --> PATH["Verify the path and the eso-read policy<br/>KV path or database/static-creds/&lt;svc&gt;-runtime"]
     PATH --> RECONCILE[Force ESO / Flux reconcile]
 ```
 

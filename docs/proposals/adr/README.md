@@ -119,12 +119,42 @@ flowchart LR
 3. During RFC review, identify **independent** architectural decisions.
 4. Create one ADR per decision at **`Proposed`** (copy [`ADR-0000-template/`](ADR-0000-template/)).
 5. On architecture approval: RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**
-   (Adoption stays **`Not started`** until code lands).
-6. Implement code and tests.
+   (Adoption stays **`Not started`** until code lands). Open the ADR's
+   **tracking issue** (issue type `adr`, template *ADR implementation
+   tracking*) and link it from the ADR's `Implementation tracking` row. Every
+   obligation becomes a **sub-issue** (`gh issue create --parent <issue>`);
+   work that is deferred becomes a sub-issue too, so debt has a number.
+6. Implement code and tests. Each PR names its sub-issue (`Part of #N`, or
+   `Closes #N` when it finishes it), and a tradeoff the ADR did not settle is
+   logged as a comment on the tracking issue (see [Working log](#working-log)).
 7. Update [`docs/api/`](../../api/README.md) to as-built (API-touching decisions).
-8. Update ADR **Adoption** and **History**; append RFC **Implementation History**.
+8. Update ADR **Adoption** and **History** (one line per PR, with its link);
+   append RFC **Implementation History**. When Adoption reaches **Complete**,
+   close the tracking issue; while it stays **Partial**, the open sub-issues
+   are the list of what remains.
 9. Add or update **runbooks** when the topic has meaningful operational failure
    modes (observability, databases, or other area — not a single root path).
+
+For tracker and sub-issue titles, follow the repository
+[issue naming convention](../../../AGENTS.md#issue-naming).
+
+### Working log
+
+The three records do not repeat each other:
+
+| Record | Holds | Changes |
+|---|---|---|
+| ADR | the decision, its alternatives and consequences | rarely; one History line per landed PR |
+| Tracking issue (type `adr`) + sub-issues | obligations, blockers, owner-only steps, the **tradeoff log** | throughout implementation |
+| PR | the diff, its gate evidence, the tradeoffs made in that PR | once |
+
+A tradeoff log entry is a comment on the tracking issue:
+
+`**Tradeoff — <topic>** · chose X over Y · because … · evidence: <PR / gate row>`
+
+The PR links the comment; the ADR's History row links the PR. Dependencies
+between sub-issues use GitHub's *blocked by* relationship
+(`gh issue edit <issue> --add-blocked-by <other>`), not prose.
 
 **docs/api sync (API-touching):** when Adoption reaches **Complete**, owning service
 files, hub rollup, and **Design records** links must match deployed reality. The ADR
@@ -389,7 +419,7 @@ and extend Adoption instead.
 | [ADR-011](ADR-011-detect-only-reconciliation/) | Ship reconciliation detect-only; defer auto-heal | Accepted (heal for one class added by [ADR-012](ADR-012-reconciliation-auto-heal/)) | Complete | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-013](ADR-013-per-service-db-triplet/) | Per-service database triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
-| [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Superseded by [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | Complete | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-015](ADR-015-pg-hba-connection-isolation/) | Database connection isolation via declarative pg_hba | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-016](ADR-016-otel-metrics-cutover/) | Metrics cutover to the OTLP push pipeline | Accepted | Complete | [RFC-0014](../rfc/RFC-0014/) |
 | [ADR-017](ADR-017-api-path-collection-noun/) | Collection-noun segment after the audience in every API path | Accepted | Complete | — |
@@ -400,7 +430,7 @@ and extend Adoption instead.
 | [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | Complete | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-023](ADR-023-clickhouse-observability-olap/) | Adopt ClickHouse as supplementary OLAP for OTel logs+traces SQL | Accepted | Complete | [RFC-0019](../rfc/RFC-0019/) |
 | [ADR-024](ADR-024-floci-kms-emulator-auto-unseal/) | floci KMS-emulator auto-unseal for OpenBAO on Kind | Accepted | Complete | [RFC-0008](../rfc/RFC-0008/) |
-| [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PostgreSQL credential delivery & role model (PgDog passthrough PoC) | Proposed | Not started | [RFC-0008](../rfc/RFC-0008/), [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PostgreSQL credential delivery & role model (PgDog passthrough PoC) | Proposed | Partial: PgDog passthrough on product-db (2026-10-18) | [RFC-0008](../rfc/RFC-0008/), [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority | Accepted | **Complete** | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model (FSM, ledger, one-order-one-warehouse) | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
@@ -459,10 +489,12 @@ and extend Adoption instead.
 | [ADR-081](ADR-081-agent-leases-and-reconciliation/) | Serialize Agent Work with Leases and Reconciliation | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |
 | [ADR-082](ADR-082-agent-evaluation-gates/) | Promote Agent Autonomy through Measured Evaluation Gates | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |
 | [ADR-083](ADR-083-documentation-steward/) | Govern Platform Documentation through a Documentation Steward | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |
-| [ADR-084](ADR-084-split-service-database-roles/) | Split Each Service Database Identity into Owner, Migrator and Runtime Roles | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
-| [ADR-085](ADR-085-service-migrations-own-authorization/) | Own Object ACLs and Default Privileges in Service Migrations | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
-| [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-084](ADR-084-split-service-database-roles/) | Split Each Service Database Identity into Owner, Migrator and Runtime Roles | Accepted | Complete | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-085](ADR-085-service-migrations-own-authorization/) | Own Object ACLs and Default Privileges in Service Migrations | Superseded | Superseded by [ADR-088](ADR-088-platform-owns-database-authorization/) | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Complete | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-087](ADR-087-homelab-private-and-web-access/) | Separate Private Administration from Published Web Access | Proposed | Not started | [RFC-0011](../rfc/RFC-0011/) |
+| [ADR-088](ADR-088-platform-owns-database-authorization/) | Apply Database Authorization from the Platform, Not from Service Code | Accepted | Complete | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-089](ADR-089-postgresql-access-contract/) | Define the PostgreSQL Access Contract Between Applications and the Platform | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 
 Principles:
 

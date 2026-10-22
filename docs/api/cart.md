@@ -33,7 +33,7 @@ Known gaps: [planned gRPC mTLS](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `ClearCart` activity → `DELETE /cart/v1/internal/cart/:userId` after fulfillment — best-effort, no compensation |
 | **Idempotency** | Delete-all-rows for one `user_id` — naturally idempotent; a replayed clear is a no-op |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 Cart is the only saga participant reached over REST instead of gRPC — a
 documented exception: the internal route lets the worker clear a cart **without

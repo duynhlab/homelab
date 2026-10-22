@@ -1,0 +1,40 @@
+# ADR-089: the server certificate product-db presents, issued by homelab-ca instead
+# of CNPG's self-signed CA, so every client verifies the primary with the same
+# ca.crt it already trusts for the poolers (*-db-ca-trust). CNPG checks only the
+# CA between its own instances, not the name. The cnpg.io/reload label makes the
+# instances reload the files when cert-manager renews them, without a restart.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-server-tls
+  namespace: product
+spec:
+  secretName: product-db-server-tls
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  commonName: product-db-rw.product.svc
+  dnsNames:
+    - product-db-rw
+    - product-db-rw.product
+    - product-db-rw.product.svc
+    - product-db-rw.product.svc.cluster.local
+    - product-db-ro
+    - product-db-ro.product
+    - product-db-ro.product.svc
+    - product-db-ro.product.svc.cluster.local
+    - product-db-r
+    - product-db-r.product
+    - product-db-r.product.svc
+    - product-db-r.product.svc.cluster.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - server auth
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

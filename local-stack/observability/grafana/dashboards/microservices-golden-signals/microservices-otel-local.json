@@ -3080,6 +3080,110 @@
           "refId": "B"
         }
       ]
+    },
+    {
+      "id": 226,
+      "type": "timeseries",
+      "title": "Pool dead connections replaced",
+      "description": "Pooled connections the server had already closed (a pooler roll), replaced before a query was sent. pkg/dbx >= v0.39.0; connections idle over 1s are replaced by the pgxpool ping instead and are not counted.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 160,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (service_name) (increase(pgx_pool_acquire_evictions_total{service_name=~\"$app\"}[$rate]))",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 227,
+      "type": "timeseries",
+      "title": "Pool connect failures",
+      "description": "New connections the pool failed to open, by SQLSTATE (28P01 password, 57P01 shutting down, 53300 too many) or connect. Never retried; healthy = no series, sustained = PgxPoolConnectFailures.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 160,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (service_name, error_type) (increase(pgx_pool_connect_failures_total{service_name=~\"$app\"}[$rate]))",
+          "legendFormat": "{{service_name}} {{error_type}}",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",

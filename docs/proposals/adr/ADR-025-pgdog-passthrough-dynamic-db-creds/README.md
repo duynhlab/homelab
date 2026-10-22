@@ -202,7 +202,7 @@ A pooler must decide how a client proves who it is. Three modes exist across poo
 
 | Mode | How | PgDog | PgBouncer (CNPG) |
 |---|---|---|---|
-| **Static userlist** | pooler stores the password, validates locally | ✅ (`users.toml`, today via `valuesFrom`) | ✅ |
+| **Static userlist** | pooler stores the password, validates locally | ✅ (`users.toml`; product-db used it via `valuesFrom` until 2026-10-18) | ✅ |
 | **Passthrough / forward** | pooler forwards the client password; **Postgres authenticates**; bad creds ban the pool | ✅ `passthrough_auth` | — |
 | **auth_query** | pooler uses a **dedicated account** to look up the password hash from `pg_shadow` and validates itself | ❌ **not supported** | ✅ (`cnpg_pooler_pgbouncer` + `user_search`) |
 
@@ -210,8 +210,9 @@ A pooler must decide how a client proves who it is. Three modes exist across poo
 > **auth_query = PgBouncer**, *not* PgDog. **PgDog has no auth_query** — its only
 > no-static-list option is **passthrough**.
 
-**Per-cluster (ADR-026):** product-db = **PgDog** (static list, or passthrough for
-rotating users); platform-db = **CNPG PgBouncer** (**auth_query**, operator-managed).
+**Per-cluster (ADR-026):** product-db = **PgDog** (**passthrough**,
+`enabled_allow_change` over required client TLS, as-built since 2026-10-18);
+platform-db = **CNPG PgBouncer** (**auth_query**, operator-managed).
 
 **Pool keying = per `(user, database)`** in both. So a **fixed username** (static-rotated,
 §4b) yields **one pool** — the pooler-friendly path — while **dynamic per-pod/per-lease
@@ -390,3 +391,12 @@ Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS
 - [RFC-0008](../../rfc/RFC-0008/) (secrets hardening — finding #4) · [RFC-0012](../../rfc/RFC-0012/) (credential triplets)
 - [ADR-013](../ADR-013-per-service-db-triplet/) · [ADR-014](../ADR-014-pooler-credentials-valuesfrom/) · [ADR-015](../ADR-015-pg-hba-connection-isolation/) · [ADR-024](../ADR-024-floci-kms-emulator-auto-unseal/) · [ADR-026](../ADR-026-platform-db-pgbouncer-pilot/)
 - [`docs/databases/poolers.md`](../../../databases/poolers.md)
+
+## History
+
+- 2026-10-18 — Decision 4 adopted on product-db (ADR-089, #1283 row 4): PgDog
+  chart v0.92 (PgDog v0.1.61) runs `passthrough_auth = "enabled_allow_change"`
+  behind `tls_client_required`, with no `users[]` list and no password
+  `valuesFrom`. The rest of this record keeps its status.
+- 2026-10-19 — Decision 2 (static, rotated login roles) and 5 (pattern A reload) extended from the notification pilot to every platform-db runtime: user, shipping and review (#1309).
+- 2026-10-19 — Decisions 2 and 5 cover every service runtime on both clusters; product-db relies on PgDog passthrough (decision 4) to follow the rotation without a pooler step (#1311).

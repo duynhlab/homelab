@@ -1,24 +1,56 @@
-# user — per-service database triplet (RFC-0012, ADR-013).
-#
-# user is special in exactly one way: its Secret and role/database are
-# ALSO what bootstrap.initdb (instance.yaml) uses on a fresh cluster. The
-# initdb fields are structural placeholders; this triplet adopts the
-# initdb-created role and database declaratively, so a from-scratch build
-# and a backup restore converge to the same state. The DatabaseRole and
-# bootstrap.initdb.secret MUST keep pointing at the SAME Secret
-# (platform-db-user-secret) — two sources for one password would fight.
-#
-# ExternalSecret for platform-db bootstrap credentials (user DB owner).
-# OpenBAO path: secret/data/local/databases/shared-db/user (compat — pre-merge path)
-# basic-auth: required by CNPG bootstrap/app secrets and the DatabaseRole;
-# also feeds the PgDog valuesFrom (users[1]).
+# user — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# user_owner and user_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; its pgroles policy
+# (../authz/policies/user.yaml) owns the grants; CNPG keeps the
+# runtime login and the Database. Conventions: docs/databases/authorization.md.
+# The runtime password belongs to OpenBAO's static role user-runtime
+# (ADR-025, ADR-089): vault_rotator rotates it, ESO reads it every 15s,
+# and the DatabaseRole has no passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: platform-db-user-secret
+  name: platform-db-user-runtime-secret
   namespace: platform
   labels:
-    app.kubernetes.io/name: platform-db-user-secret
+    app.kubernetes.io/name: platform-db-user-runtime-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: openbao-db
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-user-runtime-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-user-runtime-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: database/static-creds/user-runtime
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: database/static-creds/user-runtime
+        property: password
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-user-migrator-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-user-migrator-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -27,14 +59,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: platform-db-user-secret
+    name: platform-db-user-migrator-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: platform-db-user-secret
+          app.kubernetes.io/name: platform-db-user-migrator-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -44,26 +76,23 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/shared-db/user
+        key: secret/data/local/databases/platform-db/user-migrator
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/shared-db/user
+        key: secret/data/local/databases/platform-db/user-migrator
         property: password
 ---
-# Written out IN FULL — adoption resets omitted attributes.
-# Adopts the role initdb created; CNPG's app-secret sync and this CR read
-# the same Secret, so they can never disagree.
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: platform-db-role-user
+  name: platform-db-role-user-runtime
   namespace: platform
 spec:
   cluster:
     name: platform-db
-  name: user
-  comment: "user-service application role (RFC-0012)"
+  name: user_runtime
+  comment: "user: the service; CRUD only"
   login: true
   superuser: false
   createdb: false
@@ -73,11 +102,10 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: platform-db-user-secret
   databaseRoleReclaimPolicy: retain
 ---
-# user Database extensions.
+# user_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema. CNPG retries until the catalog Job creates it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -85,10 +113,13 @@ metadata:
   namespace: platform
 spec:
   name: user
-  owner: user
+  owner: user_owner
   cluster:
     name: platform-db
   extensions:
     - name: pgaudit
     - name: pg_stat_statements
+    # pg_stat_ch's SQL surface in one database per cluster (the exporter's
+    # pg_stat_ch custom query targets it); see product-db/services/product.yaml.
+    - name: pg_stat_ch
   databaseReclaimPolicy: retain

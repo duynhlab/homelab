@@ -1,0 +1,75 @@
+# Credential projection and declarative role for OpenBAO's PostgreSQL static-
+# role rotation administrator. The KV value is random per fresh cluster; an
+# existing cluster must seed it before reconciling this manifest (runbook:
+# docs/databases/runbooks/rotate-vault-rotator-credential.md).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-vault-rotator-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-vault-rotator-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-vault-rotator-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-vault-rotator-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: local/databases/product-db/vault-rotator
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: local/databases/product-db/vault-rotator
+        property: password
+---
+# Written out in full because DatabaseRole adoption resets omitted attributes.
+# `inRoles` preserves the membership name but cannot express its ADMIN,
+# INHERIT, or SET options; bootstrap SQL grants the least-privilege option set
+# and the rotation runbook audits it explicitly.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-vault-rotator
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: vault_rotator
+  comment: "OpenBAO administrator for runtime static-role rotation"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: true
+  inherit: false
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles:
+    - product_runtime
+    - inventory_runtime
+    - cart_runtime
+    - order_runtime
+    - checkout_runtime
+    - payment_runtime
+  passwordSecret:
+    name: product-db-vault-rotator-secret
+  databaseRoleReclaimPolicy: retain

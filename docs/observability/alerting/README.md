@@ -294,7 +294,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 | Layer 1: PostgreSQL alerts | 42 alerts (all CNPG: product-db + platform-db per-cluster, + backups) | Implemented |
 | Layer 2: SLO alerts | 44 alerts (22 SLOs x 2 severities), minimum-events guard | Implemented |
 | Alert dashboard | Karma reading VMAlertmanager API | Implemented |
-| Layer 1: Database connection pool | PgDog pooler saturation alerts | Planned |
+| Layer 1: Database connection pool | PgDog pooler saturation alerts (`PgDogClientsWaiting`, `PgDogCheckoutTimeouts`, `PgDogPoolBanned`) | Active |
 | Layer 1: Infrastructure | Node memory/disk/PID pressure, NotReady, unschedulable | Implemented (`kubernetes/node-alerts.yaml`) |
 | Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Implemented (`kubernetes/pod-resources-alerts.yaml`, `workload-alerts.yaml`) |
 | Integration | Slack routing in VMAlertmanager (severity-based receivers) | Wired (webhook URL placeholder — inject via secret) |

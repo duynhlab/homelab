@@ -13,6 +13,11 @@ metadata:
   namespace: product
 spec:
   instances: 3
+  # ADR-089: serve the homelab-ca certificate (server-tls.yaml); the operator
+  # keeps managing the replication client certificates.
+  certificates:
+    serverTLSSecret: product-db-server-tls
+    serverCASecret: product-db-server-tls
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   plugins:
@@ -27,29 +32,61 @@ spec:
       synchronizeLogicalDecoding: true
 
   postgresql:
+    # pg_stat_ch (query telemetry → ClickHouse) arrives as an image-volume
+    # extension, not in the operand image: CNPG mounts it at /extensions/pg_stat_ch
+    # and appends its lib/ and share/ to dynamic_library_path and
+    # extension_control_path, so the preload entry below resolves. The image is
+    # built against this exact operand digest (duynhlab/images, pg-stat-ch);
+    # move the two together. Changing the image reference replaces the pods.
+    extensions:
+      - name: pg_stat_ch
+        image:
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:0a7595c74478972efc25b43c79cd5c6f7b9f35decb793f22d7722bb3caed6c7b
+
     shared_preload_libraries:
       - pgaudit
       - pg_stat_statements
       - auto_explain
+      - pg_stat_ch
 
     # Connection isolation (RFC-0012 P4, ADR-015): each service role connects
     # only to its own database. CNPG inserts these BETWEEN its fixed rules
     # (local peer for instance manager/exporter, cert-based hostssl for
     # streaming_replica) and its default host-all catch-all — so the trailing
     # reject preempts the catch-all without touching operator paths.
-    # First match wins. `host` (not hostssl) for the pgdog/migration pairs:
-    # their TLS is encrypted but unverified (TLS 1.3 measured on Kind 2026-10-01
-    # via pg_stat_ssl; PgDog default prefer); tighten to hostssl with RFC-0020's
-    # pooler slice. Applied by reload, not restart.
+    # First match wins. Every allow line is hostssl: PgDog, migrate and the
+    # authz Job all verify this server (ADR-089), and a plaintext login falls
+    # through to the reject. Applied by reload, not restart.
     # Adding a service? Add its allow line ABOVE the reject (the one
     # exception to "never touch instance.yaml" — HBA is cluster infra).
     pg_hba:
-      - hostssl payment payment all scram-sha-256
-      - host    product product all scram-sha-256
-      - host    cart    cart    all scram-sha-256
-      - host    order   order   all scram-sha-256
-      - host    checkout checkout all scram-sha-256
-      - host    inventory inventory all scram-sha-256
+      # Every product-db database admits its runtime and migrator only
+      # (RFC-0029); <svc>_owner never logs in, and the bootstrap role `product`
+      # has no line at all.
+      - hostssl payment   payment_runtime    all scram-sha-256
+      - hostssl payment   payment_migrator   all scram-sha-256
+      - hostssl product   product_runtime    all scram-sha-256
+      - hostssl product   product_migrator   all scram-sha-256
+      - hostssl inventory inventory_runtime  all scram-sha-256
+      - hostssl inventory inventory_migrator all scram-sha-256
+      - hostssl cart      cart_runtime       all scram-sha-256
+      - hostssl cart      cart_migrator      all scram-sha-256
+      - hostssl order     order_runtime      all scram-sha-256
+      - hostssl order     order_migrator     all scram-sha-256
+      - hostssl checkout  checkout_runtime   all scram-sha-256
+      - hostssl checkout  checkout_migrator  all scram-sha-256
+      # db_authz applies the role catalog in `postgres` and each database's
+      # grants, as the Job or as pgroles (ADR-088). One line per database.
+      - hostssl postgres  db_authz all scram-sha-256
+      - hostssl product   db_authz all scram-sha-256
+      - hostssl inventory db_authz all scram-sha-256
+      - hostssl cart      db_authz all scram-sha-256
+      - hostssl order     db_authz all scram-sha-256
+      - hostssl checkout  db_authz all scram-sha-256
+      - hostssl payment   db_authz all scram-sha-256
+      # OpenBAO's rotation administrator (ADR-025) logs in to `product` only;
+      # ALTER ROLE is cluster-wide, so one database is enough.
+      - hostssl product   vault_rotator all scram-sha-256
       - host    all     all     all reject
 
     synchronous:
@@ -137,6 +174,25 @@ spec:
       # sends every plan to the pg_parse_failures debug sink instead.
       auto_explain.log_format: "json"
 
+      # pg_stat_ch: one event per statement execution into ClickHouse
+      # (database pg_stat_ch, native :9000) as the INSERT-only `pg_stat_ch` user.
+      # The password is a postmaster GUC with no file/env alternative, so Flux
+      # substitutes it at apply time from the pg-stat-ch-clickhouse Secret in
+      # flux-system (databases-local postBuild.substituteFrom) — never a
+      # literal here. Queue sized for this cluster's 1Gi pods: 8192 slots
+      # (~4 MiB) + a 16 MiB string area, far below the 128K/64 MiB defaults.
+      # ClickHouse down = events dropped and send_failures counted, never
+      # back-pressure on queries; PgStatCh* alerts watch those counters.
+      pg_stat_ch.clickhouse_host: "clickhouse-clickhouse.monitoring.svc.cluster.local"
+      pg_stat_ch.clickhouse_port: "9000"
+      pg_stat_ch.clickhouse_user: "pg_stat_ch"
+      pg_stat_ch.clickhouse_password: "${PG_STAT_CH_CLICKHOUSE_PASSWORD}"
+      pg_stat_ch.clickhouse_database: "pg_stat_ch"
+      pg_stat_ch.queue_capacity: "8192"
+      pg_stat_ch.string_area_size: "16"
+      pg_stat_ch.flush_interval_ms: "1000"
+      pg_stat_ch.batch_max: "8192"
+
       # Replication slot sync (PostgreSQL 18 native)
       hot_standby_feedback: "on"
       sync_replication_slots: "on"
@@ -148,6 +204,8 @@ spec:
 
   bootstrap:
     initdb:
+      # The bootstrap role `product` is NOLOGIN and owns nothing once the
+      # Database CR hands `product` to product_owner (services/product.yaml).
       database: product
       owner: product
       secret:
@@ -157,6 +215,35 @@ spec:
       encoding: "UTF8"
       localeCType: "C"
       localeCollate: "C"
+      postInitSQL:
+        # ADR-025 pattern A: OpenBAO rotates every runtime password through
+        # vault_rotator, which needs ADMIN OPTION on each (PG18). The roles are
+        # created here so the GRANTs can carry ADMIN; the DatabaseRole CRs then
+        # adopt them.
+        - CREATE ROLE product_runtime WITH LOGIN
+        - CREATE ROLE inventory_runtime WITH LOGIN
+        - CREATE ROLE cart_runtime WITH LOGIN
+        - CREATE ROLE order_runtime WITH LOGIN
+        - CREATE ROLE checkout_runtime WITH LOGIN
+        - CREATE ROLE payment_runtime WITH LOGIN
+        # Password and ordinary attributes converge through DatabaseRole from a
+        # per-cluster OpenBAO value. SQL retains only the ADMIN OPTION that the
+        # DatabaseRole API cannot express or audit.
+        - CREATE ROLE vault_rotator WITH LOGIN CREATEROLE NOINHERIT
+        # ALTER ROLE needs CREATEROLE plus ADMIN on the target. INHERIT/SET are
+        # deliberately false: the administrator rotates a credential but must
+        # not inherit the runtime's data access or become it.
+        - GRANT product_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT inventory_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT cart_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT order_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT checkout_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT payment_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        # Creator of every catalog role (ADR-088). Unmanaged by CNPG on purpose:
+        # CNPG revokes undeclared memberships of the roles it manages, and this
+        # role is a member of every role it creates. db_authz reaches it via SET
+        # ROLE. An existing cluster runs this once by hand (runbook).
+        - CREATE ROLE authz_admin NOLOGIN CREATEROLE INHERIT
 
   # Roles live in per-service DatabaseRole CRs under services/ (RFC-0012,
   # ADR-013) — do not re-add an inline managed.roles entry except as the

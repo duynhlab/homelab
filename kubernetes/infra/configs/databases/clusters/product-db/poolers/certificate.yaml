@@ -1,0 +1,25 @@
+# Client-side TLS for PgDog (ADR-089). Every client verifies it
+# (sslmode=verify-full) against product-db-ca-trust, so dnsNames must keep the
+# name the clients dial; PgDog refuses plaintext.
+# A renewal does not roll PgDog: the mounted Secret updates in place and the
+# tls-reload sidecar in the HelmRelease sends PgDog SIGHUP (#1350).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pgdog-product-tls
+  namespace: product
+spec:
+  secretName: pgdog-product-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+  commonName: pgdog-product.product.svc
+  dnsNames:
+    - pgdog-product.product.svc
+    - pgdog-product.product.svc.cluster.local

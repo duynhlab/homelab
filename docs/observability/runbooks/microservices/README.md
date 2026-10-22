@@ -36,6 +36,7 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 | DBClientErrorRate | warning | database | [DBClientErrorRate.md](DBClientErrorRate.md) |
 | PgxPoolNearExhaustion | warning | database | [PgxPoolNearExhaustion.md](PgxPoolNearExhaustion.md) |
 | PgxPoolAcquireWaitHigh | warning | database | [PgxPoolAcquireWaitHigh.md](PgxPoolAcquireWaitHigh.md) |
+| PgxPoolConnectFailures | warning | database | [PgxPoolConnectFailures.md](PgxPoolConnectFailures.md) |
 
 ### RFC-0021 stock migration (write path)
 

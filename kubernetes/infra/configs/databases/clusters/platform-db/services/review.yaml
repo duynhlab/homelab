@@ -1,8 +1,10 @@
-# review — owner / migrator / runtime roles (RFC-0029, ADR-084).
-# Conventions: docs/databases/authorization.md.
-#
-# The Secrets are basic-auth because they double as each login's
-# passwordSecret; the owner has no password and no pg_hba line.
+# review — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# review_owner and review_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; CNPG keeps the
+# runtime login and the Database. Conventions: docs/databases/authorization.md.
+# The runtime password belongs to OpenBAO's static role review-runtime
+# (ADR-025, ADR-089): vault_rotator rotates it, ESO reads it every 15s,
+# and the DatabaseRole has no passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -13,9 +15,9 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
-  refreshInterval: 1h
+  refreshInterval: 15s
   secretStoreRef:
-    name: openbao
+    name: openbao-db
     kind: ClusterSecretStore
   target:
     name: platform-db-review-runtime-secret
@@ -28,18 +30,17 @@ spec:
           app.kubernetes.io/name: platform-db-review-runtime-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
-          cnpg.io/reload: "true"
       data:
         username: "{{ .username }}"
         password: "{{ .password }}"
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/platform-db/review-runtime
+        key: database/static-creds/review-runtime
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/platform-db/review-runtime
+        key: database/static-creds/review-runtime
         property: password
 ---
 apiVersion: external-secrets.io/v1
@@ -81,53 +82,6 @@ spec:
         key: secret/data/local/databases/platform-db/review-migrator
         property: password
 ---
-# Every attribute written out: adoption resets anything left out.
-apiVersion: postgresql.cnpg.io/v1
-kind: DatabaseRole
-metadata:
-  name: platform-db-role-review-owner
-  namespace: platform
-spec:
-  cluster:
-    name: platform-db
-  name: review_owner
-  comment: "review: owns the schema; nobody logs in"
-  login: false
-  superuser: false
-  createdb: false
-  createrole: false
-  inherit: true
-  replication: false
-  bypassrls: false
-  connectionLimit: -1
-  inRoles: []
-  databaseRoleReclaimPolicy: retain
----
-# inherit: false makes CNPG's plain GRANT give the f/f/t membership
-# (lab CNPG-07); the ADR-086 guard watches the edge.
-apiVersion: postgresql.cnpg.io/v1
-kind: DatabaseRole
-metadata:
-  name: platform-db-role-review-migrator
-  namespace: platform
-spec:
-  cluster:
-    name: platform-db
-  name: review_migrator
-  comment: "review: runs migrations as review_owner via SET ROLE"
-  login: true
-  superuser: false
-  createdb: false
-  createrole: false
-  inherit: false
-  replication: false
-  bypassrls: false
-  connectionLimit: -1
-  inRoles: [review_owner]
-  passwordSecret:
-    name: platform-db-review-migrator-secret
-  databaseRoleReclaimPolicy: retain
----
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
@@ -147,12 +101,10 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: platform-db-review-runtime-secret
   databaseRoleReclaimPolicy: retain
 ---
 # review_owner owns the database, which on PostgreSQL 15+ is what gives it
-# CREATE on the public schema.
+# CREATE on the public schema. CNPG retries until the catalog Job creates it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:

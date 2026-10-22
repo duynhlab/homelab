@@ -4,8 +4,8 @@
 |---|---|
 | **Severity** | warning |
 | **Source** | [`role-membership-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml) ([ADR-086](../../../proposals/adr/ADR-086-guard-membership-options/)) |
-| **Clusters** | `platform-db` |
-| **Custom query** | `pg_role_membership` ([`monitoring-queries.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml)) |
+| **Clusters** | `platform-db`, `product-db` |
+| **Custom query** | `pg_role_membership` ([platform-db](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml), [product-db](../../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml)) |
 
 ## Meaning
 
@@ -31,8 +31,8 @@ guard is not running. While this fires,
 
    A SQL error usually means an edited `VALUES` list. Run the query by hand on
    the primary (`psql -U postgres -d postgres`) to see the error.
-4. Was the edge renamed? The alert selects `member="vault_rotator",
-   parent="notification"`. When the guarded edge list changes, update the
+4. Was the edge renamed? The alert selects each guarded edge by `member` and
+   `parent` (for example `member="vault_rotator", parent="user_runtime"`). When the guarded edge list changes, update the
    `absent()` selector in the same PR.
 
 ## Mitigation

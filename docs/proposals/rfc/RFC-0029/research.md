@@ -1,5 +1,11 @@
 # RFC-0029 — Research: PostgreSQL authorization and access governance
 
+> **Reading this research:** experiments retain their original dates and design
+> context. Service-owned grants and `WithSetRole` are historical, superseded by
+> [ADR-088](../../adr/ADR-088-platform-owns-database-authorization/). The current
+> accepted direction and remaining access-contract proposals are in the
+> [RFC](./README.md#decision-outcome); this research is not a new rollout audit.
+
 | | |
 |---|---|
 | **RFC** | RFC-0029 |

@@ -58,7 +58,9 @@ audit. Historical lab/drill records retain the versions they actually measured.
 Additional platform topics:
 
 - [Extensions](./extensions.md)
-- [Database authorization (owner / migrator / runtime)](./authorization.md) — **conventions accepted, not deployed** (RFC-0029)
+- [Query telemetry — pg_stat_ch into ClickHouse](../observability/metrics/postgresql/query-telemetry.md) — per-execution events, server-side percentiles
+- [Database authorization (owner / migrator / runtime)](./authorization.md) — platform-owned roles and grants for every service on platform-db and product-db (RFC-0029, ADR-088)
+- [RFC-0029 access contract](../proposals/rfc/RFC-0029/) — planned direct migration, pooled consumers, verified TLS and workload attribution; current routing remains in the database architecture guide.
 - [Cross-region DR roadmap](./cross-region-dr.md) — **planned, not
   deployed**
 

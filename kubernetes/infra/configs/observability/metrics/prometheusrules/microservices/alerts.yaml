@@ -453,3 +453,18 @@ spec:
             description: "{{ $labels.app }} acquires are waiting for a free connection {{ $value | humanize }}/s over 10 minutes (pool contention). Correlate with pgxpool_empty_acquire_wait_time and query latency; grow the pool or shorten query hold time."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PgxPoolAcquireWaitHigh.md"
 
+        # pgxpool never retries a failed connect, so dbx counts each one by
+        # SQLSTATE. A password rotation leaves at most ~1 min of 28P01; failures
+        # in every 5m window for 10m mean the pod cannot log in at all.
+        - alert: PgxPoolConnectFailures
+          expr: |
+            sum by (app, namespace, error_type) (increase(pgx_pool_connect_failures_total{app!=""}[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "DB connects failing on {{ $labels.app }} ({{ $labels.namespace }}): {{ $labels.error_type }}"
+            description: "{{ $labels.app }} has failed to open new database connections ({{ $labels.error_type }}) in every 5-minute window for 10 minutes. 28P01 means the pod's password file does not match the role; 57P01/53300 or connect point at the pooler."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PgxPoolConnectFailures.md"
+

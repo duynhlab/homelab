@@ -33,7 +33,7 @@ Known gaps: [no-caller route and unpersisted address](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `CreateShipment`, `CancelShipment` (compensation — also the `CancellationWorkflow`'s unwind step, and `GetShipmentByOrder` gates the cancel policy, RFC-0021 P5) |
 | **Idempotency** | order id — `UNIQUE (order_id)` + `ON CONFLICT` makes replays return the existing shipment |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -259,7 +259,7 @@ east-west gRPC surface is unauthenticated by design — the policy is the fence.
   on shutdown, pings the DB pool with a 1 s timeout); gRPC `:9090`.
 - **Addressing:** clients dial `dns:///shipping.shipping.svc.cluster.local:9090`
   (single multi-port Service; see [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model)).
-- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_HOST`/`DB_PORT`/`DB_SSLMODE`/`DB_POOL_MAX_CONNECTIONS`,
+- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_HOST`/`DB_PORT`/`DB_SSLMODE`/`DB_POOL_MAX_CONNECTIONS`, `DB_PASSWORD_FILE` (mounted runtime Secret, read per new connection; on the cluster it replaces `DB_PASSWORD`, rotated by OpenBAO),
   `TRACING_ENABLED`, `OTEL_SAMPLE_RATE`, `LOG_LEVEL`, `SHUTDOWN_TIMEOUT`, `READINESS_DRAIN_DELAY`.
 - **Database:** app connects through `platform-db-pooler-rw.platform:5432`
   (pool max 30); migrations run against `platform-db-rw` directly

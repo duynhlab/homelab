@@ -12,7 +12,7 @@
 # answers exactly as the matrix expects. ~1 pod per cluster, one psql loop.
 set -u
 
-IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
+IMAGE="ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
 FAIL=0
 
 # expected verdict per pair: "allow" (auth-level failure expected) | "reject"
@@ -46,26 +46,49 @@ expect_pairs() {
   printf '%s' "$EXPECT" | sed -n "s|^$1/\([^=]*\)=.*|\1|p" | sort -u
 }
 
-product_roles=(payment product cart order checkout inventory)
-product_dbs=(payment product cart order checkout inventory)
+# product-db: every service is split into three roles (RFC-0029).
+# `product` is also the bootstrap.initdb owner, now NOLOGIN with no pg_hba line,
+# so it must be rejected everywhere, its own database included. db_authz
+# applies authorization from `postgres` and inside each service database.
+product_services=(product inventory cart order checkout payment)
+product_roles=(product vault_rotator db_authz)
+for svc in "${product_services[@]}"; do
+  product_roles+=("${svc}_owner" "${svc}_migrator" "${svc}_runtime")
+done
+product_dbs=("${product_services[@]}" postgres)
 for r in "${product_roles[@]}"; do
   for d in "${product_dbs[@]}"; do
-    if [ "$r" = "$d" ]; then expect_put "product/$r/$d" allow; else expect_put "product/$r/$d" reject; fi
+    expect_put "product/$r/$d" reject
+  done
+done
+expect_put "product/db_authz/postgres" allow
+# the OpenBAO rotation administrator (ADR-025) logs in to `product` only
+expect_put "product/vault_rotator/product" allow
+for svc in "${product_services[@]}"; do
+  for p in "${svc}_runtime/$svc" "${svc}_migrator/$svc" "db_authz/$svc"; do
+    expect_put "product/${p%%/*}/${p##*/}" allow
   done
 done
 
-# review is split into three roles (RFC-0029); review_owner has no pg_hba line,
-# so every probe of it must be rejected.
-platform_roles=(user notification shipping review_owner review_migrator review_runtime temporal vault_rotator)
-platform_dbs=(user notification shipping review temporal temporal_visibility)
+# Each service is split into three roles (RFC-0029); <svc>_owner has no pg_hba
+# line, so every probe of it must be rejected.
+# db_authz (ADR-088) applies authorization from `postgres` and inside each
+# service database; `postgres` is in the matrix so every other login is proven
+# shut out of it.
+platform_roles=(temporal vault_rotator db_authz)
+for svc in user notification shipping review; do
+  platform_roles+=("${svc}_owner" "${svc}_migrator" "${svc}_runtime")
+done
+platform_dbs=(user notification shipping review temporal temporal_visibility postgres)
 for r in "${platform_roles[@]}"; do
   for d in "${platform_dbs[@]}"; do
     expect_put "platform/$r/$d" reject
   done
 done
-# the committed allow lines (platform-db instance.yaml): each service to its
-# own db, temporal additionally to temporal_visibility, and the RFC-0008
-# rotator role to notification.
+# the committed allow lines (platform-db instance.yaml): each service's runtime
+# and migrator to its own db, temporal additionally to temporal_visibility, the
+# RFC-0008 rotator role to notification, and db_authz to `postgres` and every
+# service db.
 #
 # NOT in the matrix, and deliberately so rather than forgotten: the pg_hba also
 # carries `host keycloak keycloak`. Keycloak connects direct to :5432 (its
@@ -73,11 +96,14 @@ done
 # ADR-041), so the pair is real and currently untested — untested coverage, not
 # a failure. Adding it means deciding its full allow/reject row against every
 # other platform role, which is its own change.
-for p in user/user notification/notification shipping/shipping \
-         review_runtime/review review_migrator/review \
-         temporal/temporal temporal/temporal_visibility \
-         vault_rotator/notification; do
+for p in temporal/temporal temporal/temporal_visibility \
+         vault_rotator/notification db_authz/postgres; do
   expect_put "platform/${p%%/*}/${p##*/}" allow
+done
+for svc in user notification shipping review; do
+  for p in "${svc}_runtime/$svc" "${svc}_migrator/$svc" "db_authz/$svc"; do
+    expect_put "platform/${p%%/*}/${p##*/}" allow
+  done
 done
 
 sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
@@ -146,7 +172,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
 
 echo "== product-db (6 allow / 30 reject expected)"
 sweep product product "product-db-rw.product.svc.cluster.local"
-echo "== platform-db (8 allow / 40 reject expected)"
+echo "== platform-db (16 allow / 89 reject expected)"
 sweep platform platform "platform-db-rw.platform.svc.cluster.local"
 
 echo

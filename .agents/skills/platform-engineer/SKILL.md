@@ -111,6 +111,11 @@ Design **before** building when the change is substantial or contested.
 - **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) — one decision each; **`Proposed`**
   during RFC review, **`Accepted`** with the RFC. Template:
   [`ADR-0000-template/`](../../../docs/proposals/adr/ADR-0000-template/).
+- **Tracking** — an `Accepted` ADR gets one issue of type `ADR` (template
+  *ADR implementation tracking*), linked from its `Implementation tracking`
+  row; each obligation is a sub-issue (`gh issue create --parent`). PRs say
+  `Part of #<sub-issue>`; tradeoffs the ADR did not settle are comments on
+  the tracking issue ([`adr/README.md` § Working log](../../../docs/proposals/adr/README.md#working-log)).
 - A small standalone decision may go directly to an ADR. Bugs, cleanups,
   dependency bumps, and narrow documentation corrections use a focused PR.
 - Hub: [`docs/proposals/`](../../../docs/proposals/), [`adr/README.md`](../../../docs/proposals/adr/README.md).
@@ -135,10 +140,9 @@ Design **before** building when the change is substantial or contested.
 
 ## Contribution workflow
 
-Commit and branch rules (no attribution trailers, subject/body shape, never
-push to `main`, branch prefixes, duynhlab identity) live in
-[AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow) —
-one owner, no copies.
+When writing or reviewing commit messages, squash messages, or branch names,
+read [git-commits](../git-commits/SKILL.md). The PR workflow and Git/GitHub
+identity remain in [AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow).
 
 ## IDE skills map
 

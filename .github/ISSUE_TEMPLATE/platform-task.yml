@@ -1,6 +1,7 @@
 name: Platform task or small change
 description: Propose bounded maintenance, operational work, or a small platform change that does not need an RFC.
-title: "task: "
+title: "[Task] "
+type: Task
 labels:
   - task
 body:
@@ -8,6 +9,14 @@ body:
     attributes:
       value: |
         Use this form for bounded work. For a substantial or contested architecture change, follow the RFC research and owner-approval process linked from the issue chooser first.
+  - type: input
+    id: parent
+    attributes:
+      label: Parent decision
+      description: The ADR tracking issue this task belongs to, if any. Open the task as a sub-issue of it (`gh issue create --parent <issue>`) so progress shows on the parent.
+      placeholder: "ADR-NNN · #issue"
+    validations:
+      required: false
   - type: textarea
     id: problem
     attributes:

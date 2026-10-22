@@ -6,7 +6,7 @@
 | **Source** | [`role-membership-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml) ([ADR-086](../../../proposals/adr/ADR-086-guard-membership-options/)) |
 | **Clusters** | `platform-db` |
 | **Custom query** | `pg_role_membership` ([`monitoring-queries.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml)) |
-| **Guarded edges** | `vault_rotator → notification` = `ADMIN TRUE, INHERIT FALSE, SET FALSE` |
+| **Guarded edges** | `vault_rotator → notification_runtime` = `ADMIN TRUE, INHERIT FALSE, SET FALSE` · `<svc>_migrator → <svc>_owner` (review, user, shipping, notification) = `ADMIN FALSE, INHERIT FALSE, SET TRUE` · `db_authz → authz_admin` = `ADMIN FALSE, INHERIT TRUE, SET TRUE` ([ADR-088](../../../proposals/adr/ADR-088-platform-owns-database-authorization/)) |
 
 ## Meaning
 
@@ -19,13 +19,13 @@ afterwards.
 
 ## Impact
 
-For `vault_rotator → notification`:
+For `vault_rotator → <svc>_runtime` (platform-db: notification, user, shipping, review; product-db: product, inventory, cart, order, checkout, payment):
 
-- **`ADMIN` lost, or the edge revoked:** OpenBAO can no longer rotate
-  notification's password. The current credential keeps working; the next
+- **`ADMIN` lost, or the edge revoked:** OpenBAO can no longer rotate that
+  service's password. The current credential keeps working; the next
   rotation fails.
 - **`INHERIT` or `SET` gained:** the rotation administrator can read and write
-  notification's data, which the edge is shaped to prevent.
+  that service's data, which the edge is shaped to prevent.
 
 ## Diagnosis
 
@@ -71,11 +71,11 @@ Restore the specified shape on the primary as `postgres`:
 ```bash
 kubectl exec -n platform "$PRIMARY" -c postgres -- psql -U postgres -d postgres \
   -v ON_ERROR_STOP=1 -c \
-  "GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;"
+  "GRANT notification_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;"
 ```
 
 If a second grantor's row still carries `INHERIT` or `SET`, revoke that grant:
-`REVOKE notification FROM vault_rotator GRANTED BY <grantor>`. Then run the
+`REVOKE notification_runtime FROM vault_rotator GRANTED BY <grantor>`. Then run the
 `GRANT` above again. The alert resolves within one scrape plus 5 minutes.
 
 If `ADMIN` was missing for a while, check that notification rotation still

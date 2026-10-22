@@ -51,18 +51,33 @@ authentication does not continue down the list looking for another method.
 
 - `host` permits either TLS or plaintext. It does not prove a connection uses
   plaintext, and it does not enforce encryption.
-- `hostssl` requires TLS, but does not make the client verify the server identity.
-  Payment uses this rule and `sslmode=require`: encrypted, unverified.
-- PgDog's upstream TLS and each application's pooler hop are separate. Inspect
-  active sessions and client settings rather than inferring them from HBA.
-- The OpenBAO database configuration Job currently declares `sslmode=disable`
-  for its direct notification-database connection. This is a current limitation,
-  not the recommended transport for production.
+- `hostssl` requires TLS, but does not make the client verify the server identity;
+  verification is the client's `sslmode=verify-full`. Every service, worker,
+  pooler, migration, seed and authz login is on `hostssl` and verifies the
+  server. On platform-db only `temporal`, `keycloak` and `vault_rotator` keep
+  `host` ([#1296](https://github.com/duynhlab/homelab/issues/1296)).
+- Both clusters, and the DR cluster `product-db-replica`, serve a server
+  certificate from `homelab-ca` (`<cluster>-server-tls`, cert-manager, 90
+  days, renewed 15 days before expiry) through `spec.certificates.serverTLSSecret` and `serverCASecret`,
+  instead of CNPG's self-signed CA. Its DNS names cover `<cluster>-rw`, `-ro`
+  and `-r`. Clients verify it with the same `*-db-ca-trust` CA they use for
+  the poolers. CNPG's instances check only the CA between themselves, and the
+  operator still issues the replication client certificates. The Secret
+  carries `cnpg.io/reload`, so a renewal reloads PostgreSQL without a
+  restart.
+- The OpenBAO database engine connects to both clusters with `sslmode=require`
+  (encrypted, server not verified): product-db admits it on `hostssl`,
+  platform-db still on `host`; verifying the server is part of
+  [#1296](https://github.com/duynhlab/homelab/issues/1296).
 
 Verified TLS needs trusted CA material and hostname validation at the client
 (for libpq, `verify-full`), with certificates covering the chosen endpoint.
-Changing an HBA rule alone cannot deliver that. Transport improvements are
-tracked by [RFC-0020](../proposals/rfc/RFC-0020/); do not describe them as deployed.
+Changing an HBA rule alone cannot deliver that. Today every service → pooler
+hop, both poolers → primary, and migrations, seeds and the authz Jobs → primary
+do it ([poolers](poolers.md#tls)). pgroles stays `sslMode: require`: its
+policy has no root-certificate field and its chart cannot mount a CA. Temporal,
+Keycloak and OpenBAO are tracked by
+[#1296](https://github.com/duynhlab/homelab/issues/1296).
 
 ### Credentials and reconciliation
 
@@ -72,10 +87,10 @@ application namespaces; successful ESO sync is only one step. CNPG must apply
 the credential and the client or pooler must consume it. Never paste Secret
 payloads, SCRAM verifiers or credential-bearing DSNs into evidence.
 
-Notification's OpenBAO rotation path and the separate `vault-rotator` management
+The runtimes' OpenBAO rotation path and the separate `vault-rotator` management
 identity have different owners and ordering from a normal service-password
 change. Follow the [rotator credential runbook](./runbooks/rotate-vault-rotator-credential.md)
-for that identity; do not rotate it as though it were a PgDog service password.
+for that identity; do not rotate it as though it were a service runtime password.
 
 The operator manages internal certificates, while client trust and pooler TLS
 still require deliberate configuration. Inspect `Cluster.status.certificates`
@@ -84,10 +99,11 @@ client verifies the issuer or hostname.
 
 ### Authorization and audit boundaries
 
-The current service login owns its database. HBA isolates which database it can
-enter; it does not prevent that owner from changing its schema. The planned
-owner/migrator/runtime split and membership evidence belong exclusively to
-[authorization](./authorization.md). CNPG role attributes and memberships are
+Each service database is owned by a `NOLOGIN` `<svc>_owner`; the migrator
+becomes that owner at login and the runtime login gets CRUD grants only. HBA
+isolates which database a login can enter; it does not limit what the owner
+does to its schema. The owner/migrator/runtime split and membership evidence
+belong exclusively to [authorization](./authorization.md). CNPG role attributes and memberships are
 not a replacement for application migration-owned object grants.
 
 Statement logging, pgAudit and `auto_explain` can expose query text or values.

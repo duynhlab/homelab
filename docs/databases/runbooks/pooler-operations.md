@@ -12,11 +12,11 @@ covers what differs.
 |------|-------|
 | PgDog release | `pgdog-product` (product ns) — fronts `product-db` |
 | PgBouncer pooler | `platform-db-pooler-rw` (platform ns, CNPG `Pooler`) — fronts `platform-db`; see [PgBouncer pooler](#pgbouncer-pooler-platform-db) |
-| Chart | `pgdog` `v0.39` from the `pgdogdev` HelmRepository (flux-system) |
+| Chart | `pgdog` `v0.92` (PgDog v0.1.61) from the `pgdogdev` HelmRepository (flux-system) |
 | Ports | `6432` SQL, `9090` openmetrics (`pgdog_` prefix) |
 | Topology | 3 replicas, soft anti-affinity, PDB `minAvailable: 2` |
-| Pool mode | `transaction`; R/W splitting: SELECTs → `-r` replicas, writes → `-rw` primary; LSN lag monitoring bans lagging replicas |
-| Credentials | Injected per-user via HelmRelease `spec.valuesFrom` targetPath from the per-service ESO Secrets (ADR-014) — never in values |
+| Pool mode | `transaction`; every database points at the `-rw` primary only (ADR-089: no automatic read split) |
+| Credentials | None stored. Passthrough auth (`enabled_allow_change`, ADR-025): each client's password is checked against PostgreSQL at its first login and cached per replica |
 
 Concepts, trade-offs, and deployed topology live in [poolers.md](../poolers.md);
 this page is purely operational.
@@ -40,32 +40,92 @@ Watch pool saturation (clients vs servers per database) and error counters —
 a sudden error spike is almost always auth (see rotation below) or a banned
 backend.
 
-A replica ban shows in the logs (`banned replica`) and as traffic concentrating on the primary; bans lift automatically once the replica's LSN catches up (checked every `lsnCheckInterval: 5000` ms).
-
 ## Rotate a service password
 
-Order matters — the pooler learns passwords only at Helm reconcile time:
+PgDog needs no action. Full procedure: [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md).
 
-1. Rotate in OpenBAO, let ESO refresh the Secret (or force: `kubectl annotate externalsecret <name> force-sync=$(date +%s) -n <ns>`). Full CNPG-side procedure: [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md).
-2. **`flux reconcile helmrelease pgdog-<cluster> -n <ns>`** — helm-controller re-reads `valuesFrom` only on reconcile; skipping this leaves PgDog authenticating with the old password and every new app connection failing.
-3. Verify: `kubectl logs … | grep -i auth` goes quiet; `pgdog_errors_total` flattens.
+1. OpenBAO rotates the runtime password itself (`ALTER ROLE` as `vault_rotator`, every 720 h, or now with `bao write -f database/rotate-role/<svc>-runtime`); ESO refreshes the Secret within 15 s and the pod's mounted file follows.
+2. No restart. The service's next new connection logs in with the new password, which replaces PgDog's cached copy on that replica (log line `auth: passthrough`); until then that replica still accepts the old password. After a leak, roll PgDog ([emergency rotation](rotate-cnpg-service-password.md#emergency-rotation-credential-exposed)).
+3. Verify: `kubectl logs deploy/pgdog-product -n product | grep -i 'is wrong'` stays quiet; `pgdog_errors_total` flattens.
+
+## Rotate the client TLS certificate
+
+`pgdog-product` terminates client TLS with the cert-manager `Certificate`
+`pgdog-product-tls` (ClusterIssuer `homelab-ca`, 90 days, renewed 15 days
+before expiry). A renewal needs no manual step and **no roll**:
+
+- kubelet updates the mounted Secret in place (no `subPath`), typically within
+  a minute.
+- The `tls-reload` sidecar (added to the Deployment by the HelmRelease's
+  `postRenderers`, with `shareProcessNamespace`) compares the checksum of the
+  certificate, `pgdog.toml` and `users.toml` every 30 s and sends PgDog `SIGHUP`
+  when any of them changes. The chart has no config checksum annotation, so
+  this is also how a HelmRelease config change reaches running pods.
+- On `SIGHUP` PgDog re-reads its TLS files (`TLS certificate reloaded` in its
+  log). Open sessions keep their handshake; every new one gets the new
+  certificate.
+
+To check or force it:
+
+1. `kubectl get certificate pgdog-product-tls -n product` — Ready, with the new `notAfter`. `cmctl renew pgdog-product-tls -n product` forces a renewal.
+2. `kubectl logs -n product <pod> -c tls-reload` shows `sent SIGHUP`, and `-c pgdog` shows `TLS certificate reloaded`, on every pod. Pod restart counts stay 0.
+3. Verify: the serial PgDog presents (`openssl s_client -starttls postgres -connect <pod IP>:6432 </dev/null | openssl x509 -noout -serial`, from a pod the NetworkPolicy admits) matches the Secret's, on each pod.
+
+If a pod never reloads (the sidecar is down), `kubectl rollout restart
+deploy/pgdog-product -n product` picks the certificate up with a drained roll
+(below).
+
+Verified on Kind (2026-10-22): a forced renewal under 2 orders/s reached all
+three pods within about a minute of the Secret change, each logged one
+`TLS certificate reloaded`, fresh handshakes on all three pod IPs presented the
+new serial, no container restarted, and no request failed with `57P01`.
+
+## Rolling restarts drain
+
+PgDog has no option to move idle clients off a pod: on `SIGINT` (the image's
+stop signal) it sends every idle client `FATAL: PgDog is shutting down
+(SQLSTATE 57P01)` and waits up to `shutdown_timeout` (60 s) for clients still
+in a transaction. So the clients leave first, as PgDog's upgrade guide
+prescribes:
+
+- Each PgDog pod gets a 70-second `preStop` sleep. The Service stops routing
+  new connections to it as soon as deletion starts.
+- Every client behind PgDog (product, inventory, cart, order, checkout, payment
+  and both workers) sets `DB_POOL_MAX_CONN_LIFETIME=45s` and
+  `DB_POOL_HEALTH_CHECK_PERIOD=10s`. An idle pgx connection then lives at most
+  45 s × 1.1 + 10 s ≈ 60 s, so by `SIGINT` the pool has replaced every
+  connection to the stopping pod with one to another pod.
+- `terminationGracePeriodSeconds` is 140: the 70 s sleep, the 60 s drain and a
+  margin. With 3 replicas and PDB `minAvailable: 2` a restart is rolling, one
+  pod at a time; a full roll finishes in about two and a half minutes.
+- As a backstop, `pkg/dbx` checks each pooled connection before handing it out
+  and replaces one the pooler already closed
+  (`pgx_pool_acquire_evictions_total` counts them).
+
+Measured on Kind (2026-10-22, 2 orders/s for 180 s through the edge, dbx
+v0.40.1): **0 server 5xx during a roll against 0 at baseline**, 0 evictions, 0
+`57P01`. Before this change a roll cost 5–24 failed requests. Two client-side
+defects made it worse and are fixed in dbx v0.40.0/v0.40.1: a two-minute
+default connect timeout, and an acquire-check peek that could block forever
+behind pgconn's background reader and leak the connection. One residual: a
+freshly started pod can refuse a first passthrough login (upstream
+pgdog#1798); it surfaced once as `pgx_pool_connect_failures_total{error_type="58000"}`
+on a worker, with no request failure.
 
 ## Add a database backend (new service)
 
 The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add-service-database.md); the PgDog slice of it:
 
-1. In the cluster's `poolers/helmrelease.yaml`: append a `databases:` entry (primary `-rw`, replica `-r`) **and** a `users:` entry, then a `valuesFrom` block with `targetPath: "users[N].password"`.
-2. **Indices are positional** — `users[N]` must match the position in `values.users`. Keep the header comment (`[0]=product, …`) true; a mismatched index silently wires service A's password to service B's user, which surfaces as auth failures for BOTH.
-3. `make validate`, merge, reconcile. The rollout restarts pooler pods; with 3 replicas + PDB 2 the restart is rolling, but in-flight transactions on the drained pod are cut — sequence with deploys, not during load tests.
+1. In the cluster's `poolers/helmrelease.yaml`: append a `databases:` entry (primary `-rw` only, no `replicas:`). There is no user list; passthrough auth admits the service's runtime login once PostgreSQL accepts its password.
+2. `make validate`, merge, reconcile. The rollout restarts pooler pods one at a time and each drains (above).
 
 ## Known failure modes
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| New connections fail after a password rotation | `valuesFrom` read at reconcile time only | `flux reconcile helmrelease pgdog-<cluster>` (step 2 above) |
-| Auth failures for two services at once after adding a backend | positional `users[N]` mismatch | re-align `valuesFrom` targetPath indices with `values.users` order |
+| `password for user … is wrong` about 5 s after connecting | Passthrough: PostgreSQL refused the password while PgDog tried it (`checkout_timeout`) | The app holds an old or wrong password: compare the ESO Secret with the pod's mounted file (`DB_PASSWORD_FILE`); restart only if the file never changed |
 | App migrations hang in Init | migrations connect **direct** to `<cluster>-rw:5432`, not the pooler — NetworkPolicy must admit the app namespace to 5432 | check the cluster namespace's netpol app-services rule |
-| Payment errors that look pooler-related | payment doesn't use PgDog — it connects direct over TLS (`sslmode=require`) because PgDog terminates no TLS yet | debug against `product-db-rw:5432`, not `pgdog-product` |
+| A product-db service or worker cannot connect, TLS errors | Every runtime verifies PgDog (`sslmode=verify-full`) against `ca.crt` from `product-db-ca-trust` in its own namespace; PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` and refuses plaintext | Both Certificates must be Ready (`kubectl get certificate -n product pgdog-product-tls`, `-n <ns> product-db-ca-trust`). `does not match host name`: `db_host` must be one of the certificate's DNS names. `certificate verify failed`: the two are not from the same `homelab-ca`. `only TLS connections are allowed`: the client sent `sslmode=disable`. `make db-tls` checks every pooled hop. `migrate` goes direct to `product-db-rw:5432` |
 | `up{job=~"pgdog.*"}` empty | ServiceMonitor scrape broken | `kubectl get servicemonitor -n <ns>`; port 9090 must be admitted from the monitoring namespace in the netpol |
 
 ## References
@@ -88,6 +148,7 @@ tool with different day-2 mechanics — do not carry PgDog habits across.
 | Topology | `type: rw` — **all** traffic to the primary. No read/write split, no replica load-balancing (the pilot's accepted tradeoff) |
 | Credentials | None stored. CNPG configures `auth_query`: PgBouncer looks each login up in `pg_shadow` via a generated `user_search` function, authenticating itself with a TLS client certificate |
 | Metrics | `enablePodMonitor: true` → the PgBouncer exporter on `:9127` (`pgbouncer_` prefix), scraped by VMAgent |
+| Client TLS | `clientTLSSecret: platform-db-pooler-tls`, `client_tls_sslmode: require`, `server_tls_sslmode: verify-full`. Clients verify with `sslmode=verify-full` against `platform-db-ca-trust`. A renewal reloads in place, no roll ([poolers](../poolers.md#pgbouncer-platform-db)) |
 
 ### Status
 
@@ -105,9 +166,10 @@ operator from the manifest under
 
 - **Credential rotation needs no pooler action.** `auth_query` reads `pg_shadow`
   live, so the `ALTER ROLE` is effective immediately — no reconcile, no rollout
-  restart, no window where the pooler serves a stale password. Contrast the
-  PgDog path in
-  [rotate-cnpg-service-password.md](./rotate-cnpg-service-password.md).
+  restart, no window where the pooler serves a stale password. PgDog's
+  passthrough also needs no action, but each replica accepts the old password
+  until the first login with the new one
+  ([rotate-cnpg-service-password.md](./rotate-cnpg-service-password.md)).
 - **Backend changes are the `Cluster`'s business.** PgBouncer follows the
   `-rw` service, so a failover repoints automatically; there is no backend list
   to edit.

@@ -105,7 +105,8 @@ specific Kustomization or run `make sync`.
 | [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
 | [`keycloak.md`](keycloak.md) | The identity provider: deployment, realm import, database, reset procedure, signals |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
-| [`gitflow.md`](gitflow.md) | Branching and release policy (**target** — prod cluster TBD) |
+| [Git commits](../../.agents/skills/git-commits/SKILL.md) | Current homelab commit messages, squash messages and branch names |
+| [`gitflow.md`](gitflow.md) | Microservice branching and release model (**target** — prod cluster TBD) |
 | [`kyverno.md`](kyverno.md) | Admission policy tiers, Audit→Enforce, PolicyExceptions |
 | [`mcp-servers.md`](mcp-servers.md) | VictoriaMetrics/Logs/Flux/Grafana MCP servers for AI-assisted ops |
 | [`sonarcloud.md`](sonarcloud.md) | Per-repo SonarCloud keys and coverage gates |

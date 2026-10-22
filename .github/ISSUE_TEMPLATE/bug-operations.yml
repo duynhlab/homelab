@@ -1,6 +1,7 @@
 name: Bug or operational problem
 description: Report a failure in GitOps, cluster infrastructure, observability, databases, or local-stack.
-title: "bug: "
+title: "[Bug] "
+type: Bug
 labels:
   - bug
 body:

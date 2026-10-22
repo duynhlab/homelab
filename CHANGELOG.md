@@ -88,6 +88,21 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Breaking Change
+
+#### Observability
+
+- **Query telemetry stores `application_name`, not `app`.** The ClickHouse
+  schema Job pins clickhouse-ddl 2.0.0. The pg_stat_ch extension still inserts
+  the client name as upstream's `app`, which is now an `EPHEMERAL` column, so
+  `events_raw`, `db_app_user_1m` and `errors_recent` store and expose it as
+  `application_name`. Any query that reads `app` fails. Fresh-only: Kind
+  rebuilds the store, so there is no migration. The as-code dashboards move to
+  `0.7.0` in the same change: its query-telemetry board reads
+  `application_name`, lists its variables from the 90-day rollup, hides PgDog's
+  and Barman's sessions under *Workload only*, and adds a table of roles whose
+  statements arrive without a name.
+
 ### Feature
 
 #### GitOps
@@ -132,6 +147,53 @@ Skeleton (copy what you need):
 
 - **RFC-0030 telemetry qualification:** document the planned idle freshness sampler, standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
 
+- **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`
+  and `PgDogPoolBanned` on PgDog's own metrics (`pgdog_cl_waiting`,
+  `pgdog_total_checkout_timeouts`, `pgdog_banned`), with runbooks; the catalog's
+  "PgDog pooler saturation alerts" row moves from Planned to Active.
+
+- **Pool connection churn on the Microservices (OTel) board.** The as-code
+  dashboards move to `0.8.0`, which adds two panels to the database row:
+  *Pool dead connections replaced* (`pgx_pool_acquire_evictions_total`) and
+  *Pool connect failures* (`pgx_pool_connect_failures_total` by `error_type`,
+  the signal behind `PgxPoolConnectFailures`). The local-stack copy of the
+  board gets the same two panels (#1338).
+
+- **`PgxPoolConnectFailures` alert** (#1338). dbx v0.39.0 counts every
+  connection a service fails to open in `pgx_pool_connect_failures_total`,
+  labelled with the SQLSTATE (`28P01`, `57P01`, `53300`) or `connect`; pgxpool
+  never retries one. The alert fires when failures continue in every 5-minute
+  window for 10 minutes, so the short `28P01` burst of a password rotation does
+  not page. Runbook, alert catalog and the metrics docs list it with
+  `pgx_pool_acquire_evictions_total`.
+
+- **Authorization guards beyond membership options (ADR-088).** New CNPG
+  queries `pg_role_config` (each migrator's `role=`) and
+  `pg_default_privileges` (each Job-owned database's owner defaults), the
+  `db_authz → authz_admin` edge in `pg_role_membership`, and alerts
+  `CNPGRoleConfigDrift`, `CNPGDefaultPrivilegesDrift`,
+  `CNPGAuthorizationGuardMissing` with runbooks. K3.7 asserts all three guards;
+  K3.8/K3.9 check the migrator is the owner from login and after `RESET ROLE`;
+  K3.10 checks the catalog Job; the isolation sweep adds `db_authz` and the
+  `postgres` database.
+
+- **PostgreSQL query telemetry: dashboard, store and alerts.** ClickHouse gains
+  a second Replicated database, `pg_stat_ch` (`clickhouse-ddl` 1.2.1:
+  `events_raw` on `ReplicatedMergeTree`, 7 days hot → cold, 90 days, plus the
+  `query_stats_5m`, `db_app_user_1m` and `errors_recent` rollups), and the
+  `clickhouse-schema` Job now bootstraps and verifies both databases. The CHI
+  defines the INSERT-only `pg_stat_ch` user, with its own settings profile
+  pinning `network_compression_method: LZ4` (ClickHouse 26 replies in ZSTD,
+  which the extension cannot decode). New Grafana board
+  `postgresql-query-telemetry` (Databases folder), written as Go in
+  `duynhlab/grafana-dashboards` and delivered by the as-code artifact pinned at
+  0.6.0 — its first board on the logical `clickhouse` datasource: server-side
+  p50/p95/p99 over time, statements/s by operation, database and application,
+  errors by SQLSTATE, CPU-vs-I/O split, top statements by total time and
+  physical reads, slowest individual executions, recent errors, and an
+  exporter-health row. Three alerts with runbooks — `PgStatChExportFailing`,
+  `PgStatChDroppingEvents`, `PgStatChNotExporting` — watch the loss counters,
+  because the extension drops rather than back-pressures.
 - **Kind gate row K3.7: guarded database memberships have not drifted.**
   `smoke.js` asserts that the ADR-086 guard reports a series for every edge in
   `GUARDED_EDGES` (today `vault_rotator → notification`) and that
@@ -171,6 +233,255 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **Opt-in stale reads through PgDog** (#1304). PgDog runs
+  `read_write_split = "prefer_primary"` with `ban_replica_lag = 2000`; the
+  `product` database lists `product-db-ro`, and product-service reads related
+  products from it (`DB_READ_REPLICA=true`, startup option
+  `-c pgdog.role=replica`). Everything else stays on the primary. A banned
+  replica falls back to the primary. The PgDog reload sidecar now also
+  reloads `pgdog.toml` and `users.toml`, so a config change reaches running
+  pods without a roll.
+
+- **A PgDog certificate renewal reloads in place instead of rolling** (#1350).
+  The HelmRelease no longer copies `tls.crt` into a pod annotation; a
+  `tls-reload` sidecar (PgDog's own image, added through `postRenderers` with
+  `shareProcessNamespace`) sends PgDog `SIGHUP` when the mounted certificate
+  changes, and PgDog re-reads its TLS files. Renewals were the most frequent
+  PgDog roll and each cost checkout requests. Verified on Kind: new serial on
+  all three pods, no restart.
+
+- **OpenBAO rotates every product-db runtime password.** The six runtimes
+  (`product`, `inventory`, `cart`, `order`, `checkout`, `payment`) move to
+  OpenBAO static roles (720h) like platform-db's (#1310): product-db gets its
+  own `vault_rotator` (bootstrap SQL with ADMIN on each runtime, `inRoles`,
+  drift guard, `hostssl product vault_rotator` on the cluster and its DR
+  replica) and its own `openbao-db-config` Job in namespace `product`, so
+  neither cluster's Job depends on the other. The eleven runtime
+  ExternalSecrets read `database/static-creds/<svc>-runtime` every 15s, the
+  DatabaseRoles drop `passwordSecret`, and the pods and both workers read the
+  password from a mounted file with no `DB_PASSWORD` env (images product
+  1.16.3, inventory 0.9.2, cart 2.4.2, order 2.10.3, checkout 0.13.3, payment
+  2.8.1). Every runtime password on the platform now has one writer (#1311).
+
+- **OpenBAO rotates every platform-db runtime password.** `user_runtime`,
+  `shipping_runtime` and `review_runtime` join `notification_runtime` on
+  OpenBAO static roles (720h, ADR-025, ADR-089): `vault_rotator` holds ADMIN
+  on each (bootstrap SQL, `inRoles`, drift guard), the ExternalSecrets read
+  `database/static-creds/<svc>-runtime` through `openbao-db`, the
+  DatabaseRoles drop `passwordSecret`, and the pods read the password from a
+  mounted file (`db_password_file`; images user 2.5.2, shipping 1.10.1,
+  review 2.6.1). With a password file the domain templates no longer set
+  `DB_PASSWORD` on the service container, notification included. Runtime
+  ExternalSecrets refresh every 15s instead of 1m, which shortens the window
+  in which a new connection still holds the old password. OpenBAO reaches
+  platform-db with `sslmode=require` (#1309).
+
+- **The DR cluster verifies and isolates like product-db.**
+  `product-db-replica` serves a `homelab-ca` certificate
+  (`product-db-replica-server-tls`) and carries product-db's `pg_hba`
+  instead of CNPG's self-signed CA and default `host all all all` rule, so
+  after a promotion PgDog and `migrate` connect with `verify-full` and only
+  the host changes. `make validate` fails when the two `pg_hba` lists
+  differ, and `make db-tls` checks the replica hop when the DR wave is on
+  (#1307).
+
+- **PgDog authenticates by passthrough and keeps no passwords.** The
+  `pgdog-product` HelmRelease drops its six `users[]` entries and their
+  positional password `valuesFrom` (ADR-014, now superseded) and sets
+  `passthrough_auth = "enabled_allow_change"` (ADR-025): PgDog asks each
+  client for its password over the required TLS, checks it against
+  `product-db` and caches it, and a rotated password replaces the cache at
+  the next login. A runtime password change no longer needs a HelmRelease
+  reconcile or a PgDog rollout (#1283 row 4).
+
+- **Both clusters serve a homelab-ca certificate, and every direct hop
+  verifies it.** `platform-db` and `product-db` take their server certificate
+  from a cert-manager `<cluster>-server-tls` (`spec.certificates`), so
+  clients verify the primary with the same `*-db-ca-trust` CA they use for
+  the poolers. `migrate`, the seed Job, both authz Jobs and CronJobs and
+  PgDog's upstream (`tls_verify = verify_full`) move from `require`/`prefer`
+  to `verify-full`, and every service, migrator and `db_authz` line in
+  `pg_hba` becomes `hostssl`. `temporal`, `keycloak` and `vault_rotator` keep
+  `host` (#1296); pgroles stays `require` (no root-certificate field).
+  `make db-tls` adds the two direct hops.
+
+- **Every product-db client verifies PgDog, and PgDog refuses plaintext.**
+  product, inventory, cart, order, checkout and both Temporal workers move from
+  `sslmode=disable` to `verify-full`, joining payment. Each namespace gets a
+  `product-db-ca-trust` Certificate on the live `homelab-ca` (payment's
+  `payment-db-ca-trust` is renamed to it), and `fulfillment-rs` learns
+  `db_ca_secret`. PgDog sets `tls_client_required`, so a plaintext login gets
+  `only TLS connections are allowed`. `make db-tls` (`scripts/db-tls-check.sh`)
+  checks each pooled hop: the right host and CA reach authentication, the
+  Service IP and a foreign CA fail the handshake, and plaintext is refused.
+
+- **platform-db services verify PgBouncer, and PgBouncer refuses plaintext.**
+  user, notification, shipping and review move from `sslmode=disable` to
+  `verify-full`. The CNPG Pooler serves `platform-db-pooler-tls` through
+  `clientTLSSecret`, sets `client_tls_sslmode: require` and
+  `server_tls_sslmode: verify-full`; each namespace gets a
+  `platform-db-ca-trust` Certificate. The identity, comms and catalog domain
+  templates take the `db_ca_secret` input (comms merges it with the password
+  file volume). Verified on Kind: wrong host name, foreign CA and plaintext
+  are refused, and a renewal reloads in place (ADR-089, #1283 row 1).
+
+- **payment verifies PgDog (`sslmode=verify-full`).** A new Certificate,
+  `payment-db-ca-trust`, is issued by the live `homelab-ca` and read only for
+  its `ca.crt`. The checkout domain template mounts it and sets
+  `PGSSLROOTCERT` on the service container when an RSIP sets `db_ca_secret`;
+  `migrate` keeps `require` straight to CNPG. Verified on Kind: wrong host
+  name and wrong CA are refused, and a PgDog renewal keeps payment connected.
+  PgDog still accepts plaintext (ADR-089, #1283 row 1).
+
+- **PgDog drains on restart and rolls itself on a certificate renewal**
+  (ADR-089, #1283). Each pod now has a 10 s `preStop` sleep and a 75 s grace
+  period, so it leaves the Service before PgDog's 60 s shutdown drain. The
+  `pgdog-product-tls` Secret carries `reconcile.fluxcd.io/watch`, and the
+  HelmRelease copies `tls.crt` into a pod annotation, so a renewal rolls the
+  Deployment with no manual step. Verified on Kind with `cmctl renew`: the pods
+  rolled in about 87 s and served the new serial. A roll still costs a few
+  fail-closed 503s (5 of 1993 requests under load), because idle pooled client
+  connections get `57P01`; the client retry is duynhlab/pkg#124.
+
+- **cart, order, checkout and payment move to the owner / migrator / runtime
+  split (RFC-0029 product-db wave 2, ADR-088).** Every one of the ten services
+  is now on the split. On product-db:
+  - The role catalog Job + CronJob own `<svc>_owner` and `<svc>_migrator` for
+    all six databases (`ROLE_SERVICES`), and one pgroles policy per database
+    owns the grants.
+  - Runtime and migrator ExternalSecrets (`product-db-<svc>-runtime-secret`,
+    `product-db-<svc>-migrator-secret`, copies in each service namespace) are
+    seeded per cluster in OpenBAO at `product-db/<svc>-runtime` / `-migrator`.
+    The single-role `product-db-<svc>-secret` Secrets, their KV seeds and
+    logins are gone.
+  - `pg_hba` admits only each database's runtime, migrator and `db_authz`
+    (`hostssl` for payment), and the guard queries and `absent()` selectors
+    cover the four new migrator edges and databases.
+
+  PgDog lists `cart_runtime`, `order_runtime`, `payment_runtime` and
+  `checkout_runtime` (ADR-014 indices kept). order-worker and checkout-worker
+  use their service's runtime Secret. `db-authz-check.sh`, the isolation sweep,
+  `smoke.js` and local-stack (`init.sql`, compose, audit rows) cover all ten
+  services. Verified on a fresh Kind bring-up 2026-10-16: authz-check 120/120,
+  isolation sweep, six policies Ready, drift restored in 26 s, e2e saga 9/9,
+  staff 59/59, operator 26/26.
+
+- **payment reaches its database through PgDog, over client TLS (ADR-089).**
+  PgDog terminates client TLS with the cert-manager `Certificate`
+  `pgdog-product-tls` (ClusterIssuer `homelab-ca`); TLS stays optional, so the
+  other services keep plaintext. payment connects with `sslmode=require`:
+  encrypted, not verified, and `verify-full` is a follow-up. PgDog reads the
+  certificate only at start, so a renewal needs a PgDog restart
+  ([pooler operations](docs/databases/runbooks/pooler-operations.md)). payment's
+  migrate stays direct to `product-db-rw` over `hostssl`; local-stack keeps
+  payment direct to PostgreSQL, with no pooler. On Kind (2026-10-16) PgDog
+  serves the `homelab-ca` certificate, every `payment_runtime` session comes
+  from a PgDog pod, and the reconciler's session advisory lease works through
+  it (7 passes completed, none failed, no lock left). The database topology
+  diagram shows the new edge.
+
+- **product and inventory move to the owner / migrator / runtime split
+  (RFC-0029 product-db wave 1, ADR-088).** product-db gets the platform-db
+  shape:
+  - `authz_admin` in the bootstrap SQL and a `db_authz` login.
+  - A role catalog Job + CronJob (`product-db/authz/`), sharing platform-db's
+    `apply.sh` and `roles.sql`, with `PGHOST` picking the cluster.
+  - One pgroles policy per service, with host `product-db-rw.product.svc`.
+  - Runtime and migrator ExternalSecrets seeded per cluster in OpenBAO, and
+    `Database` objects owned by `<svc>_owner`.
+  - `pg_hba` lines for the runtime, migrator and `db_authz`, and a
+    `pgroles-system` network policy.
+  - Guard queries for the role membership and role config, and default
+    privileges in both databases. The `*GuardMissing` alerts now name the
+    cluster they fire for.
+
+  PgDog lists `product_runtime` and `inventory_runtime` (ADR-014 indices kept),
+  and both services read `db_runtime_secret` / `db_migrator_secret`. The
+  bootstrap database keeps its name `product`; its initdb role `product` is now
+  NOLOGIN with no `pg_hba` line, and CNPG hands the database to
+  `product_owner`. `db-authz-check.sh`, the isolation sweep, `smoke.js` K3.7 and
+  local-stack (`init.sql`, `product-authz` / `inventory-authz`, A23) cover the
+  two services. The database topology diagram now shows PgDog as primary-only
+  and the authorization executors. product moves to `1.16.2`, whose migration
+  000006 checks the table ACL instead of effective privilege (product-service#241),
+  which the split needs.
+
+- **Platform clients name themselves too (ADR-089).** The role catalog Job and
+  CronJob run as `db-authz` (`PGAPPNAME`), `db-authz-check` as `db-authz-check`,
+  Keycloak as `keycloak` (`ApplicationName` in the JDBC URL, also in local-stack),
+  Temporal as `temporal` (`connectAttributes` on both datastores; local-stack uses
+  `PGAPPNAME`, which its driver reads), and the OpenBAO database engine as
+  `openbao`. pgroles stays unnamed: its `PostgresPolicy` connection has no
+  `application_name` field in 0.13 or 0.14.
+
+- **PgDog sends every query to the primary (ADR-089).** The six product-db
+  databases no longer list `product-db-r`, so PgDog cannot route a `SELECT`
+  outside a transaction to a replica, where a read right after a commit could
+  miss it. A flow that tolerates stale reads will opt in through an explicit
+  replica profile with a lag tolerance (planned). The pooler docs, architecture
+  guide, PgDog runbook and the replication-lag runbook drop the read-split and
+  replica-ban text. ADR-089 adoption moves to Partial.
+
+- **Every service, migration and worker sets `application_name`
+  (ADR-089).** The five domain ResourceSets set `PGAPPNAME` to the service
+  name on the main container and `<name>-migrate` on the `migrate` init
+  container; `order-worker` and `checkout-worker` use their own names, and
+  local-stack sets the same values. Demo seeds run as `<name>-seed` (local-stack
+  and `make seed`), and local-stack's grant jobs as `db-authz`. pgx reads
+  `PGAPPNAME`, so no service code changes. Through PgDog the name replaces `PgDog` on product-db sessions.
+  Platform consumers (`db-authz`, Keycloak, Temporal, OpenBAO, pgroles) follow
+  later.
+
+- **user, shipping and notification run on three database roles (RFC-0029
+  D2, ADR-088).** The role catalog Job now owns `<svc>_owner` and
+  `<svc>_migrator` (with `role=<svc>_owner`) for all four `platform-db`
+  services; CNPG keeps each `<svc>_runtime`. The pgroles operator 0.13.0
+  (`pgroles-system`, own Flux wave) owns the in-database grants of user,
+  shipping and notification through one `PostgresPolicy` per database
+  (`adopt`, as `db_authz` → `authz_admin`); review stays on the Job. pgroles
+  cannot leave `schema_migrations` out of a table wildcard (PGR-10), so those
+  three runtimes hold it, by owner decision. OpenBAO now rotates
+  `notification_runtime` (static role `notification-runtime`). `platform-db`
+  bootstraps a neutral `platform` database, and `user` became an ordinary
+  `Database` owned by `user_owner`. `identity-rs` and `comms-rs` gained the
+  runtime/migrator Secret branch; the `shared-db` KV literals are gone.
+  local-stack mirrors the split for the four services and plays the grants
+  with the cluster's `grants.sql`.
+
+- **The platform applies review's database authorization (ADR-088).** review
+  no longer carries roles or grants: an `authz_admin` role (bootstrap SQL,
+  NOLOGIN CREATEROLE, unmanaged by CNPG) reached by the `db_authz` login (CNPG
+  `DatabaseRole`, `inRoles: [authz_admin]`, random OpenBAO password) runs a
+  role catalog Job on every change and a CronJob every 10 minutes. It creates
+  `review_owner` and `review_migrator`, sets `ALTER ROLE review_migrator SET
+  role = review_owner` so the migrator is the owner at login, keeps the
+  membership `f/f/t` and exact, and applies review's grants, default privileges
+  and `REVOKE EXECUTE … FROM PUBLIC`. It creates `schema_migrations` as the
+  owner before the first migrate, so the runtime never holds it. Drift it
+  may not repair fails the run (`KubeJobFailed`). The owner and migrator
+  `DatabaseRole`s are gone, the catalog template drops `DB_MIGRATION_ROLE`,
+  review is pinned to `2.6.0`, and
+  local-stack runs the cluster's `grants.sql` after review's migration.
+  One executor role in CNPG would deadlock a new cluster (CNPG creates a role
+  with `CREATE ROLE … IN ROLE`) or have its memberships revoked, hence two.
+
+- **Every statement execution on `platform-db` and `product-db` is now an
+  event in ClickHouse (`pg_stat_ch`).** The pg_stat_ch 0.4.0 extension arrives
+  as a CNPG image-volume extension (`ghcr.io/duynhlab/images/pg-stat-ch`,
+  built inside the pinned operand image and `ldd`-checked there), is preloaded
+  on both clusters and mounted-but-not-preloaded on `product-db-replica`, and
+  ships one 44-column event per execution over the native protocol to
+  ClickHouse database `pg_stat_ch` as an INSERT-only user. The password is a
+  postmaster GUC, so `databases-local` substitutes
+  `${PG_STAT_CH_CLICKHOUSE_PASSWORD}` at apply time from a Secret ESO lands in
+  `flux-system` (`postBuild.substituteFrom`, first use in this repo) — no
+  manifest carries it; OpenBAO seeds `secret/local/infra/clickhouse/pg_stat_ch`.
+  The `platform-db-authz` ConfigMap opts out of that substitution
+  (`kustomize.toolkit.fluxcd.io/substitute: disabled`), because `apply.sh`'s
+  bash `${...}` would otherwise fail the whole wave.
+  Ring sized for the 1 Gi pods (8192 slots, 16 MiB strings). The `pg_stat_ch`
+  custom query exports the exporter's own health as `cnpg_pg_stat_ch_*`.
+  Guide: `docs/observability/metrics/postgresql/query-telemetry.md`.
 - **review runs on three database roles (RFC-0029 Phase 2 canary).**
   `review_owner` (cannot log in) owns the database; `review_migrator` reaches
   it only through `SET ROLE` (`DB_MIGRATION_ROLE`); the service logs in as
@@ -194,12 +505,64 @@ Skeleton (copy what you need):
   its owner edge as `ADMIN f / INHERIT f / SET t`, which the authorization
   conventions rely on.
 
+#### Secrets
+
+- **No literal passwords in the OpenBAO bootstrap.** The `temporal`,
+  `keycloak` and `product` (initdb) seeds are random per cluster, like every
+  other seed, and the KV seed loop no longer holds platform-db runtime
+  passwords (#1309).
+
+#### Local-stack
+
+- **Lighter, closed-off bring-up.** Each service repository now builds one
+  image (`local-stack/<repo>:dev`); its migrate, seed, worker and mockpay
+  containers reuse it, so a cold build is 10 builds instead of ~31. Every
+  container has a `mem_limit` sized from measured usage (Go services peak at
+  23–44 MiB, Keycloak ~1 GiB with its heap now capped, the stack ~3.5 GiB). Every
+  published port binds `127.0.0.1`, and the project is named `local-stack`, so a
+  worktree no longer changes container names. A one-shot `gateway-ready` job
+  waits until the edge serves a route, and both SPAs wait for it. Grafana's
+  plugins persist in a volume. Valkey is pinned to `9.1.2`, the cluster chart's
+  version. `make e2e*` now requires `GATE=compose|kind`: the targets used to
+  default to different stacks.
+
 #### Docs
 
 - Document the draft RFC-0030 analytics API: exact money strings, USD-only v1,
   event-date ledger totals, cohort semantics and fail-closed freshness. Backend
   code and UI preview remain undeployed pending Linux qualification.
 
+- **The TLS topology is two diagrams** (#1339): `security/tls-pki-edge` (who
+  issues each certificate, and the request, identity and east-west hops) and
+  `security/tls-data-tier` (every database, pooler and store hop, with the
+  issuer → server and pooler certificate edges drawn instead of implied). The
+  combined view had 52 edge crossings; the two have 7 and 24. Moving dashes
+  (`flowAnimation`) are documented as a current primary flow, not a dashed
+  edge, in AGENTS.md and the house style. The two Temporal diagrams drop the
+  release numbers that went stale on every bump, and `platform/topology` names
+  the TLS state of the Keycloak and Temporal SQL edges.
+
+- **ADR-089 records its parameters and the rotation runbook covers both
+  clusters.** ADR-089 lists the certificate lifetimes, renewal pickup, expiry
+  alerts, the planned CA-overlap procedure, the rotation error budget (zero
+  failed requests; window measured on manual and scheduler-driven rotations)
+  and the credentials as built. The rotation runbook (`rotate-cnpg-service-password.md`)
+  now covers both clusters, adds an emergency rotation (roll PgDog to drop
+  cached passwords, end old sessions) and keeps the manual migrator flow
+  (#1303).
+
+- **Git commit conventions have one owner.** The `git-commits` skill defines
+  homelab messages and branch names; agent instructions and documentation link
+  to it and distinguish the microservice Gitflow target from current practice.
+
+- `docs/databases/extensions.md` compares the PostgreSQL query-telemetry tools
+  (`pg_stat_statements`, `auto_explain`, `pg_stat_monitor`, `pg_tracing`, the
+  OTel `postgresql` receiver, `pg_stat_ch`) by collection model, history,
+  strength, limitation and platform status, and its ImageVolume section now
+  describes the deployed `pg_stat_ch` delivery instead of a reference
+  capability. The custom-metrics reference, the PostgreSQL metrics hub, the
+  plan-regression workflow and `DBClientQueryP95High` point at the new
+  per-execution signal.
 - Define concise manifest comments and evidence-aware documentation conventions;
   remove editorial update footers from authoring templates while preserving
   decision and verification dates.
@@ -233,6 +596,28 @@ Skeleton (copy what you need):
 - **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
   allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
   Keep the accepted architecture separate from pending cluster qualification.
+
+- **RFC-0029 is Implemented.** Every service on `platform-db` and `product-db`
+  runs on the owner / migrator / runtime split with the platform applying roles
+  and grants; the fleet gate of 2026-10-16 is recorded in the Kind audit.
+  ADR-084, ADR-086 and ADR-088 Adoption `Complete`; ADR-089 stays `Partial`,
+  with its remaining obligations (verified TLS on both poolers, PgDog
+  certificate renewal, `passthrough_auth`, rotation delivery, replica and CDC
+  profiles) tracked in #1283.
+- Align RFC-0029 with ADR-088 platform-owned authorization and accept the
+  access contract as ADR-089: direct migrations, pooled consumers with native
+  per-instance monitoring and recovery exceptions, verify-full TLS on both
+  pooled hops, `application_name` through `PGAPPNAME`, primary-default reads
+  (PgDog's automatic read split becomes a gate) and per-role rotation
+  defaults. Record today's baseline, CNPG Pooler and PgDog support read from
+  upstream source, the remaining product-db rollout, and restore the
+  resolved historical decisions; D1/D2 evidence is unchanged.
+
+- **ADR-088 supersedes ADR-085.** Database authorization is platform-owned:
+  roles by the catalog Job, in-database grants by that Job or by pgroles;
+  services receive credentials only. Evidence from the 2026-10-12 pgroles/CNPG
+  lab (PGR-01…09, CNPG-08…10). ADR-084 and ADR-086 amended, RFC-0029 records
+  the pause and the redesign; `authorization.md` rewritten with exec evidence.
 
 - **RFC-0011 refreshed; ADR-087 proposed for homelab access.** Correct the
   M720q disk assumptions, replace unverified capacity and purchase claims with
@@ -319,6 +704,16 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **`databases-local` substitutes into the two CNPG Clusters only.** Its
+  `postBuild.substituteFrom` (the pg_stat_ch password) used to reach every
+  object in the wave, so each script had to opt out by hand; one missed
+  annotation would either fail the build on bash `${arr[@]}` or silently blank
+  a `${VAR}`. `configs/databases/kustomization.yaml` now opts every object out
+  with a patch and lets only `Kind: Cluster` back in, and `make validate` fails
+  if anything else is in scope or a Cluster references a variable other than
+  `${PG_STAT_CH_CLICKHOUSE_PASSWORD}`. The rendered manifests differ only in
+  that annotation.
+
 - Trim release diaries and repeated explanations in service, worker, CNPG,
   Temporal and edge manifests without changing configuration. Preserve sizing
   evidence in the owning docs and keep rollback constraints and Flux markers.
@@ -330,6 +725,38 @@ Skeleton (copy what you need):
   `service.version` said 2.5.0 while the image is 2.8.0.
 
 #### Databases
+
+- **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
+  recycle pooled connections within about 60 s (`DB_POOL_MAX_CONN_LIFETIME=45s`,
+  `DB_POOL_HEALTH_CHECK_PERIOD=10s`) and PgDog's `preStop` is 70 s (grace 140 s),
+  so no idle client is left on a pod when it gets SIGINT, as PgDog's upgrade
+  guide prescribes. Services pin the dbx v0.40.1 releases, which also fix a
+  connection leak: dbx v0.39.0–v0.40.0 could block forever in the acquire
+  check behind pgconn's background reader. Measured on Kind at 2 orders/s:
+  0 server 5xx during a roll against 0 at baseline (5–24 before).
+
+- **PgDog runs without a CPU limit** (was 200m), as the rest of the platform;
+  `cpu: null` drops the chart's 1000m default. During a roll the new pods were
+  throttled through the login burst. Measured on Kind: no more throttling, but
+  the roll's checkout timeouts did not drop (#1350 stays open).
+
+- **A fresh bring-up no longer stalls on the authz policies.** `db_authz` had
+  `CONNECTION LIMIT 10`, but pgroles keeps about three idle connections per
+  PostgresPolicy. product-db's six policies needed ~18, so the last ones failed
+  with `pool timed out` and backed off 300 s, holding `databases-local`
+  (`wait: true`) Unknown for 15+ minutes. The limit is now sized from the
+  policy count: 25 on product-db, 15 on platform-db (#1293).
+
+- **`make seed` no longer copies `PGSSLROOTCERT` into the seed Job.** The
+  seed dials CNPG directly like `migrate` and mounts no CA file, so pgx failed
+  to parse its DSN once a service set `db_ca_secret`.
+
+- **The DR replica's daily backup is no longer `immediate`** (#1285). A new
+  `product-db-replica` turns Ready while it is still replaying the source's WAL,
+  and the immediate backup's `pg_backup_start` was cancelled by the recovery
+  conflict, raising `PostgresBackupFailed` (critical) for about an hour on a
+  fresh bring-up. The first base backup is now the 03:30 run; the bootstrap
+  runbook shows how to take one by hand once replay has caught up.
 
 - **The committed `vault_rotator` database password is removed from current
   manifests and replaced with one random value per cluster.** Fresh OpenBAO
@@ -362,6 +789,37 @@ Skeleton (copy what you need):
   SQL access contract, RFC and ADRs. Require fresh disposable qualification
   state; historical evidence remains tied to its original commits.
 
+#### Services
+
+- **A PgDog roll no longer fails requests with `57P01`** (#1338,
+  duynhlab/pkg#124). dbx v0.39.0 checks each pooled connection before handing
+  it out and replaces one the pooler has already closed. Measured on Kind
+  (2 orders/s for 180 s through the edge, `rollout restart deploy/pgdog-product`):
+  0 `57P01` (was 5), 39 connections replaced. The roll still costs about 21
+  requests (24 5xx against 3 at baseline): checkout queries time out when each
+  old PgDog pod receives SIGINT (#1350).
+
+- **mockpay runs without a CPU limit** (was 50m), as the rest of the platform.
+
+#### Local-stack
+
+- **The compose gate checks what the cluster does.**
+  - Edge access logs are ClickHouse-only, as on the cluster (ADR-061). C13 now
+    reads `otel.otel_logs` and asserts VictoriaLogs holds none.
+  - Service healthchecks probe `/ready` instead of `/health`.
+  - payment heals reconciliation discrepancies (`RECON_HEAL_ENABLED`).
+  - checkout and the edge wait for inventory.
+  - PostgreSQL runs on Debian trixie and is initialised with locale `C`, like
+    the CNPG clusters, so text ordering matches. It used to be `en_US.utf8` on
+    Alpine.
+  - The README states the remaining divergences (no database TLS) and drops
+    stale claims: one role per database, edge logs through Vector, the VM pin.
+
+#### Docs
+
+- Standardize issue title prefixes and native types in the issue forms and
+  contribution guidance; align RFC-0030 tracking without changing its gates.
+
 - Remove accumulated editorial footers from docs; keep unique historical
   verification evidence beside its owning claims and preserve RFC/ADR metadata.
   Align the edge 429 catalog with the deployed `enforced` counter.
@@ -384,6 +842,62 @@ Skeleton (copy what you need):
   credential comes from** (`docs/secrets/openbao.md`): the per-cluster KV value,
   its ESO Secret, the CNPG `DatabaseRole` and the configurator Job that reads it
   — the path #989 introduced, which the prose already described.
+
+#### CI
+
+- **Smoke K5.8 recognises a mockpay restart** (#1209). mockpay's ledger is in
+  memory, so a restart makes `PaymentReconciliationDiscrepancy` fire for about
+  an hour on `missing_provider` alone. K5.8 no longer counts it when every
+  discrepancy in the window is `missing_provider` and mockpay started at least
+  5 minutes after payment; the alert itself is unchanged.
+
+### Dependency
+
+#### Observability
+
+- **VictoriaMetrics operator chart 0.67.2 → 0.68.1 (operator v0.75.0).** The
+  cluster follows the operator's defaults, so VMSingle, VMAgent and VMAlert move
+  from v1.148.0 to v1.152.0. VictoriaLogs stays at v1.52.0, and VTSingle stays
+  pinned at v0.11.1. The release notes for v1.149–v1.152 and VictoriaLogs list no
+  breaking change for this setup: the POST-only admin endpoints have no callers,
+  and the multitenancy-header default needs a flag that is not set. The operator
+  adds the VTAgent CRD and a config-reloader argument. Local-stack stays ahead
+  at v1.154.0 / v1.53.0 by design.
+- **Pyroscope 2.3.1 → 2.4.0** (chart and image). The bundled Alloy subchart
+  moves 1.5.2 → 1.12.1, and the headless Service drops out of the ServiceMonitor.
+- **Temporal server and admin-tools pinned to 1.32.1** (chart 1.7.0 defaults to
+  1.32.0), matching local-stack and the search-attributes Job. No schema change.
+
+#### Databases
+
+- **PgDog chart v0.90 → v0.92 (PgDog v0.1.60 → v0.1.61).** v0.1.61 stops
+  one client with a wrong password from blocking the pool under passthrough
+  auth; the chart adds only QoS backoff settings.
+
+- **pgroles operator 0.13.0 → 0.14.0.** Chart values are unchanged and the
+  CRDs add status fields only; Flux's `upgrade.crds: CreateReplace` applies them
+  before the controller, as the upgrade notes require. Relevant fixes: an
+  auto-approved plan the executor cannot apply now waits as one `Pending` plan
+  instead of being re-created every few seconds, and a stalled Kubernetes request
+  fails after 30 s instead of silently holding a reconcile. Membership
+  `inherit`/`admin` changes are made in place on PostgreSQL 16+. 0.14 still has no
+  `application_name` connection parameter.
+
+- Bump the PgDog chart for `product-db` from `v0.39` (PgDog 0.1.26) to
+  `v0.90` (PgDog v0.1.60). The rendered `pgdog.toml` keeps the same
+  effective settings; the chart no longer writes binary defaults out, and
+  it now sets `load_balancing_strategy = "round_robin"` (was the binary's
+  `random`), a zone topology spread (`ScheduleAnyway`) and a termination
+  grace of 65 s to match the 60 s shutdown timeout. Every `pgdog_*` metric
+  the dashboards and alerts read still exists. Upstream breaking changes
+  in this range touch sharding, plugins and 2PC, none of which are used.
+
+#### Services
+
+- **Ten services on `pkg/dbx` v0.39.0** (#1338): user 2.5.3, product 1.16.4,
+  inventory 0.9.3, cart 2.4.3, order 2.10.4, review 2.6.2, shipping 1.10.2,
+  notification 2.4.2, payment 2.8.2 (mockpay with it, up from 2.8.0) and
+  checkout 0.13.4; both workers follow their service.
 
 ## [2.0.0] - 2026-10-05
 

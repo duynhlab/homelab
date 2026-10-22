@@ -1,0 +1,106 @@
+# The CA every product-db client verifies PgDog against (sslmode=verify-full,
+# ADR-089). Issued by the live homelab-ca ClusterIssuer, so its ca.crt matches
+# the CA that signs pgdog-product-tls on every rebuild; the trust-manager
+# bundle holds a static copy that does not. Only ca.crt is used; the leaf is
+# never presented. One per namespace, because a pod mounts Secrets from its own.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-ca-trust
+  namespace: product
+spec:
+  secretName: product-db-ca-trust
+  commonName: product-db-ca-trust.product.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-ca-trust
+  namespace: inventory
+spec:
+  secretName: product-db-ca-trust
+  commonName: product-db-ca-trust.inventory.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-ca-trust
+  namespace: cart
+spec:
+  secretName: product-db-ca-trust
+  commonName: product-db-ca-trust.cart.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-ca-trust
+  namespace: order
+spec:
+  secretName: product-db-ca-trust
+  commonName: product-db-ca-trust.order.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-ca-trust
+  namespace: checkout
+spec:
+  secretName: product-db-ca-trust
+  commonName: product-db-ca-trust.checkout.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-ca-trust
+  namespace: payment
+spec:
+  secretName: product-db-ca-trust
+  commonName: product-db-ca-trust.payment.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

@@ -34,7 +34,7 @@ dark launch after backend-name and failure/recovery verification.
 
 ## Summary
 
-**243 statically defined alerts** exist in `.yaml` files under
+**251 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -43,18 +43,19 @@ rg '^\s*- alert:' \
   -g '*.yaml' | wc -l
 ```
 
-The 2026-10-06 breakdown is: postgres 61, microservices 52,
+The 2026-10-15 breakdown is: postgres 67 (three `PgStatCh*` export-health
+rules joined the 2026-10-14 count of 64), microservices 52,
 victoriametrics 31, kubernetes 29, observability 26, envoy-gateway 16, gitops 9,
 valkey 7, keycloak 5, kyverno 4, keda 4, and one root watchdog. The glob excludes
 retired `.yaml.bak` files. Two CNPG topology rules are gated and therefore not
-applied, leaving **243 deployed rules** from this tree.
+applied, leaving **249 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **255
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **261
 hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **299**. Of the 243 deployed entries from
+22 SLOs, bringing the cluster total to **305**. Of the 249 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **237**. The inert
+need do not exist; effective Kind coverage for that tree is **243**. The inert
 rules and both gated rules are marked inline rather than presented as working
 coverage.
 
@@ -110,6 +111,7 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 | DBClientErrorRate 💤 *`db_client_operation_errors_total` is not emitted — the other 12 `db_client_*` metrics are* | warning | `rate(db_client_operation_errors_total)>0.1/s` | Sustained DB operation failures (SQLSTATE, timeouts, broken conns) — requests are failing | 5m | [DBClientErrorRate](../runbooks/microservices/DBClientErrorRate.md) |
 | PgxPoolNearExhaustion | warning | `min_over_time(pgxpool_acquired_connections[5m]) ≥ 80%` of `pgxpool_max_connections` | Pool pinned at ceiling — new queries queue on Acquire | 5m | [PgxPoolNearExhaustion](../runbooks/microservices/PgxPoolNearExhaustion.md) |
 | PgxPoolAcquireWaitHigh | warning | `rate(pgxpool_empty_acquire_total)>1/s` | Acquires waiting for a free conn — earliest pool-saturation signal | 10m | [PgxPoolAcquireWaitHigh](../runbooks/microservices/PgxPoolAcquireWaitHigh.md) |
+| PgxPoolConnectFailures | warning | `increase(pgx_pool_connect_failures_total[5m])>0` by `error_type` | Pool cannot open new connections (28P01 password, 57P01 shutdown, connect) — pgxpool never retries | 10m | [PgxPoolConnectFailures](../runbooks/microservices/PgxPoolConnectFailures.md) |
 
 > **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) were **replaced** by `MicroserviceGCThrash`, itself **retired 2026-07-17** (audit: the runtime family has no heap series — only stack/other — so the ratio vs the heap-only GC goal false-fired permanently). `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 
@@ -228,8 +230,8 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 | CNPGClusterOffline | critical | `cnpg_collector_up` ready instances = 0 | DB fully down — total outage + data-loss risk | 5m | [CNPGClusterOffline](../runbooks/postgresql/CNPGClusterOffline.md) |
 | CNPGDRClusterOffline | critical | `cnpg_collector_up` for `product-db-replica` absent/zero | DR layer and promotion target unavailable | 5m | [CNPGDRClusterOffline](../runbooks/postgresql/CNPGDRClusterOffline.md) |
 | CnpgClusterFenced | critical | `cnpg_collector_fencing_on==1` | All writes blocked (split-brain guard) | 1m | [CnpgClusterFenced](../runbooks/postgresql/CnpgClusterFenced.md) |
-| CNPGClusterHACritical | critical | streaming replicas <1 | No standby — primary failure = data loss | 5m | [CNPGClusterHACritical](../runbooks/postgresql/CNPGClusterHACritical.md) |
-| CNPGClusterHAWarning | warning | streaming replicas <2 | Degraded HA redundancy | 5m | [CNPGClusterHAWarning](../runbooks/postgresql/CNPGClusterHAWarning.md) |
+| CNPGClusterHACritical | critical | streaming replicas <1 (excludes the 1-instance `product-db-replica`) | No standby — primary failure = data loss | 5m | [CNPGClusterHACritical](../runbooks/postgresql/CNPGClusterHACritical.md) |
+| CNPGClusterHAWarning | warning | streaming replicas <2 (excludes the 1-instance `product-db-replica`) | Degraded HA redundancy | 5m | [CNPGClusterHAWarning](../runbooks/postgresql/CNPGClusterHAWarning.md) |
 | CNPGOperatorDown | critical | `up{namespace="cloudnative-pg"}==0` | Operator down — no cluster management | 5m | [CNPGOperatorDown](../runbooks/postgresql/CNPGOperatorDown.md) |
 | CNPGControllerReconcileErrorsSpiking | warning | `increase(controller_runtime_reconcile_errors_total[10m])>5` | Cluster management degrading | 10m | [CNPGControllerReconcileErrorsSpiking](../runbooks/postgresql/CNPGControllerReconcileErrorsSpiking.md) |
 | CNPGClusterHighConnectionsCritical | critical | `cnpg_backends_total` / `max_connections` >95% | New connections refused | 5m | [CNPGClusterHighConnectionsCritical](../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md) |
@@ -254,6 +256,16 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 
 > 💤 **Inactive on this homelab** — logical replication has no subscriptions configured, so `cnpg_pg_stat_subscription_*` has no series; these arm automatically once a subscription exists.
 
+### 4c. PgDog pooler (product-db)
+
+`prometheusrules/pooler/pgdog-alerts.yaml`, from PgDog's OpenMetrics (`pgdog_*`, labels `user`/`database`/`role`). The client side of the same hop is `PgxPoolConnectFailures` (§1).
+
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| PgDogClientsWaiting | warning | `max by (database) (pgdog_cl_waiting) > 0` | Clients queue for a server connection; requests slow down | 5m | [PgDogClientsWaiting](../runbooks/postgresql/PgDogClientsWaiting.md) |
+| PgDogCheckoutTimeouts | warning | `increase(pgdog_total_checkout_timeouts[5m]) > 0` | A client gave up after `checkout_timeout` (5 s): a request failed (also a wrong password under passthrough) | — | [PgDogCheckoutTimeouts](../runbooks/postgresql/PgDogCheckoutTimeouts.md) |
+| PgDogPoolBanned | warning | `max by (database, role) (pgdog_banned) > 0` | A backend pool is banned (errors, or replica lag); its traffic falls back or fails | 1m | [PgDogPoolBanned](../runbooks/postgresql/PgDogPoolBanned.md) |
+
 ### 4b. Deep-signal alerts (hand-authored)
 
 `prometheusrules/postgres/deep-signals-alerts.yaml` (ns `monitoring`) — **not** chart-generated.
@@ -274,6 +286,9 @@ ignore (locks, deadlocks, autovacuum, cache, temp, checkpoints, wraparound, WAL 
 | CNPGWALArchiveFailing | critical | `cnpg_pg_stat_archiver_last_failed_time > …_last_archived_time` (last attempt failed, nothing archived since) | PITR/backup recovery broken; WAL piling up | 5m | [CNPGWALArchiveFailing](../runbooks/postgresql/CNPGWALArchiveFailing.md) |
 | CNPGInactiveSlotRetainingWAL | warning | inactive slot with `pg_wal_lsn_diff` >1 GiB, primary's view only | The **cause** the lag alerts report as a symptom: WAL pinned on the primary's disk, growing until the standby rejoins or the slot is dropped | 15m | [CNPGInactiveSlotRetainingWAL](../runbooks/postgresql/CNPGInactiveSlotRetainingWAL.md) |
 | CNPGLongRunningTransaction | warning | `cnpg_pg_long_running_transactions_oldest_transaction_seconds` >300 | Pins dead tuples; blocks VACUUM / freezing | 5m | [CNPGLongRunningTransaction](../runbooks/postgresql/CNPGLongRunningTransaction.md) |
+| PgStatChExportFailing | warning | `increase(cnpg_pg_stat_ch_send_failures[10m])` >0 (`pg-stat-ch-alerts.yaml`) | Query-event batches discarded; telemetry gap in ClickHouse `pg_stat_ch`, PostgreSQL unaffected | 10m | [PgStatChExportFailing](../runbooks/postgresql/PgStatChExportFailing.md) |
+| PgStatChDroppingEvents | warning | `increase(cnpg_pg_stat_ch_dropped_events[10m])` >0 | Shared-memory ring overflowed; percentiles under-report the busiest window | 10m | [PgStatChDroppingEvents](../runbooks/postgresql/PgStatChDroppingEvents.md) |
+| PgStatChNotExporting | warning | events enqueued but `exported_events` flat for 15m, no failures counted | Background worker dead or ClickHouse black-holed; ring will overflow next | 15m | [PgStatChNotExporting](../runbooks/postgresql/PgStatChNotExporting.md) |
 | CNPGIdleInTransaction | warning | `cnpg_pg_long_running_transactions_oldest_idle_in_transaction_seconds` >300 | Idle-in-transaction stalls autovacuum | 5m | [CNPGIdleInTransaction](../runbooks/postgresql/CNPGIdleInTransaction.md) |
 
 > `CNPGWALArchiveFailing` closes the previously-listed gap **CNPGContinuousArchivingFailing**.
@@ -288,7 +303,10 @@ checked here. Every guarded edge and its expected options are listed in the quer
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
 | CNPGRoleMembershipDrift | critical | `max by (cnpg_io_cluster, member, parent) (cnpg_pg_role_membership_drift)` >0 | A guarded edge is missing or has the wrong options: rotation breaks (no `ADMIN`) or the member gets the parent's data (`INHERIT` / `SET`) | 5m | [CNPGRoleMembershipDrift](../runbooks/postgresql/CNPGRoleMembershipDrift.md) |
-| CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification_runtime})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleConfigDrift | critical | `max by (cnpg_io_cluster, role) (cnpg_pg_role_config_drift)` >0 | A migrator lost `role=<owner>`: the next migration fails or creates objects the runtime cannot use | 15m | [CNPGRoleConfigDrift](../runbooks/postgresql/CNPGRoleConfigDrift.md) |
+| CNPGDefaultPrivilegesDrift | critical | `max by (cnpg_io_cluster, datname, objtype) (cnpg_pg_default_privileges_drift)` >0 | An owner's default privileges differ: new tables unreadable, over-granted, or functions executable by PUBLIC | 15m | [CNPGDefaultPrivilegesDrift](../runbooks/postgresql/CNPGDefaultPrivilegesDrift.md) |
+| CNPGAuthorizationGuardMissing | warning | `absent(cnpg_pg_role_config_drift{…})` or `absent(cnpg_pg_default_privileges_drift{…})` | The authorization guards stopped reporting, so drift would go unseen | 15m | [CNPGAuthorizationGuardMissing](../runbooks/postgresql/CNPGAuthorizationGuardMissing.md) |
 
 ## 5. Kubernetes
 

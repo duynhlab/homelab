@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: shipping
-    image_tag: "1.10.0" # {"$imagepolicy": "flux-system:shipping:tag"}
+    image_tag: "1.10.4" # {"$imagepolicy": "flux-system:shipping:tag"}
     namespace: shipping
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
     # pairs belong in the manifest rather than in compiled defaults.
@@ -21,6 +21,13 @@ spec:
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
     db_port: "5432"
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
-    db_secret: "platform-db-shipping-secret"
-    db_sslmode: "disable"
+    db_runtime_secret: "platform-db-shipping-runtime-secret"
+    db_migrator_secret: "platform-db-shipping-migrator-secret"
+    # ADR-089: TLS to PgBouncer, and from migrate to the primary, verified
+    # against the CA in db_ca_secret.
+    db_sslmode: "verify-full"
+    db_ca_secret: "platform-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "30"

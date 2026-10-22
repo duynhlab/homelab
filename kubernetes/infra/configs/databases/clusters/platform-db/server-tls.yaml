@@ -1,0 +1,40 @@
+# ADR-089: the server certificate platform-db presents, issued by homelab-ca instead
+# of CNPG's self-signed CA, so every client verifies the primary with the same
+# ca.crt it already trusts for the poolers (*-db-ca-trust). CNPG checks only the
+# CA between its own instances, not the name. The cnpg.io/reload label makes the
+# instances reload the files when cert-manager renews them, without a restart.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-server-tls
+  namespace: platform
+spec:
+  secretName: platform-db-server-tls
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  commonName: platform-db-rw.platform.svc
+  dnsNames:
+    - platform-db-rw
+    - platform-db-rw.platform
+    - platform-db-rw.platform.svc
+    - platform-db-rw.platform.svc.cluster.local
+    - platform-db-ro
+    - platform-db-ro.platform
+    - platform-db-ro.platform.svc
+    - platform-db-ro.platform.svc.cluster.local
+    - platform-db-r
+    - platform-db-r.platform
+    - platform-db-r.platform.svc
+    - platform-db-r.platform.svc.cluster.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - server auth
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

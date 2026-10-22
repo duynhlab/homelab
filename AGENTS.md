@@ -1,23 +1,24 @@
 # AGENTS.md
 
-Source of truth for **repository facts** AI agents need in homelab — layout,
-build commands, admission rules, Flux gotchas, docs conventions. **Operating
-procedure** (role, API trust, domains, RFC/ADR, commits, IDE skill map) lives in
-the project skill:
+Source of truth for **repository facts and shared contribution gates** AI
+agents need in homelab: layout, build commands, admission rules, Flux gotchas,
+documentation conventions, PR workflow and Git/GitHub identity.
 
-**→ [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md)**
+Read [platform-engineer](.agents/skills/platform-engineer/SKILL.md) before any
+non-trivial task for operating procedure, API trust, domain routing and
+RFC/ADR decisions. For commit messages and branch names, follow the skill
+routing in [Contribution workflow](#contribution-workflow).
 
-Read that skill before any non-trivial task. Generic workflows
-([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)) stay in
-the agent IDE; **this repo's platform-engineer skill** lives under
-`.agents/skills/` (Agent Skills standard — Cursor reads it natively, Claude Code
-through the `.claude/skills/platform-engineer` symlink; one file, no copies).
+Repository skills live under `.agents/skills/`; Claude Code discovers them
+through matching `.claude/skills/` symlinks. Keep one source per skill.
+Generic IDE skills supplement these instructions; repository conventions
+take precedence when they differ.
 
 This repo (`homelab`) is the platform's **Infrastructure, GitOps,
 Observability, and Docs** hub; application code lives in separate repos — see
 [`docs/README.md` § Repositories](docs/README.md#repositories). API contracts:
 [`docs/api/README.md`](docs/api/README.md) (trust over service-repo READMEs;
-details in the skill, not duplicated here).
+details in platform-engineer, not duplicated here).
 
 ## Project overview
 
@@ -142,19 +143,43 @@ Every manifest applied to the cluster must satisfy admission:
 
 ## Contribution workflow
 
-**Commits**
-
-- **No attribution trailers** (`Signed-off-by`, `Co-authored-by`, `Assisted-by`,
-  `Generated-by`, etc.).
-- **Subject:** ≤50 chars, capitalised, imperative, no trailing period.
-- **Body:** what + why, wrap 72; no `Fixes #123` or @-mentions in commits.
-
-**Branches**
+When writing or reviewing commit messages, squash messages, or branch names,
+read [the git-commits skill](.agents/skills/git-commits/SKILL.md), the source
+of truth for their conventions.
 
 - **Never push to `main`.** Branch → PR → squash-merge.
-- Prefix: `feat/` `fix/` `chore/` `docs/` `refactor/` `ci/`.
+- **PR body** follows `.github/pull_request_template.md`: `Part of #<sub-issue>`
+  (or `Closes #N`), the tradeoffs made, and the gate evidence as counts. Work
+  under an ADR hangs off that ADR's tracking issue (issue type `adr`, one
+  sub-issue per obligation); tradeoffs the ADR did not settle go on that
+  issue, not only in the PR
+  ([`docs/proposals/adr/README.md` § Working log](docs/proposals/adr/README.md#working-log)).
 - `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
   for PRs.
+
+### Issue naming
+
+Use one bracketed prefix and an English title when creating or renaming issues:
+
+| Work | Title | GitHub issue type |
+|------|-------|-------------------|
+| Failure | `[Bug] <component and symptom>` | `Bug` |
+| Implementation, operations or audit | `[Task] <action and outcome>` | `Task` |
+| Documentation or research | `[Docs] <action and subject>` | `Task` |
+| Accepted ADR implementation tracker | `[ADR-NNN] <decision title>` | `adr` |
+| RFC implementation index | `[RFC-NNNN] <tracking purpose>` | `Task` |
+
+Use the matching [issue form](.github/ISSUE_TEMPLATE/); its title is a default,
+not an enforcement rule. Replace the ADR number placeholder. An RFC index uses
+`Task` and links its ADR trackers; it does not replace them or approve a design.
+ADR documentation obligations remain native `Task` sub-issues with the `[Docs]`
+prefix and the task form's acceptance and verification sections.
+
+The prefix helps readers scan titles; the native type supports filtering.
+Labels describe affected areas and other attributes. Retain existing workflow
+labels (`bug`, `task`, `documentation`, `area/adr`); add relevant `area/*` labels
+without stacking more title prefixes. Track dependencies with native parent,
+sub-issue and blocked-by relationships rather than status flags in titles.
 
 ## Docs conventions
 
@@ -266,7 +291,10 @@ reference style.
 5. **Make state explicit.** Solid arrows are current paths. Dotted arrows mean
    optional, indirect, reference, or documented exceptions and must have a
    label. Planned nodes and edges must also contain the word `planned`; a dashed
-   border is supplementary, not the only signal.
+   border is supplementary, not the only signal. In Draw.io, **moving** dashes
+   (`flowAnimation`) mark a current primary flow and are not a dotted arrow; a
+   static PNG shows them as dashes, so read the legend (house style § Edges in
+   the [`homelab-drawio` skill](.agents/skills/homelab-drawio/references/house-style.md#edges)).
 6. **Provide a legend at the right level.** A platform-wide architecture with
    four or more semantic classes needs a compact legend. Area-level and smaller
    diagrams may rely on the nearest area legend when they use exactly the same
@@ -282,6 +310,7 @@ reference style.
 | Topic | Start here |
 |-------|-----------|
 | Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
+| Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

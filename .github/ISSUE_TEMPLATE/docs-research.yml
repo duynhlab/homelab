@@ -1,6 +1,7 @@
 name: Documentation or research request
 description: Request a documentation improvement, learning guide, or evidence-based research task.
-title: "docs: "
+title: "[Docs] "
+type: Task
 labels:
   - documentation
 body:

@@ -1,18 +1,56 @@
-# inventory — per-service database triplet (RFC-0012 pattern, RFC-0021 P1-6).
-#
-# ExternalSecret for product-db inventory database credentials — product namespace.
-# OpenBAO path: secret/data/local/databases/product-db/inventory
-#
-# Rendered as kubernetes.io/basic-auth: this secret doubles as the
-# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
-# there (see order.yaml for the type-migration caveat).
+# inventory — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# inventory_owner and inventory_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; its pgroles policy
+# (../authz/policies/inventory.yaml) owns the grants; CNPG keeps the runtime
+# login and the Database. Conventions: docs/databases/authorization.md.
+# The runtime password belongs to OpenBAO's static role inventory-runtime
+# (ADR-025, ADR-089): vault_rotator rotates it, ESO reads it every 15s,
+# and the DatabaseRole has no passwordSecret.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: product-db-inventory-secret
+  name: product-db-inventory-runtime-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: product-db-inventory-secret
+    app.kubernetes.io/name: product-db-inventory-runtime-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: openbao-db
+    kind: ClusterSecretStore
+  target:
+    name: product-db-inventory-runtime-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-inventory-runtime-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: database/static-creds/inventory-runtime
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: database/static-creds/inventory-runtime
+        property: password
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-inventory-migrator-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-inventory-migrator-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -21,14 +59,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: product-db-inventory-secret
+    name: product-db-inventory-migrator-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: product-db-inventory-secret
+          app.kubernetes.io/name: product-db-inventory-migrator-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -38,24 +76,23 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/product-db/inventory
+        key: secret/data/local/databases/product-db/inventory-migrator
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/product-db/inventory
+        key: secret/data/local/databases/product-db/inventory-migrator
         property: password
 ---
-# Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: product-db-role-inventory
+  name: product-db-role-inventory-runtime
   namespace: product
 spec:
   cluster:
     name: product-db
-  name: inventory
-  comment: "inventory-service application role (RFC-0021)"
+  name: inventory_runtime
+  comment: "inventory: the service; CRUD only"
   login: true
   superuser: false
   createdb: false
@@ -65,10 +102,10 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: product-db-inventory-secret
   databaseRoleReclaimPolicy: retain
 ---
+# inventory_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema. CNPG retries until the catalog Job creates it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -76,7 +113,7 @@ metadata:
   namespace: product
 spec:
   name: inventory
-  owner: inventory
+  owner: inventory_owner
   cluster:
     name: product-db
   extensions:

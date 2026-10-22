@@ -13,7 +13,7 @@ spec:
     # Migration 000006 drops stock data; rollback requires a restore-tested backup,
     # not just a down-migration. Retire inventory backfill before that migration.
     # See docs/proposals/rfc/RFC-0021/cutover-rollback.md for gates and recovery.
-    image_tag: "1.16.1" # {"$imagepolicy": "flux-system:product:tag"}
+    image_tag: "1.16.6" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
     # pairs belong in the manifest rather than in compiled defaults.
@@ -22,9 +22,22 @@ spec:
     replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
+    # Below PgDog's 70s preStop: clients leave a pod before SIGINT (#1350).
+    db_pool_max_conn_lifetime: "45s"
+    # Related products read from a product-db replica through PgDog (#1304).
+    db_read_replica: true
     db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-secret"
-    db_sslmode: "disable"
+    # RFC-0029: the service runs as product_runtime through PgDog; the migrate
+    # init container logs in as product_migrator, which becomes product_owner.
+    db_runtime_secret: "product-db-product-runtime-secret"
+    db_migrator_secret: "product-db-product-migrator-secret"
+    # ADR-089: verify PgDog (and, from migrate, the primary); PgDog refuses
+    # plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "50"
     cache_enabled: "true"
     review_grpc_addr: "dns:///review.review.svc.cluster.local:9090"

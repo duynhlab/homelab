@@ -1,7 +1,10 @@
-# ADR-086: alert when a guarded membership edge drifts from its specified PG18
-# options, or when the guard itself stops reporting. The edge list and the
-# expected options live in the pg_role_membership query
-# (platform-db/configmaps/monitoring-queries.yaml).
+# ADR-086 / ADR-088: alert when a guarded membership edge, a role's session
+# defaults or an owner's default privileges drift from their specified shape,
+# or when the guard itself stops reporting. The expected values live in the
+# pg_role_membership, pg_role_config and pg_default_privileges queries
+# (platform-db/configmaps/monitoring-queries.yaml). The role catalog CronJob
+# repairs most of this within 10 minutes; a drift that outlives it is one the
+# executor may not repair (it also fires KubeJobFailed).
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -35,15 +38,118 @@ spec:
       # so no series means the query, the ConfigMap or the exporter is broken.
       # One absent() per guarded edge; each carries its member/parent labels.
       expr: |-
-        absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="notification"})
+        absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="notification_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="user_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="shipping_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="review_runtime"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="review_migrator", parent="review_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="user_migrator", parent="user_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="shipping_migrator", parent="shipping_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="notification_migrator", parent="notification_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="db_authz", parent="authz_admin"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="vault_rotator", parent="product_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="vault_rotator", parent="inventory_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="vault_rotator", parent="cart_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="vault_rotator", parent="order_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="vault_rotator", parent="checkout_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="vault_rotator", parent="payment_runtime"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="product_migrator", parent="product_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="inventory_migrator", parent="inventory_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="cart_migrator", parent="cart_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="order_migrator", parent="order_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="checkout_migrator", parent="checkout_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="payment_migrator", parent="payment_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="db_authz", parent="authz_admin"})
       for: 15m
       labels:
         severity: warning
-        cnpg_cluster: platform-db
+        # absent() keeps the equality matchers as labels, so each firing series
+        # names its own cluster.
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
       annotations:
-        summary: Role membership guard is not reporting (platform-db)
+        summary: Role membership guard is not reporting ({{ $labels.cnpg_io_cluster }})
         description: >-
           cnpg_pg_role_membership_drift has no series for {{ $labels.member }} →
-          {{ $labels.parent }} on platform-db, so drift on that edge would go unseen.
+          {{ $labels.parent }} on {{ $labels.cnpg_io_cluster }}, so drift on that
+          edge would go unseen.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md"
+    - alert: CNPGRoleConfigDrift
+      expr: max by (cnpg_io_cluster, role) (cnpg_pg_role_config_drift) > 0
+      # Longer than one CronJob period: only drift the catalog cannot repair pages.
+      for: 15m
+      labels:
+        severity: critical
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Session defaults of {{ $labels.role }} drifted ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          {{ $labels.role }} on {{ $labels.cnpg_io_cluster }} is missing or its
+          rolconfig differs from what ADR-088 specifies. Without role=<owner> the
+          migrator creates objects it owns itself, which the runtime cannot use.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleConfigDrift.md"
+    - alert: CNPGDefaultPrivilegesDrift
+      expr: max by (cnpg_io_cluster, datname, objtype) (cnpg_pg_default_privileges_drift) > 0
+      for: 15m
+      labels:
+        severity: critical
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Default privileges in {{ $labels.datname }} drifted ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          The owner's default privileges for object type {{ $labels.objtype }} in
+          {{ $labels.datname }} differ from ADR-088: the next migration's tables
+          would be unreadable by the runtime, over-granted, or (functions)
+          executable by PUBLIC.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGDefaultPrivilegesDrift.md"
+    - alert: CNPGAuthorizationGuardMissing
+      expr: |-
+        absent(cnpg_pg_role_config_drift{cnpg_io_cluster="platform-db", role="review_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="platform-db", role="user_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="platform-db", role="shipping_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="platform-db", role="notification_migrator"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="review", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="review", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="review", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="user", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="user", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="user", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="shipping", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="shipping", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="shipping", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="notification", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="notification", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="notification", objtype="f"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="product_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="inventory_migrator"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="product", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="product", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="product", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="f"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="cart_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="order_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="checkout_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="payment_migrator"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="cart", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="cart", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="cart", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="order", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="order", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="order", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="checkout", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="checkout", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="checkout", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="payment", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="payment", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="payment", objtype="f"})
+      for: 15m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Database authorization guard is not reporting ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          A pg_role_config or pg_default_privileges series is missing on
+          {{ $labels.cnpg_io_cluster }}, so drift there would go unseen.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGAuthorizationGuardMissing.md"

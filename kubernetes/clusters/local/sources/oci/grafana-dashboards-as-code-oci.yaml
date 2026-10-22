@@ -52,4 +52,6 @@ spec:
     # 0.3.0: distinct panel ids (rows rendered panel 1 in every slot); OTel 1:1.
     # 0.3.1: alert rules leave NoData; OTel pies show their legends.
     # 0.4.0: OTel board deploy markers, running versions, traces/logs links.
-    semver: "0.4.0"
+    # 0.5.0: postgresql-query-telemetry (pg_stat_ch events in ClickHouse) — the
+    #        first board resolving the logical `clickhouse` datasource.
+    semver: "0.8.0"

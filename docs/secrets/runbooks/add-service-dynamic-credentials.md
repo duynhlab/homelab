@@ -1,75 +1,90 @@
 # Add Service Dynamic Credentials
 
-Use this to put a second service's database password under OpenBAO-managed
-rotation, by extending the deployed ADR-025 static-role pilot (today:
-`notification` on `platform-db`, rotated every 720h).
+Use this to put a service runtime login under OpenBAO-managed rotation
+(ADR-025 pattern A, ADR-089: one writer per password). Deployed today for all
+ten runtimes: four on `platform-db` and six on `product-db`, rotated every
+720h. Copy any of them; `user` (platform-db) is the reference below, and
+`<cluster>` is `platform-db` or `product-db`.
 
 | Status | Meaning |
 |---|---|
-| Deployed pattern (ADR-025 pilot) | Static role: OpenBAO rotates the password of an **existing** PostgreSQL role; ESO syncs `database/static-creds/<role>` via ClusterSecretStore `openbao-db` |
+| Deployed pattern (static role) | OpenBAO rotates the password of an **existing** PostgreSQL role; ESO syncs `database/static-creds/<svc>-runtime` through ClusterSecretStore `openbao-db`; the pod reads it from a mounted file |
 | Planned | Dynamic `database/creds/*` roles (per-lease `CREATE ROLE`, TTLs) — **not deployed**; do not follow that pattern yet |
 
-## 1. Add the static role to the engine-config Job
+The service image must read `DB_PASSWORD_FILE` (pkg/dbx `WithPasswordFile`);
+every service from the 2026-10-18 release does.
 
-Edit `kubernetes/infra/configs/databases/clusters/platform-db/openbao-db-config.yaml`:
+## 1. Let vault_rotator administer the role
 
-- add the role to `allowed_roles` in the `database/config/platform-db` write
-  (e.g. `allowed_roles="notification,<service>"`);
-- add a static-role block after the notification one:
+`kubernetes/infra/configs/databases/clusters/<cluster>/`:
 
-```bash
-bao write database/static-roles/<service> \
-  db_name=platform-db \
-  username="<service>" \
-  rotation_period="720h"
-```
+- `instance.yaml` `postInitSQL`: `CREATE ROLE <svc>_runtime WITH LOGIN` and
+  `GRANT <svc>_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE`.
+  This runs on a new cluster only; on a running one, run the grant by hand
+  ([rotator credential runbook](../../databases/runbooks/rotate-vault-rotator-credential.md), step 5).
+- `vault-rotator.yaml`: add `<svc>_runtime` to `inRoles`, or CNPG revokes the
+  membership. (On product-db `vault_rotator` logs in through
+  `hostssl product vault_rotator`; the same line sits on `product-db-replica`.)
+- Drift guard: one row in `configmaps/monitoring-queries.yaml`
+  (`('vault_rotator', '<svc>_runtime', true, false, false)`) and one `absent(...)`
+  line in `observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml`.
 
-The `username` must be an **existing PostgreSQL role** in the target database —
-static roles rotate a password, they do not create users. (A service on another
-CNPG cluster needs its own `database/config/<cluster>` block and a reachable
-`vault_rotator`-style login there first.)
+## 2. Add the static role to the engine-config Job
 
-## 2. Grant ESO read on the new static-creds path
+The cluster's `openbao-db-config.yaml`: add `<svc>-runtime` to `allowed_roles`
+and `<svc>` to the static-role loop. The connection already reaches PostgreSQL
+as `vault_rotator`; `ALTER ROLE` is cluster-wide, so no new `pg_hba` line is
+needed. A new cluster needs its own Job and ServiceAccount in its namespace,
+plus that namespace in the bootstrap's `db-configurator` auth role
+(`bound_service_account_namespaces`).
 
-Edit the `eso-read` policy in
-`kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml` — add:
+## 3. Grant ESO read on the static-creds path
+
+`kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml`, policy
+`eso-read`:
 
 ```text
-path "database/static-creds/<service>" { capabilities = ["read"] }
+path "database/static-creds/<svc>-runtime" { capabilities = ["read"] }
 ```
 
-**Live cluster:** the bootstrap Job cannot re-apply policies (root is revoked;
-a re-run exits "already bootstrapped"). Apply the updated policy by hand with
-an `infra-team` OIDC token (`bao login -method=oidc`, then
-`bao policy write eso-read <file>` — [ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/));
-the [generate-root ceremony](./add-secret-live-cluster.md) is the issuer-down
-fallback. Fresh clusters pick it up from the configmap automatically.
+Remove `<svc>/runtime` from the KV seed loop in the same file; the static role
+is now the only source.
 
-## 3. Create the ExternalSecret
+**Live cluster:** the bootstrap Job cannot re-apply policies (root is revoked).
+Apply the updated policy by hand with an `infra-team` OIDC token
+(`bao login -method=oidc`, then `bao policy write eso-read <file>` —
+[ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/)); the
+[generate-root ceremony](./add-secret-live-cluster.md) is the issuer-down
+fallback.
 
-Copy the shape of
-`kubernetes/infra/configs/databases/clusters/platform-db/secrets/platform-db-notification-secret-notification-ns.yaml`:
-`secretStoreRef.name: openbao-db`, `remoteRef.key: database/static-creds/<service>`,
-properties `username` / `password`, `refreshInterval: 1m`.
+## 4. Point both ExternalSecrets at the engine
 
-## 4. Deploy and re-run the engine-config Job
+`services/<svc>.yaml` (the cluster's namespace) and
+`secrets/<cluster>-<svc>-runtime-secret-<svc>-ns.yaml` (service ns):
+`secretStoreRef.name: openbao-db`, `remoteRef.key: database/static-creds/<svc>-runtime`
+(properties `username`, `password`), `refreshInterval: 15s`, and no
+`cnpg.io/reload` label. In the same file, delete the runtime `DatabaseRole`'s
+`passwordSecret`.
+
+## 5. Mount the file in the pod
+
+`kubernetes/apps/services/<svc>.yaml`: `db_password_file: "/etc/db/secret/password"`.
+The domain template mounts the runtime Secret as a directory, sets
+`DB_PASSWORD_FILE` and stops setting `DB_PASSWORD` on the service container
+(the `migrate` init container keeps its migrator password).
+
+## 6. Deploy and verify
 
 ```bash
 make validate
-make flux-push && make flux-sync
-
-# The completed Job does not re-run on its own — delete it and let Flux re-create it:
-kubectl delete job openbao-db-config -n platform
+# after merge, on a running cluster: let Flux re-create the completed Job
+kubectl delete job openbao-db-config -n <platform|product>
 flux reconcile kustomization databases-local -n flux-system --with-source
+kubectl logs -n <platform|product> job/openbao-db-config
+kubectl get externalsecret -A | grep <svc>-runtime
 ```
 
-## 5. Verify
-
-```bash
-kubectl logs -n platform job/openbao-db-config
-kubectl get externalsecret <name> -n <namespace>
-kubectl get secret <name> -n <namespace>
-```
-
-Deeper checks (engine reads, forced rotation):
-[Dynamic credentials debug](./dynamic-credentials-debug.md).
+Force one rotation and confirm the pod follows it without a restart (commands in
+[Dynamic credentials debug](./dynamic-credentials-debug.md)). A new connection
+fails authentication for up to ESO refresh + kubelet sync after a rotation;
+open connections are unaffected.

@@ -1,0 +1,15 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: pgroles-operator-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/thepartly/charts/pgroles-operator
+  ref:
+    # The ADR-088 lab measured 0.13.0 (PGR-01..10). 0.14 adds status fields
+    # only; upgrade.crds: CreateReplace applies its CRDs before the controller.
+    semver: "0.14.0"

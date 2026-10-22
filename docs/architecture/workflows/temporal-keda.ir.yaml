@@ -21,6 +21,23 @@
 #   - task-queue edges start at the worker (domains.md: the worker long-polls)
 #   - the workers' own database writes (both via PgDog to product-db)
 #   - nothing dashed: every box and edge here is deployed and live in steady state
+# Re-verified 2026-10-19 (repository review, not a runtime test) against the same
+# files plus clusters/local/sources/oci/temporal-worker-controller-oci.yaml. Fixed
+# stale versions only: server 1.31.2 -> 1.32.1 (helmrelease image tag), controller
+# 1.9.0 / chart 0.28.0 -> 1.12.0 / 0.31.0, KEDA 2.20.2 -> 2.21.0, worker images
+# order-service 2.10.1 -> 2.10.3 and checkout-service 0.13.1 -> 0.13.3. The workers'
+# PgDog hop is now sslmode verify-full against product-db-ca-trust (ADR-089), with
+# the password file from product-db-<db>-runtime-secret (OpenBao static role).
+# Unchanged and still true: queues, starters, activity targets (inventory/shipping/
+# notification/payment gRPC :9090, cart REST :8080), scaler 1-3 / 15 s / target 5,
+# rollout 10 % -> 50 % at 30 s, sunset 1 h / 0 s, server direct to platform-db-rw.
+# Layout: the Workers frame title was shortened ("one Deployment per build" is on
+# the controller edges) so the order poll no longer crosses it. Measured 2026-10-19:
+# ~200 orderings x pin, plus three re-tiers; the current order stays best at 5
+# crossings. The poll labels sit on the right-hand run, outside the cluster frame;
+# moving them next to the workers (label_pos) collides with the controller labels.
+# 2026-10-22 (#1339): release numbers dropped from node labels, since they went stale on
+# every bump; the versions live in the manifests the lines above name.
 diagram:
   id: temporal-keda
   title: "duynhlab homelab — Temporal work layer and KEDA autoscaling"
@@ -50,7 +67,7 @@ boundaries:
   - {id: f_api, label: "Workflow starters (API pods)", parent: f_cluster}
   - {id: f_temporal, label: "temporal namespace", parent: f_cluster}
   - {id: f_keda, label: "keda namespace", parent: f_cluster}
-  - {id: f_workers, label: "Workers — one Deployment per build ID", parent: f_cluster}
+  - {id: f_workers, label: "Workers", parent: f_cluster}
   - {id: f_platform, label: "platform namespace", parent: f_cluster}
   - {id: f_targets, label: "Activity targets", parent: f_cluster}
 
@@ -59,17 +76,17 @@ nodes:
   - {id: order_api, label: "order-service API (order)\nCreateOrder · cancel", role: service, layer: api, parent: f_api, icon: go}
 
   - {id: web, label: "temporal-web UI\ntemporal.duynh.me", role: edge, layer: server, parent: f_temporal, icon: temporal}
-  - {id: server, label: "Temporal server 1.31.2 · namespace mop\nfrontend :7233 · history · matching · worker", role: platform, layer: server, parent: f_temporal, icon: temporal}
+  - {id: server, label: "Temporal server · namespace mop\nfrontend :7233 · history · matching · worker", role: platform, layer: server, parent: f_temporal, icon: temporal}
   - {id: db, label: "platform-db\ntemporal · temporal_visibility", role: data, layer: server, parent: f_platform, shape: datastore, icon: postgresql}
 
-  - {id: controller, label: "temporal-worker-controller 1.9.0\nchart 0.28.0 · owns builds, not replicas", role: platform, layer: ctl, parent: f_temporal, icon: temporal}
-  - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service 0.13.1 worker\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
-  - {id: wd_order, label: "order-fulfillment (order)\norder-worker · order-service 2.10.1\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
-  - {id: keda, label: "KEDA 2.20.2\noperator · metrics apiserver", role: platform, layer: ctl, parent: f_keda, icon: keda}
+  - {id: controller, label: "temporal-worker-controller\nowns builds, not replicas", role: platform, layer: ctl, parent: f_temporal, icon: temporal}
+  - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service worker\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: wd_order, label: "order-fulfillment (order)\norder-worker · order-service\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: keda, label: "KEDA\noperator · metrics apiserver", role: platform, layer: ctl, parent: f_keda, icon: keda}
 
   - {id: grpc_targets, label: "inventory · shipping · notification · payment\ngRPC :9090", role: service, layer: targets, parent: f_targets, icon: go}
   - {id: cart, label: "cart\nREST :8080 (ClearCart)", role: service, layer: targets, parent: f_targets, icon: go}
-  - {id: appdb, label: "product-db via PgDog :6432\norder · checkout databases", role: data, layer: targets, parent: f_targets, shape: datastore, icon: postgresql}
+  - {id: appdb, label: "product-db via PgDog :6432\norder · checkout DBs · verify-full", role: data, layer: targets, parent: f_targets, shape: datastore, icon: postgresql}
 
 edges:
   - {id: s_confirm, source: checkout_api, target: order_api, type: traffic, label: "confirm → CreateOrder"}

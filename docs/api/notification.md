@@ -36,7 +36,7 @@ Known gaps: [provider, dedupe, and no-caller surfaces](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `SendNotification`, `SendReceipt` — both call `SendEmail`; post-pivot, best-effort, **no compensation** |
 | **Idempotency** | None — a retried activity inserts a fresh inbox row (accepted duplicate; see [Known gaps](#known-gaps)) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -254,8 +254,9 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
   unauthenticated by design and fenced by the namespace NetworkPolicy;
   east-west mTLS is **Planned** (see
   [Service contracts](./README.md#service-contracts)).
-- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*` (`DB_PASSWORD_FILE`
-  supported — this service is the platform's dynamic-DB-credentials pilot,
+- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*` (`DB_PASSWORD_FILE`:
+  mounted runtime Secret, read per new connection; on the cluster it replaces
+  `DB_PASSWORD`, rotated by OpenBAO — the first service on this pattern,
   ADR-025 pattern A), `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`
   (pkg v0.37.0 — empty derives `<issuer>/protocol/openid-connect/certs`),
   `OTEL_COLLECTOR_ENDPOINT`, `PYROSCOPE_ENDPOINT`.

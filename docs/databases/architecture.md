@@ -23,32 +23,32 @@ cross-region topology.
 
 ```mermaid
 flowchart TB
-    CNPG["CloudNativePG 1.30.1"]
+    subgraph Kind["Kind cluster · homelab"]
+        CNPG["CloudNativePG 1.30.1"]
 
-    subgraph PlatformClients["Platform database clients"]
-        PlatformApps["user / notification / shipping / review"]
-        DirectPlatform["Temporal / Keycloak"]
+        subgraph PlatformClients["Platform database clients"]
+            PlatformApps["user / notification / shipping / review"]
+            DirectPlatform["Temporal / Keycloak"]
+        end
+
+        subgraph ProductClients["Product database clients"]
+            ProductApps["product / cart / order / checkout<br/>inventory / payment + 2 workers"]
+        end
+
+        PgBouncer["CNPG PgBouncer<br/>platform-db-pooler-rw :5432"]
+        PgDog["PgDog<br/>pgdog-product :6432"]
+        Platform[("platform-db<br/>3 instances")]
+        Product[("product-db<br/>3 instances")]
+        DR[("product-db-replica<br/>1 instance")]
+        Store[("RustFS object storage")]
     end
-
-    subgraph ProductClients["Product database clients"]
-        ProductApps["product / cart / order / checkout / inventory"]
-        Payment["payment"]
-    end
-
-    PgBouncer["CNPG PgBouncer<br/>platform-db-pooler-rw :5432"]
-    PgDog["PgDog<br/>pgdog-product :6432"]
-    Platform[("platform-db<br/>3 instances")]
-    Product[("product-db<br/>3 instances")]
-    DR[("product-db-replica<br/>1 instance")]
-    Store[("RustFS object storage")]
 
     CNPG --> Platform
     CNPG --> Product
     CNPG --> DR
-    PlatformApps --> PgBouncer --> Platform
-    DirectPlatform --> Platform
-    ProductApps --> PgDog --> Product
-    Payment --> Product
+    PlatformApps -->|"client TLS · verify-full"| PgBouncer -->|"TLS · verify-full"| Platform
+    DirectPlatform -->|"direct · pg_hba host (#1296)"| Platform
+    ProductApps -->|"client TLS · verify-full"| PgDog -->|"TLS · verify-full"| Product
     Platform -->|"base backups + WAL"| Store
     Product -->|"base backups + WAL"| Store
     Store -->|"continuous recovery"| DR
@@ -57,7 +57,7 @@ flowchart TB
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class CNPG,PgBouncer,PgDog platform;
-    class PlatformApps,DirectPlatform,ProductApps,Payment service;
+    class PlatformApps,DirectPlatform,ProductApps service;
     class Platform,Product,DR,Store data;
 ```
 
@@ -65,7 +65,7 @@ The Draw.io view below answers the same question with the detail the Mermaid map
 leaves out:
 - the exact host each client group connects to;
 - the migration Jobs that always target the `-rw` services;
-- OpenBao rotating the `notification` password;
+- OpenBao rotating the ten runtime passwords on both clusters;
 - the WAL and base backups in RustFS that the DR replica recovers from.
 
 <p align="center">
@@ -100,18 +100,27 @@ it shares the same Kubernetes environment and object-storage failure domain.
 
 ## Connection paths
 
-- Platform services use the CNPG PgBouncer transaction pooler. Temporal and
-  Keycloak connect directly because their session and prepared-statement
+- Platform services use the CNPG PgBouncer transaction pooler over client TLS
+  and verify it (`sslmode=verify-full`); PgBouncer refuses plaintext. Temporal
+  and Keycloak connect directly because their session and prepared-statement
   semantics are outside the pilot.
-- Product, cart, order, checkout, and inventory use PgDog. PgDog routes writes
-  to `product-db-rw` and eligible reads to `product-db-r`.
-- Payment currently connects directly to `product-db-rw` with TLS, unverified
-  (`sslmode=require`: encrypted, but the server certificate is not checked).
+- Every product-db service uses PgDog as its `<svc>_runtime` login. PgDog
+  sends reads and writes to `product-db-rw`. The `product` database also lists
+  `product-db-ro` for connections that opt in (`-c pgdog.role=replica`); only
+  product-service's related-products reads do (ADR-089, #1304).
+- Every product-db service and both workers reach PgDog over client TLS and
+  verify it (`sslmode=verify-full` against `homelab-ca`); PgDog refuses
+  plaintext ([poolers](./poolers.md#tls)).
 - Migration jobs connect directly to the primary so schema changes are not
-  multiplexed or read-routed.
+  multiplexed or read-routed. They verify it (`sslmode=verify-full`): both
+  clusters serve a `homelab-ca` server certificate, so one CA covers the
+  poolers and the primary ([security](./security-and-access.md)).
 
-Read routing is not a consistency guarantee. A client that reads through a
-replica immediately after writing to the primary may observe replication lag.
+One application path reads from a replica: product-service's related products,
+through PgDog's opt-in profile with a 2 s lag ban and primary fallback
+([poolers](./poolers.md#current-connection-ownership)). A replica read is not a
+consistency guarantee: a read right after a primary commit may observe
+replication lag. That is why every other read stays on the primary.
 
 ## Database inventory
 
@@ -121,7 +130,10 @@ replica immediately after writing to the primary may observe replication lag.
 | `product-db` | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` |
 | `product-db-replica` | Physical recovery copy of `product-db` |
 
-Each service triplet owns a Secret projection, `DatabaseRole`, and `Database`.
+Each service has two Secret projections (runtime and migrator), a runtime
+`DatabaseRole`, and a `Database` owned by `<svc>_owner`; the owner and migrator
+roles come from the cluster's role catalog Job
+([authorization](./authorization.md)).
 Database content such as application tables remains owned by migrations and
 services, not by the infrastructure manifests.
 

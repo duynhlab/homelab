@@ -14,11 +14,12 @@ export BAO_ADDR=https://openbao.duynh.me   # or a port-forward to :8200
 bao login -method=oidc
 # Fallback (issuer down): generate-root ceremony per ./add-secret-live-cluster.md.
 
-# 1a. Compromised ADR-025 static-role password (deployed pilot: notification):
-#     static-creds are rotated, not lease-revoked — force an immediate rotation,
-#     the old password stops working at once.
-bao write -f database/rotate-role/notification
-# ESO re-syncs Secret platform-db-notification-secret within refreshInterval (1m).
+# 1a. Compromised service runtime password (static role, ADR-025/ADR-089):
+#     static-creds are rotated, not lease-revoked. Force a rotation, then roll
+#     PgDog (product-db) and end the old sessions, per the emergency rotation in
+#     docs/databases/runbooks/rotate-cnpg-service-password.md.
+bao write -f database/rotate-role/<svc>-runtime
+# ESO re-syncs <cluster>-<svc>-runtime-secret within refreshInterval (15s).
 
 # 1b. Compromised KV v2 static secret: overwrite it — see
 #     ./rotate-static-secret.md (same ceremony token works).
@@ -35,9 +36,11 @@ bao token revoke <token>
 bao token revoke -self
 ```
 
-Verify from PostgreSQL that the old password no longer authenticates (the
-`notification` role keeps its name — only the password rotates):
+Verify that the old password no longer authenticates (the `<svc>_runtime`
+role keeps its name — only the password rotates), as in step 4 of the
+[service password rotation runbook](../../databases/runbooks/rotate-cnpg-service-password.md#force-a-rotation).
+The role itself is unchanged:
 
 ```bash
-kubectl exec -n platform platform-db-1 -- psql -U postgres -c "\du" | grep notification
+kubectl exec -n <platform|product> <cluster>-1 -c postgres -- psql -U postgres -c "\du <svc>_runtime"
 ```

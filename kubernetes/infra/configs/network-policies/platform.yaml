@@ -90,3 +90,12 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # pgroles operator (pgroles-system) → platform-db primary to apply the
+    # PostgresPolicies that own in-database grants (ADR-088).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: pgroles-system
+      ports:
+        - protocol: TCP
+          port: 5432

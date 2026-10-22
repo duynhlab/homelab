@@ -1,0 +1,69 @@
+# db_authz: the login that applies database authorization (ADR-088). It holds
+# no attribute of its own; it SET ROLEs to authz_admin (bootstrap SQL in
+# instance.yaml), which creates and administers every catalog role.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-db-authz-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-db-authz-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-db-authz-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-db-authz-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/platform-db/db-authz
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/platform-db/db-authz
+        property: password
+---
+# inRoles never grows: catalog memberships belong to authz_admin, which CNPG
+# does not manage, so CNPG never revokes them.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-db-authz
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: db_authz
+  comment: "Applies database authorization as authz_admin (ADR-088)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  # pgroles keeps one pool per PostgresPolicy and holds ~3 idle connections in
+  # each (0.14.0 has no knob for it), plus the Job's session: 3 x 3 policies
+  # + 1, with slack. Too low and the last policies time out (#1293).
+  connectionLimit: 15
+  inRoles: [authz_admin]
+  passwordSecret:
+    name: platform-db-db-authz-secret
+  databaseRoleReclaimPolicy: retain

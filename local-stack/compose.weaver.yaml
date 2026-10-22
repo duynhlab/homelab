@@ -35,4 +35,4 @@ services:
     volumes:
       - ${WEAVER_REGISTRY:-../../pkg/semconv/registry}:/registry:ro
     ports:
-      - "4320:4320" # admin: POST /stop ends the session and answers with the report
+      - "127.0.0.1:4320:4320" # admin: POST /stop ends the session and answers with the report

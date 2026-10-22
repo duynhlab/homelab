@@ -19,6 +19,9 @@ alerts, and operator health. One file per alert name — each file covers both
 | Alert | Sev | Source | Status | Runbook |
 |-------|-----|--------|--------|---------|
 | CNPGClusterOffline | critical | chart | active | [CNPGClusterOffline.md](CNPGClusterOffline.md) |
+| PgDogClientsWaiting | warning | homelab-authored | active | [PgDogClientsWaiting.md](PgDogClientsWaiting.md) |
+| PgDogCheckoutTimeouts | warning | homelab-authored | active | [PgDogCheckoutTimeouts.md](PgDogCheckoutTimeouts.md) |
+| PgDogPoolBanned | warning | homelab-authored | active | [PgDogPoolBanned.md](PgDogPoolBanned.md) |
 | CNPGDRClusterOffline | critical | homelab-authored | active | [CNPGDRClusterOffline.md](CNPGDRClusterOffline.md) |
 | CnpgClusterFenced | critical | homelab-extra | active | [CnpgClusterFenced.md](CnpgClusterFenced.md) |
 | CNPGClusterHACritical | critical | chart | active | [CNPGClusterHACritical.md](CNPGClusterHACritical.md) |
@@ -55,8 +58,14 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGWALArchiveFailing | critical | deep-signal | active | [CNPGWALArchiveFailing.md](CNPGWALArchiveFailing.md) |
 | CNPGLongRunningTransaction | warning | deep-signal | active | [CNPGLongRunningTransaction.md](CNPGLongRunningTransaction.md) |
 | CNPGIdleInTransaction | warning | deep-signal | active | [CNPGIdleInTransaction.md](CNPGIdleInTransaction.md) |
+| PgStatChExportFailing | warning | pg-stat-ch | active | [PgStatChExportFailing.md](PgStatChExportFailing.md) |
+| PgStatChDroppingEvents | warning | pg-stat-ch | active | [PgStatChDroppingEvents.md](PgStatChDroppingEvents.md) |
+| PgStatChNotExporting | warning | pg-stat-ch | active | [PgStatChNotExporting.md](PgStatChNotExporting.md) |
 | CNPGRoleMembershipDrift | critical | role-membership | active | [CNPGRoleMembershipDrift.md](CNPGRoleMembershipDrift.md) |
 | CNPGRoleMembershipGuardMissing | warning | role-membership | active | [CNPGRoleMembershipGuardMissing.md](CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleConfigDrift | critical | role-membership | active | [CNPGRoleConfigDrift.md](CNPGRoleConfigDrift.md) |
+| CNPGDefaultPrivilegesDrift | critical | role-membership | active | [CNPGDefaultPrivilegesDrift.md](CNPGDefaultPrivilegesDrift.md) |
+| CNPGAuthorizationGuardMissing | warning | role-membership | active | [CNPGAuthorizationGuardMissing.md](CNPGAuthorizationGuardMissing.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |
 
 ## Validation levels

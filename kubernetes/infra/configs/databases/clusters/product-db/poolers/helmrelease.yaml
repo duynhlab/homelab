@@ -1,12 +1,12 @@
-# PgDog Connection Pooler for product-db (product, cart, order)
-# R/W splitting: SELECTs routed to replicas, writes to primary
-# LSN monitoring: detects replication lag, bans lagging replicas
+# PgDog Connection Pooler for product-db (product, cart, order, payment,
+# checkout, inventory)
+# Primary by default (ADR-089). Only the product database lists a replica, and
+# only clients that opt in (-c pgdog.role=replica) are routed to it (#1304).
 # Prepared statements: extended mode (no prefer_simple_protocol needed)
 #
-# User passwords come from the per-service ESO basic-auth Secrets via Flux
-# valuesFrom targetPath (RFC-0012 P2, ADR-014) — no credentials in values.
-# helm-controller re-reads valuesFrom only at reconcile time: after a
-# password rotation, run `flux reconcile helmrelease pgdog-product -n product`.
+# Passthrough auth (ADR-025): PgDog holds no password list. It asks each client
+# for its password over TLS, checks it against product-db once and caches it;
+# a changed password replaces the cached one without a reload or a roll.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -20,7 +20,7 @@ spec:
     spec:
       chart: pgdog
       interval: 5m
-      version: "v0.39"
+      version: "v0.92"
       sourceRef:
         kind: HelmRepository
         name: pgdogdev
@@ -31,126 +31,173 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  # Indices are positional against values.users below — keep both lists in
-  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment,
-  # [4]=checkout, [5]=inventory.
-  valuesFrom:
-    - kind: Secret
-      name: product-db-secret
-      valuesKey: password
-      targetPath: "users[0].password"
-    - kind: Secret
-      name: product-db-cart-secret
-      valuesKey: password
-      targetPath: "users[1].password"
-    - kind: Secret
-      name: product-db-order-secret
-      valuesKey: password
-      targetPath: "users[2].password"
-    - kind: Secret
-      name: product-db-payment-secret
-      valuesKey: password
-      targetPath: "users[3].password"
-    - kind: Secret
-      name: product-db-checkout-secret
-      valuesKey: password
-      targetPath: "users[4].password"
-    - kind: Secret
-      name: product-db-inventory-secret
-      valuesKey: password
-      targetPath: "users[5].password"
+  # A renewed certificate or a changed config is reloaded in place, not rolled
+  # (#1350, #1304): kubelet updates the mounted Secrets, and the tls-reload
+  # sidecar sends PgDog SIGHUP, which re-reads pgdog.toml, users.toml and the
+  # TLS files; open sessions keep their handshake. The chart has no config
+  # checksum annotation, so without this a config change never took effect.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: pgdog-product
+            patch: |
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: pgdog-product
+              spec:
+                template:
+                  spec:
+                    # The sidecar must see the pgdog process to signal it.
+                    shareProcessNamespace: true
+                    containers:
+                      - name: tls-reload
+                        # PgDog's own image: it ships sh, sha256sum, pidof and kill.
+                        image: ghcr.io/pgdogdev/pgdog:v0.1.61
+                        command:
+                          - sh
+                          - -c
+                          - |
+                            sum() { cat /etc/pgdog-tls/tls.crt /etc/pgdog/pgdog.toml /etc/secrets/pgdog/users.toml 2>/dev/null | sha256sum; }
+                            last=$(sum)
+                            while true; do
+                              sleep 30
+                              cur=$(sum)
+                              if [ "$cur" != "$last" ] && p=$(pidof pgdog); then
+                                kill -HUP $p && echo "certificate or config changed: sent SIGHUP to pgdog $p" && last=$cur
+                              fi
+                            done
+                        volumeMounts:
+                          - name: pgdog-tls
+                            mountPath: /etc/pgdog-tls
+                            readOnly: true
+                          - name: config
+                            mountPath: /etc/pgdog
+                            readOnly: true
+                          - name: users
+                            mountPath: /etc/secrets/pgdog
+                            readOnly: true
+                        livenessProbe:
+                          exec:
+                            command: ["test", "-r", "/etc/pgdog-tls/tls.crt"]
+                          periodSeconds: 30
+                        readinessProbe:
+                          exec:
+                            command: ["test", "-r", "/etc/pgdog-tls/tls.crt"]
+                          periodSeconds: 30
+                        resources:
+                          requests:
+                            cpu: 5m
+                            memory: 8Mi
+                          limits:
+                            memory: 32Mi
   values:
     replicas: 3
     port: 6432
     openMetricsPort: 9090
     openMetricsNamespace: "pgdog_"
 
+    # Client-side TLS (certificate.yaml). Every client verifies it with
+    # verify-full (ADR-089), and a plaintext login is refused.
+    tlsClientRequired: true
+    # Passthrough needs the client's password in clear, so TLS is mandatory;
+    # allow_change lets a rotated password replace the cached one.
+    passthroughAuth: enabled_allow_change
+    tlsCertificate: /etc/pgdog-tls/tls.crt
+    tlsPrivateKey: /etc/pgdog-tls/tls.key
+    # Upstream: verify product-db-rw's homelab-ca certificate and host name.
+    tlsVerify: verify_full
+    tlsServerCaCertificate: /etc/pgdog-server-ca/ca.crt
+    extraVolumes:
+      - name: pgdog-tls
+        secret:
+          secretName: pgdog-product-tls
+      - name: pgdog-server-ca
+        secret:
+          secretName: product-db-ca-trust
+          items:
+            - key: ca.crt
+              path: ca.crt
+    extraVolumeMounts:
+      - name: pgdog-tls
+        mountPath: /etc/pgdog-tls
+        readOnly: true
+      - name: pgdog-server-ca
+        mountPath: /etc/pgdog-server-ca
+        readOnly: true
+
+    # Drain on rollout: preStop keeps the pod serving while the Service drops
+    # it. Clients recycle connections within ~60s (lifetime 45s x 1.1 +
+    # health check 10s, set on each client), so by SIGINT none is left here
+    # (#1350); SIGINT then lets in-flight work finish (shutdown_timeout 60s).
+    # Grace covers both, since the chart's default ignores the preStop.
+    preStopSleepSeconds: 70
+    terminationGracePeriodSeconds: 140
+
     lsnCheckDelay: 0
     lsnCheckInterval: 5000
+    # Opt-in stale reads (ADR-089, #1304): prefer_primary keeps every query on
+    # the primary unless the client asks for a replica (startup option
+    # -c pgdog.role=replica). A replica lagging over 2 s is banned and those
+    # reads fall back to the primary.
+    readWriteSplit: prefer_primary
+    banReplicaLag: 2000
 
     databases:
-      # product DB -- primary
+      # product DB
       - name: product
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: product
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # cart DB -- primary
+      # The only replica entry: product-service's related-products pool
+      # (DB_READ_REPLICA) opts in; every other client stays on the primary.
+      - name: product
+        host: product-db-ro.product.svc.cluster.local
+        port: 5432
+        database: product
+        role: replica
+        poolSize: 10
+        poolMode: transaction
+      # cart DB
       - name: cart
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: cart
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # order DB -- primary
+      # order DB
       - name: order
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: order
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # payment DB -- primary
+      # payment DB
       - name: payment
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: payment
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # checkout DB -- primary
+      # checkout DB
       - name: checkout
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: checkout
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # inventory DB -- primary
+      # inventory DB
       - name: inventory
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: inventory
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
 
-    # Passwords injected per-user by spec.valuesFrom (order must match the
-    # targetPath indices above).
-    users:
-      - name: product
-        database: product
-      - name: cart
-        database: cart
-      - name: order
-        database: order
-      - name: payment
-        database: payment
-      - name: checkout
-        database: checkout
-      - name: inventory
-        database: inventory
 
     # The chart ships both probes commented out, so the pooler ran with none
     # and Kyverno's require-probes recorded a violation against it on every
@@ -175,7 +222,9 @@ spec:
         cpu: 50m
         memory: 64Mi
       limits:
-        cpu: 200m
+        # No CPU limit, as elsewhere: throttling hit the login burst of a roll (#1350).
+        # null drops the chart's 1000m default; omitting the key would keep it.
+        cpu: null
         memory: 128Mi
 
     serviceMonitor:

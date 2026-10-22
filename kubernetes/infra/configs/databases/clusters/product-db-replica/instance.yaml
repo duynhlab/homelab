@@ -17,6 +17,11 @@ metadata:
   namespace: product
 spec:
   instances: 1
+  # ADR-089: serve the homelab-ca certificate (server-tls.yaml); the operator
+  # keeps managing the replication client certificates.
+  certificates:
+    serverTLSSecret: product-db-replica-server-tls
+    serverCASecret: product-db-replica-server-tls
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   plugins:
@@ -29,6 +34,46 @@ spec:
   # Must match or exceed product-db primary for recovery-critical GUCs.
   # PostgreSQL refuses recovery when replica values < primary pg_controldata.
   postgresql:
+    # The same pg_stat_ch extension image as product-db, NOT preloaded: the
+    # extension's catalog objects arrive through WAL, and a promoted replica
+    # must be able to resolve them. Preload + pg_stat_ch.* parameters are a
+    # promotion-time decision (docs/databases/runbooks/cnpg-dr-replica-bootstrap.md).
+    extensions:
+      - name: pg_stat_ch
+        image:
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:0a7595c74478972efc25b43c79cd5c6f7b9f35decb793f22d7722bb3caed6c7b
+    # A promoted replica takes product-db's clients, so it admits them the
+    # same way (ADR-015, ADR-089). The list must equal product-db's
+    # (../product-db/instance.yaml); `make validate` fails when they differ.
+    pg_hba:
+      # Every product-db database admits its runtime and migrator only
+      # (RFC-0029); <svc>_owner never logs in, and the bootstrap role `product`
+      # has no line at all.
+      - hostssl payment   payment_runtime    all scram-sha-256
+      - hostssl payment   payment_migrator   all scram-sha-256
+      - hostssl product   product_runtime    all scram-sha-256
+      - hostssl product   product_migrator   all scram-sha-256
+      - hostssl inventory inventory_runtime  all scram-sha-256
+      - hostssl inventory inventory_migrator all scram-sha-256
+      - hostssl cart      cart_runtime       all scram-sha-256
+      - hostssl cart      cart_migrator      all scram-sha-256
+      - hostssl order     order_runtime      all scram-sha-256
+      - hostssl order     order_migrator     all scram-sha-256
+      - hostssl checkout  checkout_runtime   all scram-sha-256
+      - hostssl checkout  checkout_migrator  all scram-sha-256
+      # db_authz applies the role catalog in `postgres` and each database's
+      # grants, as the Job or as pgroles (ADR-088). One line per database.
+      - hostssl postgres  db_authz all scram-sha-256
+      - hostssl product   db_authz all scram-sha-256
+      - hostssl inventory db_authz all scram-sha-256
+      - hostssl cart      db_authz all scram-sha-256
+      - hostssl order     db_authz all scram-sha-256
+      - hostssl checkout  db_authz all scram-sha-256
+      - hostssl payment   db_authz all scram-sha-256
+      # OpenBAO's rotation administrator (ADR-025) logs in to `product` only;
+      # ALTER ROLE is cluster-wide, so one database is enough.
+      - hostssl product   vault_rotator all scram-sha-256
+      - host    all     all     all reject
     parameters:
       max_connections: "200"
       max_worker_processes: "8"

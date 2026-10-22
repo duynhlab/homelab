@@ -12,7 +12,7 @@ spec:
     name: checkout
     # Inventory is the sole availability authority; do not restore product fallback.
     # Keep storefront error handling compatible with docs/api/checkout.md.
-    image_tag: "0.13.2" # {"$imagepolicy": "flux-system:checkout:tag"}
+    image_tag: "0.13.6" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -24,9 +24,20 @@ spec:
     replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
+    # Below PgDog's 70s preStop: clients leave a pod before SIGINT (#1350).
+    db_pool_max_conn_lifetime: "45s"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-checkout-secret"
-    db_sslmode: "disable"
+    # RFC-0029: the service runs as checkout_runtime through PgDog; the migrate
+    # init container logs in as checkout_migrator, which becomes checkout_owner.
+    db_runtime_secret: "product-db-checkout-runtime-secret"
+    db_migrator_secret: "product-db-checkout-migrator-secret"
+    # ADR-089: verify PgDog (and, from migrate, the primary); PgDog refuses
+    # plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "25"
     # Client-only gRPC: use the multi-port Services below, not the absent
     # <service>-grpc Services assumed by old application defaults.

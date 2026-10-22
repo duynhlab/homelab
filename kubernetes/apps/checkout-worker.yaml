@@ -83,7 +83,7 @@ spec:
           # one shared binary, two subcommands, one CVE surface.
           #
           # THE ONE LINE a release edits.
-          image: ghcr.io/duynhlab/checkout-service/checkout-service:0.13.2
+          image: ghcr.io/duynhlab/checkout-service/checkout-service:0.13.6
           imagePullPolicy: IfNotPresent
           args: ["worker"]
           ports:
@@ -154,17 +154,33 @@ spec:
               value: "6432"
             - name: DB_NAME
               value: checkout
+            # ADR-089: pgx reads PGAPPNAME as application_name, which names the
+            # session in pg_stat_activity and pg_stat_ch.
+            - name: PGAPPNAME
+              value: checkout-worker
+            # Same checkout_runtime login as the service (RFC-0029).
             - name: DB_USER
-              value: checkout
-            - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: product-db-checkout-secret
-                  key: password
+                  name: product-db-checkout-runtime-secret
+                  key: username
+            # ADR-025 pattern A: the password comes from the mounted runtime
+            # Secret (OpenBAO static role), read on every new connection; no
+            # DB_PASSWORD env, so a broken mount fails instead of falling back.
+            - name: DB_PASSWORD_FILE
+              value: /etc/db/secret/password
+            # ADR-089: verify PgDog against the CA in product-db-ca-trust.
             - name: DB_SSLMODE
-              value: disable
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/db/ca/ca.crt
             - name: DB_POOL_MAX_CONNECTIONS
               value: "10"
+            # Below PgDog's 70s preStop: the pool leaves a pod before SIGINT (#1350).
+            - name: DB_POOL_MAX_CONN_LIFETIME
+              value: "45s"
+            - name: DB_POOL_HEALTH_CHECK_PERIOD
+              value: "10s"
             - name: DB_POOL_MODE
               value: transaction
             # Temporal — the address checkout-service reads (not the injected
@@ -196,3 +212,20 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "300m"
+          volumeMounts:
+            - name: db-credentials
+              mountPath: /etc/db/secret
+              readOnly: true
+            - name: db-ca
+              mountPath: /etc/db/ca
+              readOnly: true
+      volumes:
+        - name: db-credentials
+          secret:
+            secretName: product-db-checkout-runtime-secret
+        - name: db-ca
+          secret:
+            secretName: product-db-ca-trust
+            items:
+              - key: ca.crt
+                path: ca.crt

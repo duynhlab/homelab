@@ -99,8 +99,11 @@ it and re-bootstrapping from the then-current primary.
 kubectl cnpg status product-db-replica -n product    # expect: Primary, accepting connections
 ```
 
-Cut PgDog over and smoke test — same rule, and the pooler re-reads `valuesFrom`
-only on reconcile (see [pooler-operations.md](pooler-operations.md)):
+Cut PgDog over and smoke test — same rule; Flux applies the host change on
+reconcile (see [pooler-operations.md](pooler-operations.md)). PgDog and
+`migrate` verify the primary against `homelab-ca` (`verify-full`);
+`product-db-replica` serves `product-db-replica-server-tls` from the same CA and
+carries product-db's `pg_hba`, so only the host name changes:
 
 ```yaml
 # pgdog-product HelmRelease (product tier DR promotion)

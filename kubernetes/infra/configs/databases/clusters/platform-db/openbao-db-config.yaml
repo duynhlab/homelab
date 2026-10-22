@@ -1,5 +1,5 @@
 # openbao-db-config — enable the OpenBAO database secrets engine + configure a
-# static-role that rotates the `notification` role's password (RFC-0008 / ADR-025
+# static-role that rotates the `notification_runtime` role's password (RFC-0008 / ADR-025
 # pattern-A pilot). Runs in the databases wave (after platform-db) because
 # database/config validates the live PostgreSQL connection, which the
 # openbao-bootstrap Job (secrets wave) cannot — platform-db is not up yet, and
@@ -70,7 +70,7 @@ spec:
             # active node's POD IP, which this client cannot follow — the request
             # hangs to the context deadline instead of failing. Measured on Kind:
             # `database/config/platform-db` succeeded (lucky pod) and the
-            # `static-roles/notification` write immediately after it timed out,
+            # `static-roles/notification-runtime` write immediately after it timed out,
             # repeatedly, across three restarts. Same class as the bootstrap Job's
             # standby hang (#793), which was fixed by pinning to a pod; this one
             # was missed. `openbao-active` carries exactly one endpoint — the pod
@@ -100,29 +100,31 @@ spec:
               # list and OpenBAO command logs; bao reads it from stdin.
               until printf '%s' "$DB_ADMIN_PASSWORD" | bao write database/config/platform-db \
                   plugin_name=postgresql-database-plugin \
-                  allowed_roles="notification" \
-                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable" \
+                  allowed_roles="notification-runtime,user-runtime,shipping-runtime,review-runtime" \
+                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=require&application_name=openbao" \
                   username="$DB_ADMIN_USERNAME" \
                   password=- 2>/dev/null; do
                 n=$((n + 1)); [ "$n" -ge 60 ] && { echo "ERROR: database/config failed after 300s (platform-db unreachable / vault_rotator?)"; exit 1; }
                 echo "  platform-db not reachable yet, retry 5s..."; sleep 5
               done
 
-              echo "Writing static-role notification (rotate the fixed role's password)..."
-              # Retried for the same reason the config write above is: a leader
-              # election DURING this Job moves the active node, and the next write
-              # would hang rather than error. The address fix removes the
-              # steady-state race; this removes the mid-run one.
-              n=0
-              until bao write database/static-roles/notification \
-                db_name=platform-db \
-                username="notification" \
-                rotation_period="720h"; do
-                n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role notification failed after 60s"; exit 1; }
-                echo "  static-role write failed, retry 5s..."; sleep 5
+              # One static role per runtime login (ADR-089: OpenBAO is the only
+              # writer). Retried for the same reason the config write above is: a
+              # leader election DURING this Job moves the active node, and the next
+              # write would hang rather than error.
+              for SVC in notification user shipping review; do
+                echo "Writing static-role ${SVC}-runtime..."
+                n=0
+                until bao write "database/static-roles/${SVC}-runtime" \
+                  db_name=platform-db \
+                  username="${SVC}_runtime" \
+                  rotation_period="720h"; do
+                  n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role ${SVC}-runtime failed after 60s"; exit 1; }
+                  echo "  static-role write failed, retry 5s..."; sleep 5
+                done
               done
 
-              echo "openbao-db-config complete: static-role notification ready."
+              echo "openbao-db-config complete: 4 runtime static roles ready."
           resources:
             requests:
               cpu: 20m

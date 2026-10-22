@@ -55,12 +55,14 @@ flowchart LR
     CACOPY[ConfigMap<br/>homelab-ca-source<br/>committed PEM]
     Bundle[Bundle<br/>homelab-ca-bundle]
     OUT[ConfigMap<br/>homelab-ca-bundle<br/>across labeled namespaces]
+    DBC[Certificates<br/>PostgreSQL server + pooler TLS<br/>*-db-ca-trust per client ns · ADR-089]
   end
   HR --> cm
   K --> SS --> CA --> HCA
   Bao --> ES --> Sec --> LES & LEP
   LEP -->|prod| EdgeCert
   HCA -->|local Kind overlay patch| EdgeCert
+  HCA --> DBC
   CA -. one-time export .-> CACOPY --> Bundle --> OUT
   LE[Let's Encrypt ACME] <-->|DNS-01 TXT on duynh.me zone| LEP
   LE <-->|staging| LES
@@ -71,7 +73,7 @@ flowchart LR
 
 | PKI | Issuer chain | Used by | Trusted by |
 |---|---|---|---|
-| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Future internal mTLS (RFC-0020, planned), the two live-CA trust anchors (`openbao-idp-trust`, `flux-web-idp-trust`), **and `platform-edge-tls` on local Kind** (via the overlay patch — reconciled with the RFC-0024 bring-up) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
+| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | The PostgreSQL server and pooler certificates and the per-namespace `*-db-ca-trust` anchors (ADR-089), future internal mTLS (RFC-0020, planned), the two live-CA trust anchors (`openbao-idp-trust`, `flux-web-idp-trust`), **and `platform-edge-tls` on local Kind** (via the overlay patch — reconciled with the RFC-0024 bring-up) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
 | Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `platform-edge-tls` (browser-facing wildcard) **on prod — planned, not deployed** | Browsers (Mozilla bundle covers LE roots) |
 
 > **Local vs prod:** on the local Kind cluster the `platform-edge-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it would be Let's Encrypt via Cloudflare DNS-01 — **planned**: `kubernetes/clusters/production/` declares no cert-manager or edge Kustomization yet. Webhook serving certs do not come from `homelab-ca` either: each chart (cert-manager, Kyverno, Temporal Worker Controller, Barman plugin) runs its own self-signed Issuer. The switch is a `spec.patches` override in [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) (not `cert-manager-config.yaml` — the edge Certificate lives in the `envoy-gateway` Kustomization, not the `cert-manager` one); prod has no such patch. The patch reconciled on Kind with the RFC-0024 bring-up (#791) and has since passed the end-to-end Kind gate ([Previous runs](../platform/kind-e2e-audit.md#previous-runs)).
@@ -280,7 +282,7 @@ spec:
           dnsZones: [duynh.me]
 ```
 
-**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `platform-edge-tls` is `homelab-ca`-signed, so the (failing) DNS-01 solver never uses this token. On **prod (planned)** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [OpenBAO initial setup § Step 7](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `platform-edge-tls` is `homelab-ca`-signed, so the (failing) DNS-01 solver never uses this token. On **prod (planned)** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [OpenBAO initial setup § Step 6](./runbooks/openbao-initial-setup.md#step-6--seed-bootstrap-only-cloudflare-token-operator).
 
 ---
 
@@ -669,24 +671,33 @@ slice applied**). This section only links to it. The secrets pipeline
 (OpenBao → ESO → Secrets) is a different question, drawn in
 [`README.md` § Platform pipeline](./README.md#platform-pipeline).
 
-| Fact | Value (verified against manifests, 2026-10-01) |
+| Fact | Value (verified against manifests 2026-10-01; database rows re-checked against manifests 2026-10-19, after ADR-089) |
 |------|------|
-| Certificates issued from `homelab-ca` | 3 leaves: `platform-edge-tls` (the edge), `openbao-idp-trust` and `flux-web-idp-trust` (only their `ca.crt` is used). There is also the root `Certificate homelab-ca` |
-| Hops with verified TLS | browser → edge, and the two `id.duynh.me` hairpins (OpenBao OIDC config, Flux web UI) |
-| Hops with TLS but no verification | `payment` → `product-db-rw` (`sslmode=require`), PgDog → CNPG `product-db`, and Keycloak JDBC → `platform-db` — all TLS 1.3, measured on Kind 2026-10-01 via `pg_stat_ssl`. PgDog's `tls_verify` and pgjdbc both default to `prefer`, which never checks the CA |
-| Plaintext | every other in-cluster hop: app → pooler, gRPC, Temporal, OpenBao `:8200`, Keycloak `:8080`, Valkey, telemetry, S3 (RustFS). Temporal → `platform-db` and the OpenBao DB engine → `platform-db` are confirmed plaintext (measured on Kind 2026-10-01 via `pg_stat_ssl`) |
-| Operator-managed TLS (not `homelab-ca`) | CNPG auto-CA (server cert, `streaming_replica`, PgBouncer client cert), the OpenBao Raft cluster port `:8201`, Envoy Gateway xDS (certgen), and chart self-signed webhook Issuers (Temporal Worker Controller, Barman plugin) |
+| Certificates issued from `homelab-ca` | the edge `platform-edge-tls`; the PostgreSQL server certificates `platform-db-server-tls`, `product-db-server-tls`, `product-db-replica-server-tls`; the pooler certificates `pgdog-product-tls` and `platform-db-pooler-tls`; and trust anchors whose `ca.crt` only is used: `openbao-idp-trust`, `flux-web-idp-trust` and eleven `*-db-ca-trust` (one per database client namespace). There is also the root `Certificate homelab-ca` |
+| Hops with verified TLS | browser → edge, the two `id.duynh.me` hairpins (OpenBao OIDC config, Flux web UI), and every database hop of the services: runtimes and workers → PgDog / PgBouncer, both poolers → primary, `migrate`, seeds and the authz Jobs → primary (`verify-full` against `homelab-ca`) |
+| Hops with TLS but no verification | the OpenBao DB engine → both clusters (`sslmode=require`), pgroles → both clusters (`sslMode: require`, #1306), and Keycloak JDBC → `platform-db` (no `sslmode`, so pgjdbc's `prefer`); Keycloak measured TLS 1.3 on Kind 2026-10-01 via `pg_stat_ssl` |
+| Plaintext | every other in-cluster hop: gRPC, Temporal, OpenBao `:8200`, Keycloak `:8080`, Valkey, telemetry, S3 (RustFS). Temporal → `platform-db` is plaintext (`pg_hba` `host`, measured on Kind 2026-10-01 via `pg_stat_ssl`; #1296) |
+| Operator-managed TLS (not `homelab-ca`) | CNPG's client CA (`streaming_replica`, the PgBouncer `auth_query` client certificate), the OpenBao Raft cluster port `:8201`, Envoy Gateway xDS (certgen), and chart self-signed webhook Issuers (Temporal Worker Controller, Barman plugin) |
 | Trust bundle | `homelab-ca-bundle` reaches `monitoring` only, and nothing mounts it (§11.2) |
 | local-stack | plaintext end to end, by design (an RFC-0020 non-goal). The only TLS there is Envoy Gateway xDS (`certgen --local`) |
 
-The Draw.io view below is the canonical picture for this question. Every edge
+The two Draw.io views below split this section's question in two; in both, every edge
 names its state: `TLS verified`, `TLS unverified` (encrypted, but the client
 does not check who answers), `PLAINTEXT`, or `planned`. No edge is left
-`unconfirmed`: every database hop was read from `pg_stat_ssl` on Kind (2026-10-01). Telemetry and datasource hops are collapsed
+`unconfirmed`: every database hop was read from `pg_stat_ssl` on Kind (2026-10-01, re-read 2026-10-19 on `main` 0ffaf2cc: every TCP session on both primaries is TLS 1.3 except `temporal`'s, including `vault_rotator`, `db_authz`, PgBouncer's `auth_query` and streaming replication). Telemetry and datasource hops are collapsed
 to one edge per pair of tiers; §12.1 lists each hop with its evidence.
 
-<p align="center"><a href="../architecture/security/tls-topology.svg"><img src="../architecture/security/tls-topology.svg" alt="TLS topology of the Kind cluster: only browser to Envoy Gateway and the two id.duynh.me hairpins carry verified TLS from homelab-ca; the payment, PgDog and Keycloak database hops are TLS 1.3 but unverified; app to pooler, gRPC, Temporal, OpenBao, Keycloak, Valkey, telemetry and RustFS are plaintext; RFC-0020 slices are planned" width="960"></a></p>
-<p align="center"><sub>Source <a href="../architecture/security/tls-topology.drawio"><code>security/tls-topology.drawio</code></a> · <a href="../architecture/security/img/tls-topology.png">PNG</a></sub></p>
+**PKI, edge and east-west** answers who issues each certificate and which request,
+identity and service-to-service hops are encrypted:
+
+<p align="center"><a href="../architecture/security/tls-pki-edge.svg"><img src="../architecture/security/tls-pki-edge.svg" alt="TLS of the PKI, the edge and east-west hops on the Kind cluster: homelab-ca signs the ClusterIssuer, which issues the edge certificate and the two OIDC trust anchors; the browser reaches Envoy Gateway over verified TLS and the OpenBao and Flux OIDC hairpins verify against the live CA; every hop behind the edge (Envoy to services, JWKS, OAuth, gRPC, Temporal, OTLP, ESO to OpenBao, the KMS seal, the OCI pull) is plaintext; the remaining RFC-0020 slices are planned" width="960"></a></p>
+<p align="center"><sub>Source <a href="../architecture/security/tls-pki-edge.drawio"><code>security/tls-pki-edge.drawio</code></a> · <a href="../architecture/security/img/tls-pki-edge.png">PNG</a></sub></p>
+
+**Data tier** answers which database, pooler and store hops are encrypted and whether
+the client verifies the server:
+
+<p align="center"><a href="../architecture/security/tls-data-tier.svg"><img src="../architecture/security/tls-data-tier.svg" alt="TLS of the data tier on the Kind cluster: homelab-ca issues the pooler leaves and both clusters' server certificates; every service, worker, migration, seed and authz hop and both pooler upstreams are verified TLS; Keycloak, the OpenBao DB engine and pgroles are encrypted but unverified; Temporal SQL, Valkey, telemetry stores and RustFS S3 are plaintext; CNPG's own client CA signs replication and the PgBouncer auth_query certificate" width="960"></a></p>
+<p align="center"><sub>Source <a href="../architecture/security/tls-data-tier.drawio"><code>security/tls-data-tier.drawio</code></a> · <a href="../architecture/security/img/tls-data-tier.png">PNG</a></sub></p>
 
 ### 12.1 Hop inventory
 
@@ -702,14 +713,15 @@ to one edge per pair of tiers; §12.1 lists each hop with its evidence.
 | flux-operator web UI → `https://id.duynh.me` | TLS | `homelab-ca` (live) | yes — `SSL_CERT_DIR` = `flux-web-idp-trust` | `terraform/main.tf:43-52`; `configs/flux-web/certificate.yaml` |
 | Service ↔ service gRPC `:9090` (incl. workers → payment) | plaintext | — | — | `pkg/grpcx/client.go:71` (`insecure.NewCredentials()`); `grpcx/server.go:116` (no `grpc.Creds`) |
 | Services / workers → Temporal frontend `:7233` | plaintext | — | — | `pkg/temporalx/temporalx.go:58`; `apps/order-worker.yaml:53-54` |
-| 9 services + 2 workers → PgDog `:6432` / PgBouncer `:5432` | plaintext | — | — | `apps/services/*.yaml` `db_sslmode: "disable"` (e.g. `cart.yaml:42`); `apps/order-worker.yaml:228-229`, `checkout-worker.yaml:173-174`; PgDog sets no `tls_*` (`product-db/poolers/helmrelease.yaml`) |
-| `payment` → `product-db-rw:5432` | TLS, **not verified** | CNPG auto-CA | no (`sslmode=require`) | `apps/services/payment.yaml:72-81`; `product-db/instance.yaml:46` (`hostssl`); TLS 1.3, measured on Kind 2026-10-01 via `pg_stat_ssl` |
-| PgDog → CNPG `product-db` | TLS, **not verified**. Encrypted (TLS 1.3 for all six PgDog backends: cart, checkout, inventory, order, payment, product); PgDog's `tls_verify` default `prefer` does not check the CA | CNPG auto-CA | no | `poolers/helmrelease.yaml:71-136` (no `tls_verify`); measured on Kind 2026-10-01 via `pg_stat_ssl` |
-| CNPG PgBouncer → `platform-db` | TLS + client cert (`auth_query`); the user, review, shipping and notification server connections are TLS 1.3 | CNPG auto-CA | managed by the operator; the verify mode is not visible in the repo | `platform-db/poolers/pooler.yaml:1-8`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
-| Keycloak → `platform-db-rw` (JDBC) | TLS, **not verified**. Encrypted (TLS 1.3); there is no `sslmode` in the URL, so pgjdbc's default `prefer` applies and the CA is not checked | CNPG auto-CA | no | `controllers/keycloak/deployment.yaml:56-57`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
-| Temporal → `platform-db-rw` | plaintext (no `tls:` in either datastore); 14 connections with `ssl=f` | — | — | `controllers/temporal/helmrelease.yaml:146-198`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
-| OpenBao DB secrets engine → `platform-db-rw` | plaintext; `vault_rotator` sessions show `ssl=f` | — | — | `platform-db/openbao-db-config.yaml:85` (`sslmode=disable`); measured on Kind 2026-10-01 via `pg_stat_ssl` |
-| CNPG replication (`streaming_replica`) | TLS + cert auth (TLS 1.3) | CNPG auto-CA | yes (operator-managed) | `product-db/instance.yaml:36-38`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| 10 services + 2 workers → PgDog `:6432` / PgBouncer `:5432` | TLS; both poolers refuse plaintext | `homelab-ca` (`pgdog-product-tls`, `platform-db-pooler-tls`) | yes — `sslmode=verify-full`, CA from `<cluster>-db-ca-trust` | `apps/services/*.yaml` (`db_sslmode: "verify-full"`); `apps/{order,checkout}-worker.yaml`; `product-db/poolers/helmrelease.yaml` (`tlsClientRequired`); `platform-db/poolers/pooler.yaml` (`client_tls_sslmode: require`) |
+| `migrate` init containers, seeds, authz Jobs → `<cluster>-rw:5432` | TLS (`hostssl`) | `homelab-ca` (`<cluster>-server-tls`) | yes — `sslmode=verify-full` | `apps/domains/*-rs.yaml` (migrate `DB_SSLMODE`); `*/instance.yaml` (`serverTLSSecret`, `hostssl`) |
+| PgDog → CNPG `product-db` | TLS | `homelab-ca` (`product-db-server-tls`) | yes — `tls_verify = verify_full` against `product-db-ca-trust` | `product-db/poolers/helmrelease.yaml` (`tlsVerify`) |
+| CNPG PgBouncer → `platform-db` | TLS + client cert (`auth_query`) | `homelab-ca` (`platform-db-server-tls`) | yes — `server_tls_sslmode: verify-full` | `platform-db/poolers/pooler.yaml` |
+| Keycloak → `platform-db-rw` (JDBC) | TLS, **not verified**. Encrypted (TLS 1.3); there is no `sslmode` in the URL, so pgjdbc's default `prefer` applies and the CA is not checked | `homelab-ca` (`platform-db-server-tls`) | no (#1296) | `controllers/keycloak/deployment.yaml`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| Temporal → `platform-db-rw` | plaintext (no `tls:` in either datastore; `pg_hba` `host`); 14 connections with `ssl=f` (16 on 2026-10-19) | — | — (#1296) | `controllers/temporal/helmrelease.yaml`; measured on Kind 2026-10-01 and 2026-10-19 via `pg_stat_ssl` |
+| OpenBao DB secrets engine → `platform-db-rw` / `product-db-rw` | TLS, **not verified** | `homelab-ca` (`<cluster>-server-tls`) | no (`sslmode=require`; #1296) | `*/openbao-db-config.yaml` (`connection_url`) |
+| pgroles → both clusters | TLS, **not verified** | `homelab-ca` (`<cluster>-server-tls`) | no (`sslMode: require`; the policy has no root-certificate field, #1306) | `*/authz/policies/*.yaml` |
+| CNPG replication (`streaming_replica`) | TLS + cert auth (TLS 1.3) | server: `homelab-ca`; client: CNPG's client CA | the instances check the CA only (operator-managed) | `*/instance.yaml` (`serverCASecret`); measured on Kind 2026-10-01 via `pg_stat_ssl` |
 | CNPG Barman → RustFS · DR replica restore · ClickHouse cold tier · Pyroscope | plaintext HTTP S3 | — | — | `*/objectstore.yaml:11`; `product-db-replica/instance.yaml:59-65`; `configs/clickhouse/clickhouseinstallation.yaml:347`; `controllers/profiling/pyroscope/helmrelease.yaml:96` |
 | Services → Valkey `:6379` | plaintext, no auth | — | — | `controllers/caching/valkey/helmrelease.yaml:46-47`; `catalog-rs.yaml:155-157` |
 | ESO / bootstrap / OIDC / DB-config Jobs → OpenBao `:8200` | plaintext HTTP | — | — | `controllers/secrets/openbao/helmrelease.yaml:56,94`; `configs/secrets/cluster-secret-store.yaml:24`, `cluster-secret-store-db.yaml:18`; `openbao-bootstrap/configmap.yaml:33` |

@@ -465,6 +465,48 @@ validate_deny_all_single_owner() {
   echo "  app-tier namespaces: $(wc -w <<<"${app_ns}"), static deny-all-ingress outside them: $(wc -w <<<"${static}")"
 }
 
+validate_databases_substitution_scope() {
+  # databases-local runs postBuild substitution over every object it applies
+  # (pg_stat_ch password). configs/databases/kustomization.yaml opts all of them
+  # out except the CNPG Clusters. Fail if anything else is back in scope, or if
+  # a Cluster grows a ${...} that the Secret does not define: Flux would turn it
+  # into an empty string, and bash syntax like ${arr[@]} fails the whole wave.
+  local dir="kubernetes/infra/configs/databases"
+  local render kinds vars
+  echo "INFO - Checking substitution scope of ${dir}"
+  render=$(kustomize build "${dir}" "${kustomize_flags[@]}" | \
+    yq eval-all 'select(.metadata.annotations."kustomize.toolkit.fluxcd.io/substitute" != "disabled")')
+  kinds=$(yq -N eval-all '.kind + "/" + .metadata.name' <<<"${render}" | sort -u)
+  if grep -qv '^Cluster/' <<<"${kinds}"; then
+    echo "ERROR - ${dir}: objects other than Clusters are open to Flux substitution:" >&2
+    grep -v '^Cluster/' <<<"${kinds}" >&2
+    exit 1
+  fi
+  vars=$(grep -oE '\$\{[^}]*\}' <<<"${render}" | sort -u | paste -sd' ' || true)
+  if [[ "${vars}" != '${PG_STAT_CH_CLICKHOUSE_PASSWORD}' ]]; then
+    echo "ERROR - ${dir}: substituted objects must reference only \${PG_STAT_CH_CLICKHOUSE_PASSWORD}, found: ${vars:-<none>}" >&2
+    exit 1
+  fi
+  echo "  in scope: $(tr '\n' ' ' <<<"${kinds}")"
+}
+
+validate_dr_replica_pg_hba() {
+  # A promoted product-db-replica takes product-db's clients, so it must admit
+  # them exactly as product-db does (ADR-015, ADR-089). Two copies of the list
+  # exist because each Cluster is its own manifest; fail when they drift.
+  local dir="kubernetes/infra/configs/databases/clusters"
+  local want got
+  echo "INFO - Checking product-db-replica pg_hba matches product-db"
+  want=$(yq '.spec.postgresql.pg_hba[]' "${dir}/product-db/instance.yaml" | tr -s ' ')
+  got=$(yq '.spec.postgresql.pg_hba[]' "${dir}/product-db-replica/instance.yaml" | tr -s ' ')
+  if [[ "${want}" != "${got}" ]]; then
+    echo "ERROR - product-db-replica pg_hba differs from product-db (< product-db, > replica):" >&2
+    diff <(echo "${want}") <(echo "${got}") >&2 || true
+    exit 1
+  fi
+  echo "  $(wc -l <<<"${want}") lines, identical"
+}
+
 validate_rustfs_bucket_lists() {
   echo "INFO - Validating RustFS bucket lists agree"
   local job="kubernetes/infra/controllers/storage/rustfs/job-setup-buckets.yaml"
@@ -487,6 +529,8 @@ validate_kyverno_policies
 validate_clickhouse_embedded_xml
 validate_clickhouse_replica_count
 validate_rustfs_bucket_lists
+validate_databases_substitution_scope
+validate_dr_replica_pg_hba
 validate_service_namespaces
 validate_deny_all_single_owner
 validate_platform_image_references

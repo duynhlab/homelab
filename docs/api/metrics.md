@@ -359,8 +359,15 @@ double as the availability heartbeat (see  [Availability](../observability/metri
 | `pgxpool_empty_acquire_wait_time_nanoseconds_total` | Total time spent waiting; ÷ `empty_acquire_total` = mean wait |
 | `pgxpool_acquires_total`, `pgxpool_new_connections_total`, `pgxpool_max_lifetime_destroys_total`, … | Churn/lifecycle detail |
 
+**Connection health (pkg/dbx ≥ v0.39.0):**
+
+| Metric | Reading |
+|--------|---------|
+| `pgx_pool_connect_failures_total{error_type}` | New connections the pool failed to open, by SQLSTATE (`28P01` wrong password, `57P01` shutting down, `53300` too many) or `connect` (dial, TLS, timeout). pgxpool never retries them |
+| `pgx_pool_acquire_evictions_total` | Pooled connections the server had already closed, replaced at acquire before a query was sent (a pooler rollout). Connections idle over 1 s are replaced by the pgxpool ping instead and are not counted |
+
 Alerts on this layer: `DBClientQueryP95High`, `DBClientErrorRate`,
-`PgxPoolNearExhaustion`, `PgxPoolAcquireWaitHigh`
+`PgxPoolNearExhaustion`, `PgxPoolAcquireWaitHigh`, `PgxPoolConnectFailures`
 ( [alert catalog §1](../observability/alerting/alert-catalog.md#1-microservices-red-metrics)).
 
 > **Naming trap:** the `db_client_connections_*` series (usage, use_time in

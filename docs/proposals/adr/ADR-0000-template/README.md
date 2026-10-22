@@ -30,7 +30,7 @@ Avoid:
 | **Related research** | [research.md](../../rfc/RFC-NNNN/research.md) or — |
 | **Supersedes** | ADR-NNN or — |
 | **Superseded by** | ADR-NNN or — |
-| **Implementation tracking** | `{issue / epic / planning document / PRs}` |
+| **Implementation tracking** | `#NNN` — the ADR tracking issue (issue type `ADR`; one sub-issue per obligation) |
 | **Adoption** | Not started / Partial / Complete |
 
 <!--
@@ -210,8 +210,8 @@ List work that must happen for the decision to be considered adopted.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| {code or contract change} | {team} | {issue/PR} | {observable result} |
-| {test or operational work} | {team} | {issue/PR} | {observable result} |
+| {code or contract change} | {team} | #sub-issue | {observable result} |
+| {test or operational work} | {team} | #sub-issue | {observable result} |
 | Update service contracts | {team} | `docs/api/...` | As-built docs match code |
 | Update diagrams and call graph | {team} | `docs/api/api.md` | No stale edge remains |
 

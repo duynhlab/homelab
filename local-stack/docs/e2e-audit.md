@@ -1150,23 +1150,50 @@ audit_curl -s -o /dev/null -w '%{http_code}\n' \
   "$BASE/order/v1/protected/orders?status=not_a_status" \
   -H "Authorization: Bearer $KCT_STAFF"   # 400
 
-# A23. REVIEW'S THREE DATABASE ROLES (RFC-0029, docs/databases/authorization.md).
+# A23. THE SPLIT SERVICES' THREE DATABASE ROLES (RFC-0029, ADR-088,
+#      docs/databases/authorization.md): all ten services — review, user,
+#      shipping, notification, product, inventory, cart, order, checkout,
+#      payment.
 #      Run as the real logins over TCP (password auth), not as postgres: the
-#      runtime reads but cannot change the schema, the migrator creates
-#      nothing until SET ROLE, and the owner owns every object. Mirrors the
-#      Kind rows K3.8/K3.9 (scripts/db-authz-check.sh).
-a23() { # $1 login, $2 SQL
+#      runtime reads but cannot change the schema; the migrator IS the owner
+#      from login (role=, set by the platform) and stays the owner after RESET
+#      ROLE; the owner owns every object. Mirrors the Kind rows K3.8/K3.9
+#      (scripts/db-authz-check.sh). Here every runtime is refused
+#      schema_migrations; on the cluster the pgroles-owned services (all but
+#      review) hold it (PGR-10), so that one line differs by design.
+a23() { # $1 database, $2 login, $3 SQL
   docker compose exec -T postgres psql -qAtX -v ON_ERROR_STOP=1 \
-    "host=127.0.0.1 dbname=review user=$1 password=$1-local" -c "$2" 2>&1 </dev/null | head -1
+    "host=127.0.0.1 dbname=$1 user=$2 password=$2-local" -c "$3" 2>&1 </dev/null | head -1
 }
-echo "A23 runtime reads:          $(a23 review_runtime 'SELECT count(*) > 0 FROM reviews')"       # t
-echo "A23 runtime CREATE:         $(a23 review_runtime 'CREATE TABLE a23 (i int)')"               # permission denied for schema public
-echo "A23 runtime DROP:           $(a23 review_runtime 'DROP TABLE reviews')"                     # must be owner of table reviews
-echo "A23 runtime SET ROLE owner: $(a23 review_runtime 'SET ROLE review_owner')"                  # permission denied to set role
-echo "A23 runtime migrations:     $(a23 review_runtime 'SELECT 1 FROM schema_migrations')"        # permission denied for table
-echo "A23 migrator CREATE:        $(a23 review_migrator 'CREATE TABLE a23 (i int)')"              # permission denied for schema public
-echo "A23 migrator as owner:      $(a23 review_migrator 'BEGIN; SET ROLE review_owner; CREATE TABLE a23 (i int); ROLLBACK;')"  # (empty: succeeded, rolled back)
-echo "A23 non-owner objects:      $(a23 review_migrator "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> 'review_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')")"  # 0
+for st in review:reviews user:user_profiles shipping:shipments notification:notifications \
+          product:products inventory:inventory_balances \
+          cart:cart_items order:orders checkout:checkout_sessions payment:payments; do
+  S=${st%%:*} T=${st##*:}
+  echo "A23 $S runtime reads:          $(a23 $S ${S}_runtime "SELECT count(*) >= 0 FROM $T")"       # t
+  echo "A23 $S runtime CREATE:         $(a23 $S ${S}_runtime 'CREATE TABLE a23 (i int)')"             # permission denied for schema public
+  echo "A23 $S runtime DROP:           $(a23 $S ${S}_runtime "DROP TABLE $T")"                        # must be owner of table
+  echo "A23 $S runtime SET ROLE owner: $(a23 $S ${S}_runtime "SET ROLE ${S}_owner")"                  # permission denied to set role
+  echo "A23 $S runtime migrations:     $(a23 $S ${S}_runtime 'SELECT 1 FROM schema_migrations')"      # permission denied for table
+  echo "A23 $S migrator identity:      $(a23 $S ${S}_migrator 'SELECT current_user')"                 # <svc>_owner
+  echo "A23 $S migrator after RESET:   $(a23 $S ${S}_migrator 'RESET ROLE; SELECT current_user')"     # <svc>_owner
+  echo "A23 $S migrator CREATE:        $(a23 $S ${S}_migrator 'BEGIN; CREATE TABLE a23 (i int); ROLLBACK;')"  # (empty: succeeded, rolled back)
+  echo "A23 $S non-owner objects:      $(a23 $S ${S}_migrator "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> '${S}_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')")"  # 0
+done
+
+# A24. EVERY CLIENT NAMES ITSELF (ADR-089, RFC-0029 naming table). Each
+#      long-running client sets application_name through PGAPPNAME; read it
+#      from the server, not from the env. The one-shot jobs have exited by now,
+#      so for them assert the env they ran with.
+docker compose exec -T postgres psql -U postgres -qAtX -F' ' -c \
+  "SELECT application_name, usename, datname FROM pg_stat_activity
+   WHERE backend_type = 'client backend' AND usename NOT IN ('postgres', 'temporal', 'keycloak')
+   GROUP BY 1, 2, 3 ORDER BY 1"
+# Each of the ten services as <svc> <svc>_runtime <svc> (cart cart_runtime cart,
+# order order_runtime order, …) · order-worker order_runtime order ·
+# checkout-worker checkout_runtime checkout. No row with an empty first column.
+for c in $(docker compose ps -a --format '{{.Name}}' | grep -E -- '-(migrate|seed|authz)-1$'); do
+  echo "A24 $c $(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$c" | grep '^PGAPPNAME=')"
+done   # <svc>-migrate-1 → <svc>-migrate, <svc>-seed-1 → <svc>-seed, <svc>-authz-1 → db-authz
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
@@ -1901,29 +1928,40 @@ missing = sorted({'user','product','inventory','cart','order','review','shipping
 print('C12 OTLP log streams:', 'OK all 10 services' if not missing else 'FAIL missing=' + ','.join(missing))"
 # want every service Phase A drove.
 
-# C13. EDGE ACCESS LOGS, OTLP leg. The second-most important row in this phase:
-#      the edge's JSON access log is the only structured record of what the edge
-#      did, and the field set is contracted in gateway/eg/envoyproxy.yaml.
+# C13. EDGE ACCESS LOGS, in ClickHouse. The second-most important row in this
+#      phase: the edge's JSON access log is the only structured record of what
+#      the edge did, and the field set is contracted in gateway/eg/envoyproxy.yaml.
 #
-#      THE STREAM MOVED. Until ADR-060 (#886, 2026-08-24) this row read the Vector
-#      leg, `_stream:{service="gateway"}`. That leg now carries ZERO lines — the
-#      access log goes out over OTLP instead, landing under
-#      `_stream:{"service.name"="platform.envoy-gateway"}` with the same field set.
-#      Measured on the 2026-08-25 gate run: Vector leg 0, OTLP leg 1540, every one
-#      of them carrying `upstream_cluster` and `route_name`. The old query could
-#      only ever fail, which is exactly the "an expression that cannot pass reads
-#      as coverage" failure this audit exists to catch.
+#      THE STORE MOVED TWICE. ADR-060 (2026-08-24) moved the access log from the
+#      Vector leg to OTLP. ADR-061 then made it ClickHouse-only on the cluster:
+#      the collector's filter/drop_edge_logs keeps it out of VictoriaLogs, where
+#      attributes-only records (no _msg) were invisible to free-text LogsQL anyway.
+#      local-stack carries the same filter since 2026-10-16, so this row reads
+#      ClickHouse and also asserts VictoriaLogs holds NONE — a non-zero count
+#      there means the filter is gone and the stack no longer matches the cluster.
 #
 #      `upstream_cluster` and `route_name` exist only on access-log lines, so
 #      requiring both still discriminates them from the control plane's own logs.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT count() FROM otel.otel_logs
+  WHERE Timestamp > now() - INTERVAL 45 MINUTE
+    AND ServiceName = 'platform.envoy-gateway'
+    AND mapContains(LogAttributes, 'upstream_cluster')
+    AND mapContains(LogAttributes, 'route_name')" \
+  | python3 -c "import sys; n=int(sys.stdin.read().strip() or 0); \
+    print('C13 edge access logs (ClickHouse):', 'OK %d' % n if n > 0 else 'FAIL 0')"
 curl -s "$VL" --data-urlencode \
-  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* route_name:* | count()' \
+  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* | count()' \
   | python3 -c "import json,sys; n=int(json.load(sys.stdin)['count(*)']); \
-    print('C13 edge access logs:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+    print('C13 edge access logs kept out of VictoriaLogs:', 'OK 0' if n == 0 else 'FAIL %d' % n)"
 # Then pin the specific request driven in C0:
-curl -s "$VL" --data-urlencode \
-  "query=_time:45m _stream:{\"service.name\"=\"platform.envoy-gateway\"} upstream_cluster:* uri:\"audit=$TAG\"" \
-  --data-urlencode 'limit=1' | python3 -c "
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT toJSONString(LogAttributes) FROM otel.otel_logs
+  WHERE ServiceName = 'platform.envoy-gateway'
+    AND LogAttributes['uri'] LIKE '%audit=$TAG%'
+  LIMIT 1
+  SETTINGS output_format_json_escape_forward_slashes = 0
+  FORMAT TSVRaw" | python3 -c "
 import json,sys
 lines = [json.loads(l) for l in sys.stdin.read().splitlines() if l]
 d = lines[0] if lines else {}
@@ -1933,17 +1971,17 @@ ok = lines and not missing and d['status'] == '200' and d['method'] == 'GET' \
      and d['upstream_cluster'].endswith('/api-product/rule/0')
 print('C13 tagged access log:', 'OK CR field set, %s %s -> %s' % (d.get('method'), d.get('status'), d.get('upstream_cluster'))
       if ok else 'FAIL lines=%d missing=%s' % (len(lines), missing))"
-# want ONE line whose parsed fields are the CR's contract:
+# TSVRaw and the slash setting matter: plain TSV escapes the backslashes that
+# toJSONString puts before every `/`, and upstream_cluster then reads
+# `httproute\/…`, which never matches.
+# want ONE row whose attribute names are the CR's contract:
 #   uri=/product/v1/public/products?audit=$TAG  status=200  method=GET
 #   upstream_cluster=httproute/envoy-gateway-system/api-product/rule/0
 #   route_name=.../match/0/*  upstream=<ip:8080>  duration=<ms>  request_id=<uuid>
-# `host` (the authority, `localhost:8080`) and `trace_id` arrive too since the
-# OTLP move; the Vector-era note that `del(.host)` ate the authority no longer
-# applies. Neither is asserted — they are not part of what this row guards.
-# Read those FIELD NAMES, not just the values: with the EnvoyProxy CR unattached
+# Read those NAMES, not just the values: with the EnvoyProxy CR unattached
 # Envoy falls back to its built-in JSON, which reports the same facts as
-# `x-envoy-origin-path`, `response_code` and `upstream_host` — every Vector-parsed
-# edge panel breaks on that rename while this row would still find "a log line".
+# `x-envoy-origin-path`, `response_code` and `upstream_host` — every edge panel
+# breaks on that rename while this row would still find "a log line".
 
 # C14. Vector is tailing NON-app containers too — the half of the log estate that
 #      has no OTel SDK at all. `frontend` is the right witness: it is the SPA's
@@ -2223,7 +2261,8 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
 | A22 | The attention cards' six reads (RFC-0023) | the five count queries the portal dashboard issues each answer **200** with a **numeric `total_items`** (zero is a legitimate count; a missing or non-numeric field is not), the recent-orders panel honours `page_size=5`, and a status order-service does not know is **400** — which is what proves the `manual_review` and `cancelling` cards are genuinely filtered rather than both reporting the total order count |
-| A23 | Review's three database roles (RFC-0029) | as `review_runtime`: reads `reviews`, and `CREATE`, `DROP`, `SET ROLE review_owner` and reading `schema_migrations` are each **refused**; as `review_migrator`: `CREATE` is **refused** until `SET ROLE review_owner` and succeeds after it; **0** relations in `public` owned by anyone but `review_owner` |
+| A23 | The split services' three database roles (RFC-0029) | for each of the ten services (review, user, shipping, notification, product, inventory, cart, order, checkout, payment): as `<svc>_runtime`, reads its table, and `CREATE`, `DROP`, `SET ROLE <svc>_owner` and reading `schema_migrations` are each **refused**; as `<svc>_migrator` with no `SET ROLE` anywhere: `current_user` is `<svc>_owner` at login **and after `RESET ROLE`**, and `CREATE` succeeds; **0** relations in `public` owned by anyone but `<svc>_owner` |
+| A24 | Every client names itself (ADR-089) | `pg_stat_activity` shows each of the 10 services under its own name as `<svc>_runtime`, plus `order-worker` as `order_runtime` and `checkout-worker` as `checkout_runtime`, with **no** application session left unnamed; every `*-migrate`, `*-seed` and `*-authz` container ran with `PGAPPNAME` `<svc>-migrate`, `<svc>-seed` and `db-authz` |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
@@ -2246,7 +2285,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C10 | Temporal metrics, both halves | SDK: latency histograms + `temporal_workflow_completed_total`, worker slots, pollers have series (`_total` on the SDK counters since ADR-063 — the cluster rules and the Temporal dashboard query that name); server: `up{job="temporal"}` is 1 and `service_requests` / `persistence_requests` rate — the :8000 listener `PROMETHEUS_ENDPOINT` enables |
 | C11 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C12 | App logs (OTLP leg) | `_stream:{"service.name"="cart"}` non-empty in VictoriaLogs, and the stream-field enumeration lists every service Phase A drove |
-| C13 | Edge access logs (OTLP leg, ADR-060) | `_stream:{"service.name"="platform.envoy-gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's own logs) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — with `GET 200` to the `api-product` cluster, not Envoy's built-in fallback names |
+| C13 | Edge access logs (ClickHouse only, ADR-060 + ADR-061) | `otel.otel_logs` rows for `platform.envoy-gateway` carrying `upstream_cluster` + `route_name` (the discriminator against the control plane's own logs) are non-empty, VictoriaLogs holds **0** of them (the collector's `filter/drop_edge_logs`, as on the cluster), and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — with `GET 200` to the `api-product` cluster, not Envoy's built-in fallback names |
 | C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C14 empty while C12 and C13 are healthy = the Vector leg is down |
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
 | C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
@@ -2260,8 +2299,8 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 Any failed row blocks the release tag. **C14** empty while C12 and C13 are
 healthy means the Vector leg is down, not that the services' logging regressed —
 check `vector` per the container-runtime note in Preconditions, recreate the
-stack, and rerun. (C13 used to share that cause; it reads the OTLP leg since
-ADR-060.)
+stack, and rerun. (C13 used to share that cause; since ADR-060/ADR-061 it reads
+ClickHouse.)
 
 Phase C rows print one `Cn OK …` or `Cn FAIL …` verdict each, except the
 enumerations marked "read, not asserted". A row that prints raw data and no
@@ -2341,43 +2380,3 @@ a passing decision, continue with the
 - [Canonical API contracts](../../docs/api/README.md)
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
-
-_Last updated: 2026-10-02 — A15 is runnable on compose and passed on Temporal 1.32.0; its header now says so, names the manual fresh-checkout step, and its teardown check expects A10's abandonment watch. Previously 2026-10-01 — A6 no longer calls the auth-service cluster retirement pending: RFC-0024 P5 removed it. Earlier the same day — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
-RFC-0025: the header's "Sign in" is a link to
-`/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
-storage assertion now names the legitimate residents (`theme`, and a
-`checkoutIdemKey:<uuid>` during a checkout) while still failing on anything
-JWT-shaped. B3 changes what it asserts, not how strictly: a private route after
-sign-out renders a sign-in prompt **in place** rather than bouncing to `/login`,
-so the row now checks the property that mattered — that no order data from the
-previous session survives — instead of the redirect that used to carry it. A10
-gains a spent-cap row: a promo whose redemptions are used up answers `409
-PROMO_EXHAUSTED`, which it did not before checkout-service 0.7.1. The evidence
-table's Phase A line said `A1–A14 + A16`, three rows behind the audit itself._
-
-_Previously, 2026-08-12 — makes a from-scratch stack recreation mandatory for
-every run and rewrites the two phases that had drifted from reality. **Phase B**
-is rebuilt around the browser's real identity flow: the SPA has no credential
-form, so B1 asserts the redirect to the realm's own login page, that no
-JWT-shaped value exists in either web storage, and the realm claims of the token
-actually in use; B2 observes the keycloak-js pre-emptive refresh inside a bounded
-window using a temporary 60s client-level token lifespan; B3 asserts the
-end-session GET redirect and that no service participates in sign-out. **Phase C**
-grows from 6 rows to 19 so no telemetry leg is sampled by proxy — the edge span as
-the trace root (with the derived `service.name` discovered at runtime), edge→service
-trace continuity, per-service span coverage, spanmetrics, app semconv metrics,
-Temporal SDK metrics, both VictoriaLogs ingest legs with the access-log
-discriminator, log↔trace correlation, profiling, datasource health, and panels
-actually returning data. A3/A4/A5 no longer carry "confirm on the first run"
-placeholders: the `www-authenticate` challenge, realm family revocation, and
-idempotent logout were measured and are asserted. A9 asserts its 201 and A12
-asserts the outbox epoch against the workflow id instead of printing both.
-The gate now runs against local-stack's post-auth-service end state: A6 asserts
-the `auth` DATABASE is gone rather than a table inside it, A7 drops the retired
-`auth/v1/public/login` alias, and the trace/profile coverage sets are the ten
-remaining applications plus the edge (the cluster surface retires in RFC-0024 P5).
-Preconditions carry the podman bring-up (`compose.podman.yaml` — resolved socket,
-`userns_mode: keep-id`, `label=disable`) without which the Vector log leg is
-silently absent. Envoy's admin and proxy Prometheus endpoints, and the collector's
-unpublished gRPC receiver, are documented as out of scope with reasons so nothing
-reads as forgotten._

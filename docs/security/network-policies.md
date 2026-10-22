@@ -128,11 +128,14 @@ depend on. Without these the operator cannot reach the database pods and
 | **platform** | `user`, `notification`, `shipping`, `review` (cross-ns) | `:5432` | Platform apps share `platform-db` via the CNPG PgBouncer `Pooler` `platform-db-pooler-rw` (ADR-026 — replaced `pgdog-platform`). PgBouncer listens on 5432, so runtime and migration traffic use the same port. |
 | **platform** | `temporal` (cross-ns) | `:5432` | Temporal server connects **direct** to `platform-db-rw` (no pooler). |
 | **platform** | `identity` (cross-ns) | `:5432` | Keycloak connects **direct** to `platform-db-rw` — no pooler (RFC-0022 OQ#8 / ADR-041). |
-| **platform** | `openbao` (cross-ns) | `:5432` | OpenBAO database secrets engine rotates the notification role's password (static-role, RFC-0008 / ADR-025). |
+| **platform** | `openbao` (cross-ns) | `:5432` | OpenBAO database secrets engine rotates the four platform-db runtime passwords (static roles, ADR-025 / ADR-089). |
+| **platform** | `pgroles-system` (cross-ns) | `:5432` | pgroles operator applies the PostgresPolicies that own in-database grants (ADR-088). |
 | **platform** | intra-namespace | `:5432`, `:8000` | CNPG HA replica WAL streaming + PgBouncer → Postgres + operator status probe. (`:6432` is gone — ADR-026 removed PgDog from `platform`.) |
 | **platform** | `monitoring` | `:9187` (postgres exporter), `:9127` (PgBouncer exporter, ADR-026) | VMAgent scrapes the postgres/pooler exporters. |
 | **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
-| **product** | `cart`, `order`, `payment`, `checkout`, `inventory` (cross-ns) | `:6432` (PgDog), `:5432` (`product-db-rw`) | Sibling apps use the PgDog pooler for runtime + the primary for migration initContainers; `payment` connects **direct-TLS to `product-db-rw:5432`** for runtime too (its config refuses cleartext and PgDog has no TLS yet). |
+| **product** | `cart`, `order`, `payment`, `checkout`, `inventory` (cross-ns) | `:6432` (PgDog), `:5432` (`product-db-rw`) | Sibling apps use the PgDog pooler for runtime + the primary for migration initContainers; every runtime, `payment`'s included, reaches PgDog over client TLS (`sslmode=verify-full`, ADR-089). |
+| **product** | `openbao` (cross-ns) | `:5432` | OpenBAO database secrets engine rotates the six product-db runtime passwords (static roles, ADR-025 / ADR-089). |
+| **product** | `pgroles-system` (cross-ns) | `:5432` | pgroles operator applies the PostgresPolicies that own in-database grants (ADR-088). |
 | **product** | intra-namespace | `:5432`, `:6432`, `:8000` | CNPG replica WAL streaming + product-service → PgDog + PgDog → Postgres + operator status probe. |
 | **product** | `monitoring` | `:9187` (postgres exporter), `:9090` (PgDog openmetrics) | VMAgent scrapes the postgres/pooler exporters. |
 
@@ -214,7 +217,7 @@ flowchart LR
 > NetworkPolicy is the fence, never a route rule.
 
 The same question, drawn per namespace:
-- the gateway's ten north-south allows collapse into one arrow into the fenced frame;
+- the gateway's eleven north-south allows (ten services + identity) collapse into one arrow into the fenced frame;
 - east-west calls are drawn caller → callee, with their ports;
 - the moving dashes follow the calls.
 

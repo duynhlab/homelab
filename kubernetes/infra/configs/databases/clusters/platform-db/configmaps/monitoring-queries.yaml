@@ -7,6 +7,45 @@ metadata:
     cnpg.io/reload: ""
 data:
   custom-queries: |
+    # pg_stat_ch exporter health (cnpg_pg_stat_ch_*) — same query as
+    # product-db; the extension's SQL objects live in `user` on this cluster.
+    pg_stat_ch:
+      query: "SELECT enqueued_events, dropped_events, exported_events, send_failures, dsa_oom_count,
+               queue_size, queue_usage_pct,
+               COALESCE(EXTRACT(EPOCH FROM (now() - last_success_ts)), -1) AS last_success_age_seconds,
+               COALESCE(EXTRACT(EPOCH FROM (now() - last_error_ts)), -1) AS last_error_age_seconds
+               FROM pg_stat_ch_stats()"
+      target_databases:
+        - "user"
+      metrics:
+        - enqueued_events:
+            usage: "COUNTER"
+            description: "Events accepted into the pg_stat_ch ring buffer"
+        - dropped_events:
+            usage: "COUNTER"
+            description: "Events dropped because the ring buffer was full"
+        - exported_events:
+            usage: "COUNTER"
+            description: "Events the background worker delivered to ClickHouse"
+        - send_failures:
+            usage: "COUNTER"
+            description: "Failed ClickHouse inserts (the batch is lost, not retried)"
+        - dsa_oom_count:
+            usage: "COUNTER"
+            description: "Query/error strings lost because the string area was full"
+        - queue_size:
+            usage: "GAUGE"
+            description: "Events waiting in the ring buffer"
+        - queue_usage_pct:
+            usage: "GAUGE"
+            description: "Ring buffer fill level in percent"
+        - last_success_age_seconds:
+            usage: "GAUGE"
+            description: "Seconds since the last successful export (-1 = never)"
+        - last_error_age_seconds:
+            usage: "GAUGE"
+            description: "Seconds since the last export error (-1 = never)"
+
     # Scope pg_stat_statements to current_database() for each target DB.
     # Joining pg_database and scanning all dbids on every target connection can
     # produce duplicate labelsets and make exporter /metrics fail with HTTP 500.
@@ -381,8 +420,15 @@ data:
                 OR COALESCE(bool_or(m.admin_option), false) <> e.want_admin
                 OR COALESCE(bool_or(m.inherit_option), false) <> e.want_inherit
                 OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
-               FROM (VALUES ('vault_rotator', 'notification', true, false, false),
-                            ('review_migrator', 'review_owner', false, false, true))
+               FROM (VALUES ('vault_rotator', 'notification_runtime', true, false, false),
+                            ('vault_rotator', 'user_runtime', true, false, false),
+                            ('vault_rotator', 'shipping_runtime', true, false, false),
+                            ('vault_rotator', 'review_runtime', true, false, false),
+                            ('review_migrator', 'review_owner', false, false, true),
+                            ('user_migrator', 'user_owner', false, false, true),
+                            ('shipping_migrator', 'shipping_owner', false, false, true),
+                            ('notification_migrator', 'notification_owner', false, false, true),
+                            ('db_authz', 'authz_admin', false, true, true))
                  AS e(member, parent, want_admin, want_inherit, want_set)
                LEFT JOIN pg_roles mr ON mr.rolname = e.member
                LEFT JOIN pg_roles pr ON pr.rolname = e.parent
@@ -410,3 +456,54 @@ data:
         - drift:
             usage: "GAUGE"
             description: "1 if the membership is missing or its options differ from the specified shape"
+
+    # ADR-088: session defaults the platform sets on a role (the migrator's
+    # role=<owner>). One row per guarded role, so a dropped role reads drift=1.
+    pg_role_config:
+      query: "SELECT e.role, (COALESCE(r.rolconfig, '{}') <> e.want)::int AS drift
+               FROM (VALUES ('review_migrator', ARRAY['role=review_owner']),
+                            ('user_migrator', ARRAY['role=user_owner']),
+                            ('shipping_migrator', ARRAY['role=shipping_owner']),
+                            ('notification_migrator', ARRAY['role=notification_owner'])) AS e(role, want)
+               LEFT JOIN pg_roles r ON r.rolname = e.role"
+      metrics:
+        - role:
+            usage: "LABEL"
+            description: "Role whose session defaults are guarded"
+        - drift:
+            usage: "GAUGE"
+            description: "1 if the role is missing or its rolconfig differs from the specified defaults"
+
+    # ADR-088: the owner's default privileges in each converted database,
+    # whether the Job (review) or pgroles applies them. The runtime's entry
+    # must be exactly the declared set, and functions must have no PUBLIC
+    # EXECUTE. One row per expected entry.
+    pg_default_privileges:
+      query: "SELECT current_database() AS datname, e.objtype,
+               (NOT EXISTS (
+                  SELECT 1 FROM pg_default_acl d
+                   WHERE d.defaclrole = to_regrole(current_database() || '_owner')
+                     AND d.defaclobjtype = e.objtype
+                     AND d.defaclnamespace = COALESCE(to_regnamespace(e.ns), 0)
+                     AND d.defaclacl::text[] @> e.want
+                     AND NOT d.defaclacl::text[] && e.forbid))::int AS drift
+               FROM (VALUES
+                 ('r', 'public', ARRAY[current_database() || '_runtime=arwd/' || current_database() || '_owner'], ARRAY[]::text[]),
+                 ('S', 'public', ARRAY[current_database() || '_runtime=rU/' || current_database() || '_owner'], ARRAY[]::text[]),
+                 ('f', NULL, ARRAY[current_database() || '_owner=X/' || current_database() || '_owner'], ARRAY['=X/' || current_database() || '_owner']))
+                 AS e(objtype, ns, want, forbid)"
+      target_databases:
+        - "review"
+        - "user"
+        - "shipping"
+        - "notification"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database whose owner's default privileges are guarded"
+        - objtype:
+            usage: "LABEL"
+            description: "pg_default_acl object type (r table, S sequence, f function)"
+        - drift:
+            usage: "GAUGE"
+            description: "1 if the entry is missing or differs from the specified grant"

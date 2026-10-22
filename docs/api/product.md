@@ -38,7 +38,7 @@ Known gaps: [platform mTLS and cache tradeoffs](#known-gaps).
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | None. Historically `ReserveStock` + `ReleaseStock`; the saga now reserves at inventory-service |
 | **Idempotency** | `reservation_id` = order id (historical) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
+| **Deep dive** | [workflows.md](./workflows.md#registry) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -190,6 +190,11 @@ user input ever reaches the `ORDER BY` clause raw.
 here. `status` is one of `in_stock | low_stock | out_of_stock | unknown`, and
 `available_to_promise` is **omitted** rather than zeroed on an `unknown` answer —
 so a missing figure can never be misread as a real zero.
+
+Related products are read from a product-db replica through PgDog (opt-in,
+`DB_READ_REPLICA`), so a just-published or just-edited product can be missing
+from another product's related list for up to about 2 s; the product itself,
+lists and prices always come from the primary.
 
 Reviews, related products, and availability are all soft-fail enrichments. A
 review-service outage does not turn a valid product page into a `5xx`; product

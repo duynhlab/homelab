@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Kind gate K3.8 / K3.9 (RFC-0029): a converted service's runtime and migrator
-# logins behave as docs/databases/authorization.md says, checked as the REAL
-# logins through pg_hba rather than by asking the catalog as postgres.
+# Kind gate K3.8 / K3.9 (RFC-0029, ADR-088): a converted service's runtime and
+# migrator logins behave as docs/databases/authorization.md says, checked as the
+# REAL logins through pg_hba rather than by asking the catalog as postgres. The
+# migrator is the owner from login (role=); no check runs SET ROLE.
 #
 #   scripts/db-authz-check.sh            # every converted service
 #   scripts/db-authz-check.sh review     # one service
@@ -12,21 +13,36 @@
 # unless every expected CHECK came back PASS.
 set -u
 
-IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
-# service -> "cluster namespace host". Add a service when it is converted.
+IMAGE="ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
+# service -> "cluster namespace host table migrations": one table the runtime
+# serves from, and what the runtime gets on schema_migrations. The Job denies
+# it (review); a pgroles table wildcard cannot exclude it, so pgroles-owned
+# databases grant it by decision (ADR-088, PGR-10). Add a service when it is
+# converted.
 declare_service() {
+  local pdb="platform-db platform platform-db-rw.platform.svc.cluster.local"
+  local rdb="product-db product product-db-rw.product.svc.cluster.local"
   case "$1" in
-    review) echo "platform-db platform platform-db-rw.platform.svc.cluster.local" ;;
+    review)       echo "$pdb reviews denied" ;;
+    user)         echo "$pdb user_profiles ok" ;;
+    shipping)     echo "$pdb shipments ok" ;;
+    notification) echo "$pdb notifications ok" ;;
+    product)      echo "$rdb products ok" ;;
+    inventory)    echo "$rdb inventory_balances ok" ;;
+    cart)         echo "$rdb cart_items ok" ;;
+    order)        echo "$rdb orders ok" ;;
+    checkout)     echo "$rdb checkout_sessions ok" ;;
+    payment)      echo "$rdb payments ok" ;;
     *) return 1 ;;
   esac
 }
-CONVERTED=(review)
-EXPECTED_CHECKS=10
+CONVERTED=(review user shipping notification product inventory cart order checkout payment)
+EXPECTED_CHECKS=12
 FAIL=0
 
 check_service() {
-  local svc="$1" cluster ns host
-  read -r cluster ns host <<<"$(declare_service "$svc")" || { echo "FAIL  unknown service $svc"; FAIL=1; return; }
+  local svc="$1" cluster ns host table migrations
+  read -r cluster ns host table migrations <<<"$(declare_service "$svc")" || { echo "FAIL  unknown service $svc"; FAIL=1; return; }
   local pod="db-authz-check-$svc-$$"
 
   # $1 = check name, $2 = role env prefix (RT|MG), $3 = expectation
@@ -34,7 +50,7 @@ check_service() {
   # typo or a missing table can never pass as a denial.
   local script
   script=$(cat <<EOF
-q() { PGPASSWORD="\$(eval echo \\\$\${2}_PASS)" psql "host=$host dbname=$svc user=\$(eval echo \\\$\${2}_USER) connect_timeout=5" -qAtX -v ON_ERROR_STOP=1 -c "\$4" 2>&1; }
+q() { PGPASSWORD="\$(eval echo \\\$\${2}_PASS)" psql "host=$host dbname=$svc user=\$(eval echo \\\$\${2}_USER) connect_timeout=5 application_name=db-authz-check" -qAtX -v ON_ERROR_STOP=1 -c "\$4" 2>&1; }
 check() {
   out=\$(q "\$@"); rc=\$?
   case "\$3" in
@@ -43,14 +59,16 @@ check() {
     *)      [ "\$out" = "\$3" ] && echo "CHECK \$1 PASS \$out" || echo "CHECK \$1 FAIL want=\$3 got=\$out" ;;
   esac
 }
-check K3.8-runtime-reads           RT ok     "SELECT count(*) FROM public.reviews"
+check K3.8-runtime-reads           RT ok     "SELECT count(*) FROM public.$table"
 check K3.8-runtime-no-create       RT denied "CREATE TABLE public.k38_probe (i int)"
-check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.reviews ADD COLUMN k38_probe int"
-check K3.8-runtime-no-drop         RT denied "DROP TABLE public.reviews"
+check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.$table ADD COLUMN k38_probe int"
+check K3.8-runtime-no-drop         RT denied "DROP TABLE public.$table"
 check K3.8-runtime-no-owner        RT denied "SET ROLE ${svc}_owner"
-check K3.8-runtime-no-migrations   RT denied "SELECT count(*) FROM public.schema_migrations"
-check K3.9-migrator-no-create      MG denied "CREATE TABLE public.k39_probe (i int)"
-check K3.9-migrator-creates-as-owner MG ok   "BEGIN; SET ROLE ${svc}_owner; CREATE TABLE public.k39_probe (i int); ROLLBACK;"
+check K3.8-runtime-migrations      RT $migrations "SELECT count(*) > 0 FROM public.schema_migrations"
+check K3.9-migrator-is-owner       MG ${svc}_owner "SELECT current_user"
+check K3.9-owner-after-reset       MG ${svc}_owner "RESET ROLE; SELECT current_user"
+check K3.9-role-config             MG role=${svc}_owner "SELECT array_to_string(rolconfig, ',') FROM pg_roles WHERE rolname = '${svc}_migrator'"
+check K3.9-migrator-creates        MG ok     "BEGIN; CREATE TABLE public.k39_probe (i int); ROLLBACK;"
 check K3.9-owner-owns-everything   MG 0      "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> '${svc}_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')"
 check K3.9-membership-f-f-t        MG f/f/t  "SELECT admin_option::text::char || '/' || inherit_option::text::char || '/' || set_option::text::char FROM pg_auth_members WHERE member = '${svc}_migrator'::regrole AND roleid = '${svc}_owner'::regrole"
 EOF
@@ -78,9 +96,15 @@ spec:
         - {name: MG_USER, valueFrom: {secretKeyRef: {name: $cluster-$svc-migrator-secret, key: username}}}
         - {name: MG_PASS, valueFrom: {secretKeyRef: {name: $cluster-$svc-migrator-secret, key: password}}}
 EOF
+  # Wait in two phases: the first probe on a fresh cluster pulls the image
+  # while Flux pulls everything else (over 300 s on Kind), then the SQL runs.
+  local deadline=$((SECONDS + 900))
+  while [ "$(kubectl get "pod/$pod" -n "$ns" -o jsonpath='{.status.phase}' 2>/dev/null)" = Pending ] \
+    && [ "$SECONDS" -lt "$deadline" ]; do sleep 5; done
   kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$pod" -n "$ns" --timeout=120s >/dev/null 2>&1
-  local out rows=0
+  local out rows=0 phase
   out=$(kubectl logs "pod/$pod" -n "$ns" 2>/dev/null)
+  phase=$(kubectl get "pod/$pod" -n "$ns" -o jsonpath='{.status.phase} {.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null)
   kubectl delete "pod/$pod" -n "$ns" --wait=false >/dev/null 2>&1
 
   local tag name verdict rest
@@ -91,7 +115,7 @@ EOF
     [ "$verdict" = PASS ] || FAIL=1
   done <<<"$out"
   if [ "$rows" -ne "$EXPECTED_CHECKS" ]; then
-    printf "FAIL  %-8s parsed %s checks, expected %s\n" "$svc" "$rows" "$EXPECTED_CHECKS"
+    printf "FAIL  %-8s parsed %s checks, expected %s (pod: %s)\n" "$svc" "$rows" "$EXPECTED_CHECKS" "${phase:-gone}"
     FAIL=1
   fi
 }

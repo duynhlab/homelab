@@ -1,0 +1,55 @@
+# PgDog (product-db pooler) health. Metrics come from PgDog's OpenMetrics port
+# (prefix pgdog_, labels user/database/role per pool), scraped by the chart's
+# ServiceMonitor. Client-side pool health is in microservices/alerts.yaml
+# (PgxPool*); these see the pooler's side of the same hop.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pgdog-pooler
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: pgdog-pooler
+    platform.duynhlab.dev/source: homelab-authored
+spec:
+  groups:
+    - name: pgdog-pooler
+      rules:
+        # Clients queued for a server connection: the pool (poolSize 30 per
+        # database) is exhausted or PostgreSQL is slow to hand connections back.
+        - alert: PgDogClientsWaiting
+          expr: |
+            max by (database) (pgdog_cl_waiting{namespace="product"}) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "PgDog clients waiting for a server connection on {{ $labels.database }}"
+            description: "Clients of {{ $labels.database }} have queued in PgDog for 5 minutes. Check pool saturation (pgdog_sv_active vs poolSize) and slow queries on product-db."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/PgDogClientsWaiting.md"
+
+        # A client gave up waiting (checkout_timeout, 5s): a request already failed.
+        # increase(), not rate(): the first timeout creates the series.
+        - alert: PgDogCheckoutTimeouts
+          expr: |
+            sum by (database) (increase(pgdog_total_checkout_timeouts{namespace="product"}[5m])) > 0
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "PgDog checkout timeouts on {{ $labels.database }}"
+            description: "{{ $value | humanize }} clients of {{ $labels.database }} timed out waiting for a server connection in 5 minutes. With passthrough auth a wrong password also times out here."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/PgDogCheckoutTimeouts.md"
+
+        # PgDog banned a backend after errors: its traffic moved elsewhere or fails.
+        - alert: PgDogPoolBanned
+          expr: |
+            max by (database, role) (pgdog_banned{namespace="product"}) > 0
+          for: 1m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "PgDog banned the {{ $labels.role }} backend of {{ $labels.database }}"
+            description: "PgDog has banned the {{ $labels.role }} pool of {{ $labels.database }} for over a minute (ban_timeout 5m). Check the backend's health and PgDog's log for the error that caused it."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/PgDogPoolBanned.md"

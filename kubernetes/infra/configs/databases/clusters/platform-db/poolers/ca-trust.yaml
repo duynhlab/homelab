@@ -1,0 +1,88 @@
+# The CA each platform-db service verifies PgBouncer against (sslmode=verify-full,
+# ADR-089), plus one in platform for the authz Job, which verifies the primary. Issued by the live homelab-ca ClusterIssuer, so its ca.crt matches
+# the CA that signs platform-db-pooler-tls on every rebuild; the trust-manager
+# bundle holds a static copy that does not. Only ca.crt is used.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-ca-trust
+  namespace: user
+spec:
+  secretName: platform-db-ca-trust
+  commonName: platform-db-ca-trust.user.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-ca-trust
+  namespace: notification
+spec:
+  secretName: platform-db-ca-trust
+  commonName: platform-db-ca-trust.notification.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-ca-trust
+  namespace: shipping
+spec:
+  secretName: platform-db-ca-trust
+  commonName: platform-db-ca-trust.shipping.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-ca-trust
+  namespace: review
+spec:
+  secretName: platform-db-ca-trust
+  commonName: platform-db-ca-trust.review.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-ca-trust
+  namespace: platform
+spec:
+  secretName: platform-db-ca-trust
+  commonName: platform-db-ca-trust.platform.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

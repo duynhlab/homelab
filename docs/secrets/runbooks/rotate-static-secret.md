@@ -6,7 +6,7 @@ keys, or other values that are still not dynamic.
 | Rotation type | Current status |
 |---|---|
 | KV v2 static secret | Deployed today |
-| Database static role (ADR-025 pilot) | Deployed for `notification` only — rotate now with `bao write -f database/rotate-role/notification` (ceremony token); other services remain KV static. See [OpenBAO architecture §5.2](../openbao.md#52-database-secrets-engine--dynamic-credentials) |
+| Database static role (ADR-025, ADR-089) | Deployed for all ten service runtime logins — not a KV secret; rotate with `bao write -f database/rotate-role/<svc>-runtime` per the [service password rotation runbook](../../databases/runbooks/rotate-cnpg-service-password.md). Migrator, `db_authz`, Temporal and Keycloak passwords stay KV static and follow this page. See [OpenBAO architecture §5.2](../openbao.md#52-database-secrets-engine--dynamic-credentials) |
 
 ## Generic rotation flow
 

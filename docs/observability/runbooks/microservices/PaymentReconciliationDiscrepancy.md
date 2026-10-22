@@ -113,7 +113,9 @@ dirty on every pass forever.
 - Restarting `mockpay` empties its in-memory ledger. Expect a burst of
   `missing_provider` for every internal payment still inside the window; it
   clears on its own about an hour later, as they age out of the lookback, so do
-  not correct them by hand. Since payment `v2.4.2` its ids are random
+  not correct them by hand. The Kind gate's K5.8 row recognises this case (only
+  `missing_provider`, mockpay started at least 5 minutes after payment) and does
+  not fail on it; the alert itself still fires. Since payment `v2.4.2` its ids are random
   (`mp_<hex>`, also `re_` and `evt_`), so a restart no longer reissues an id —
   before that, a new charge could reuse an old `provider_payment_id` and a reused
   webhook `event_id` was dropped as a redelivery.

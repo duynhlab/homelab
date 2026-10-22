@@ -31,7 +31,11 @@ s3://pg-backups-cnpg/product-db-replica/
 ```
 
 The replica also has a daily `ScheduledBackup` (`product-db-replica-daily`) and
-a seven-day retention window. Its write prefix therefore contains a complete,
+a seven-day retention window. It is not `immediate`, so after a rebuild the
+prefix holds WAL only until the 03:30 run. To anchor it sooner, take one by
+hand once replay has caught up (`kubectl cnpg backup product-db-replica -n
+product --method plugin --plugin-name barman-cloud.cloudnative-pg.io`); a backup
+started during the bootstrap replay is cancelled by the recovery conflict. Its write prefix therefore contains a complete,
 independently restorable Barman chain rather than WAL alone. Normal DR bootstrap
 still reads from `product-db/`; the replica prefix protects the promoted-cluster
 case and is not the source for a routine re-clone.
@@ -171,3 +175,7 @@ from the then-current primary.
 single instance to keep the spare cheap (2026-09-29), so a promoted cluster
 would otherwise be a single point of failure with no quorum. CNPG adds the two
 standbys by streaming from the new primary; they do not need the object store.
+
+TLS and connection isolation need no promotion step: the replica already serves
+a `homelab-ca` certificate (`product-db-replica-server-tls`) and the same
+`pg_hba` as product-db, which `make validate` keeps identical.

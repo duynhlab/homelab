@@ -1,5 +1,7 @@
 # ADR-014: PgDog pooler credentials via Flux valuesFrom targetPath
 
+> **Superseded by [ADR-025](../ADR-025-pgdog-passthrough-dynamic-db-creds/)** (2026-10-18): PgDog on product-db uses passthrough auth and holds no password list, so no `valuesFrom` password wiring remains. platform-db left PgDog earlier (ADR-026).
+
 Remove the four inline cleartext user passwords from the `pgdog-cnpg`
 HelmRelease and inject each one at reconcile time from the per-service ESO
 basic-auth Secret, using Flux `valuesFrom` with a list-indexed `targetPath`
@@ -7,7 +9,7 @@ basic-auth Secret, using Flux `valuesFrom` with a list-indexed `targetPath`
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Accepted | 2026-07-08 | [RFC-0012](../../rfc/RFC-0012/) |
+| Superseded by [ADR-025](../ADR-025-pgdog-passthrough-dynamic-db-creds/) | 2026-07-08 | [RFC-0012](../../rfc/RFC-0012/) |
 
 > **Don't forget: every decision is a tradeoff.** Record what you gave up, not just
 > what you gained.

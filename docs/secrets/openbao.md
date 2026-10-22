@@ -12,19 +12,19 @@
 > | Capability | Deployed now (local Kind) | Planned for prod |
 > |---|---|---|
 > | Storage / HA | ✅ OpenBAO HA, 3-node Raft, PVC | same |
-> | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`) for most services; **notification reads a DB-engine static role** via the `openbao-db` store | per-request dynamic DB creds |
+> | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`); **all ten service runtime DB passwords are DB-engine static roles** read via the `openbao-db` store (`refreshInterval: 15s`) | per-request dynamic DB creds |
 > | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | same |
 > | Auth (humans) | ✅ **OIDC via the `duynhlab-staff` realm** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/)): UI button + `bao login -method=oidc`; groups → external groups → team policies (`infra-team`, `sre-team`) | same, real IdP hostname |
 > | Audit | ✅ declarative `audit "file" "to-stdout"` (active node only) → Vector → VictoriaLogs **and** ClickHouse `otel_logs`; still stdout-only, no durable `auditStorage` | durable, fail-closed |
-> | **Database secrets engine** | ✅ **enabled — pattern-A pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)): static role `notification` on `platform-db` (`rotation_period` 720h), read through the dedicated `openbao-db` ClusterSecretStore. Per-request dynamic roles and other services: §5.2, §6, §10 — still *planned* | per-request dynamic roles, more services |
+> | **Database secrets engine** | ✅ **enabled — pattern A** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/), [ADR-089](../proposals/adr/ADR-089-postgresql-access-contract/)): one static role per runtime login, four on `platform-db` and six on `product-db` (`rotation_period` 720h), each cluster with its own `vault_rotator` and configurator Job, read through the dedicated `openbao-db` ClusterSecretStore. Per-request dynamic roles: §5.2, §6, §10 — still *planned* | per-request dynamic roles; migrators, `db_authz`, Temporal, Keycloak |
 > | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
 > | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager — planned, [RFC-0020](../proposals/rfc/RFC-0020/) Slice 1 |
-> | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
+> | Credentials | ⚠️ database passwords are random per cluster (none in Git); infra dev passwords (RustFS, ClickHouse, Keycloak admin, `pg_stat_ch`) are still **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
 > | Root token | ✅ **revoked** after bootstrap (verified by exit code, node-pinned); inert copy left in `openbao-init-keys` (BusyBox `wget` can't PATCH it out). Break-glass **recovery key** remains = full admin via `generate-root`, so a Secret read is still high-value. **Human access no longer depends on it** — OIDC login is live (ADR-062) | revoked; OIDC / AppRole; recovery key sharded offline |
 >
 > **These local-only choices are unsafe for production.** The hardening path and a
 > local-vs-prod parity/testing matrix live in [RFC-0008](../proposals/rfc/RFC-0008/).
-> The database engine's **static-role pilot is deployed** (§5.2); any section below
+> The database engine's **static roles are deployed** for every runtime login (§5.2); any section below
 > describing *per-request dynamic* credentials or leases is **planned**, not deployed;
 > **OIDC is deployed** for staff since [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/).
 
@@ -70,7 +70,7 @@ form the quorum behind the in-cluster service; External Secrets Operator (ESO)
 logs in with a Kubernetes service account, reads the KV engine, and materializes
 Kubernetes Secrets that pods consume. **Auto-unseal is deployed on Kind via the floci
 KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot. The database engine
-is live with one **static role** (`notification`, ADR-025 pilot). **OIDC is live** — staff log in through the
+is live with one **static role per service runtime login** (ten, both clusters — ADR-025, ADR-089). **OIDC is live** — staff log in through the
 `duynhlab-staff` realm and group membership maps to team policies (ADR-062).
 Dashed **(planned)** nodes/edges are designed but not yet deployed (per-request
 dynamic DB creds, AppRole, real cloud KMS); everything else is live on local Kind.
@@ -95,7 +95,7 @@ flowchart TD
         end
         subgraph engines["Secret engines"]
             kv["KV v2 · secret/<br/>static creds"]:::platform
-            db["Database · database/<br/>static role notification (720h)"]:::platform
+            db["Database · database/<br/>10 runtime static roles (720h)"]:::platform
             dyn["Database · per-request<br/>dynamic creds (planned)"]:::planned
             transit["Transit · transit/<br/>(planned, unused)"]:::planned
         end
@@ -112,7 +112,7 @@ flowchart TD
     cnpg[("CNPG platform-db / product-db")]:::data
 
     eso -->|"login (SA token)"| k8sauth
-    eso -->|"read KV"| svc
+    eso -->|"read KV + static-creds"| svc
     svc --> raft
     raft --- engines
     raft --- authm
@@ -121,7 +121,7 @@ flowchart TD
     floci -->|"unwrap root key (awskms)"| raft
     operators -->|"SSO — Keycloak staff realm"| oidc
     cicd -.->|"planned"| approle
-    db -->|"rotate notification password"| cnpg
+    db -->|"rotate runtime passwords<br/>as vault_rotator · sslmode=require"| cnpg
     dyn -.->|"per-request creds (planned)"| cnpg
     kms -.->|"replaces floci in prod (planned)"| raft
 
@@ -319,7 +319,7 @@ flowchart TD
     end
 
     subgraph policies["Policies Issued"]
-        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/static-creds/notification"]
+        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/static-creds/&lt;svc&gt;-runtime (10)"]
         p_infra["infra-team\nfull access (renamed from devops-admin)"]
         p_sre["sre-team\nread-only secret/local/infra/*"]
         p_default["default only\n(dev-team maps to no policy — deliberate)"]
@@ -394,7 +394,9 @@ sequenceDiagram
 
 ### 5.1 KV v2 — Static Secrets
 
-Used for infrastructure credentials that cannot be dynamic (S3 backup keys, pooler admin users).
+Used for credentials the database engine does not rotate: S3 backup keys,
+infra admin logins, and the database migrator, `db_authz`, `vault_rotator`,
+Temporal and Keycloak passwords.
 
 **Path structure** (unchanged from current Vault convention):
 
@@ -408,28 +410,32 @@ secret/{environment}/{category}/{service}/{resource}
 | `staging` | `secret/staging/` | Staging environment |
 | `prod` | `secret/prod/` | EKS / GKE production |
 
-**Current KV paths** (seeded at bootstrap). RFC-0029 replaces a service's entry
-with `secret/local/databases/<cluster>/<svc>-runtime` and `…/<svc>-migrator`,
-random per cluster, when the service is cut over
-([Database authorization](../databases/authorization.md#naming)); `review` is
-converted, the rest still use one path each.
+**Current KV paths** (seeded at bootstrap). Each service has one
+`secret/local/databases/<cluster>/<svc>-migrator` entry, random per cluster
+([Database authorization](../databases/authorization.md#naming)); its runtime
+password is not in KV but in the static role `database/static-creds/<svc>-runtime`
+(§5.2). `product-db/product` remains only for the NOLOGIN bootstrap role
+`product`.
 
 | Path | Keys | Consumer |
 |------|------|---------|
-| `secret/local/databases/shared-db/user` | `username`, `password` | platform-db user owner (compat path) |
-| `secret/local/databases/shared-db/notification` | `username`, `password` | **superseded** — still seeded, now unused: the live Secret comes from `database/static-creds/notification` (ADR-025 pilot, §5.2) |
-| `secret/local/databases/shared-db/shipping` | `username`, `password` | platform-db shipping owner (compat path) |
-| `secret/local/databases/platform-db/review-runtime` | `username`, `password` | `review_runtime` login (service pods) — random per cluster |
+| `secret/local/databases/platform-db/user-migrator` | `username`, `password` | `user_migrator` login (migrate init container) — random per cluster |
+| `secret/local/databases/platform-db/shipping-migrator` | `username`, `password` | `shipping_migrator` login — random per cluster |
+| `secret/local/databases/platform-db/notification-migrator` | `username`, `password` | `notification_migrator` login — random per cluster. The runtime's password is the static role `database/static-creds/notification-runtime` |
 | `secret/local/databases/platform-db/review-migrator` | `username`, `password` | `review_migrator` login (migrate init container) — random per cluster |
 | `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
 | `secret/local/databases/platform-db/keycloak` | `username`, `password` | Keycloak persistence role — RFC-0012 triplet in ns `platform` (`platform-db/services/keycloak.yaml`) + copy in ns `identity` (`platform-db-keycloak-secret-identity-ns.yaml`) |
 | `secret/local/databases/platform-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator — random per cluster; projected to `platform-db-vault-rotator-secret` for CNPG and the configurator Job |
-| `secret/local/databases/product-db/product` | `username`, `password` | CNPG bootstrap owner |
-| `secret/local/databases/product-db/cart` | `username`, `password` | CNPG cart owner |
-| `secret/local/databases/product-db/order` | `username`, `password` | CNPG order owner |
-| `secret/local/databases/product-db/payment` | `username`, `password` | CNPG payment owner — materialised in ns `payment` only (`product-db-payment-secret-payment-ns.yaml`); the product-side secret comes from the RFC-0012 triplet (`product-db/services/payment.yaml`) |
-| `secret/local/databases/product-db/inventory` | `username`, `password` | CNPG inventory owner — RFC-0012 triplet (`product-db/services/inventory.yaml`) + copy in ns `inventory` (`product-db-inventory-secret-inventory-ns.yaml`) |
-| `secret/local/databases/product-db/checkout` | `username`, `password` | CNPG checkout owner — RFC-0012 triplet (`product-db/services/checkout.yaml`) + copy in ns `checkout` (`product-db-checkout-secret-checkout-ns.yaml`) |
+| `secret/local/databases/platform-db/db-authz` | `username`, `password` | `db_authz` login (role catalog Job, pgroles) — random per cluster |
+| `secret/local/databases/product-db/db-authz` | `username`, `password` | `db_authz` login (role catalog Job, pgroles) — random per cluster |
+| `secret/local/databases/product-db/product` | `username`, `password` | bootstrap role `product` (NOLOGIN, no `pg_hba` line) — `product-db-secret`, CNPG `passwordSecret` only |
+| `secret/local/databases/product-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator for product-db — random per cluster; projected to `product-db-vault-rotator-secret` for CNPG and the configurator Job |
+| `secret/local/databases/product-db/product-migrator` | `username`, `password` | `product_migrator` login (migrate init container, role catalog Job) — random per cluster |
+| `secret/local/databases/product-db/cart-migrator` | `username`, `password` | `cart_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `cart` |
+| `secret/local/databases/product-db/order-migrator` | `username`, `password` | `order_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `order` |
+| `secret/local/databases/product-db/checkout-migrator` | `username`, `password` | `checkout_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `checkout` |
+| `secret/local/databases/product-db/payment-migrator` | `username`, `password` | `payment_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `payment` |
+| `secret/local/databases/product-db/inventory-migrator` | `username`, `password` | `inventory_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `inventory` |
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) — `payment-webhook-hmac` ExternalSecret, ns `payment` only (both workloads run there) |
 | `secret/local/auth/jwt-signing` | `private_key`, `public_key` | **orphaned** — zero consumers since auth-service retired (see note below); recorded cleanup candidate |
 | `secret/local/infra/rustfs/root` | `access_key`, `secret_key` | RustFS root creds — `rustfs-credentials` Secret in ns `rustfs` (`controllers/storage/rustfs/external-secret.yaml`) |
@@ -440,7 +446,7 @@ converted, the rest still use one path each.
 
 > **Note — `secret/local/services/payment/webhook-hmac`**: follows the standard 4-level `secret/{env}/{category}/{service}/{resource}` structure and is covered by the existing `eso-read` `local/services/*` grant. (It was briefly seeded at the 3-level `secret/local/payment/webhook-hmac`, which sat outside every `eso-read` prefix; renaming it into `local/services/*` fixed both the convention and the RBAC scope.)
 
-> ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `platform-edge-tls` is `homelab-ca`-issued, planned). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [OpenBAO initial setup](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+> ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `platform-edge-tls` is `homelab-ca`-issued, planned). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [OpenBAO initial setup](./runbooks/openbao-initial-setup.md#step-6--seed-bootstrap-only-cloudflare-token-operator).
 
 > **Note — `secret/local/auth/jwt-signing`**: the bootstrap still seeds this RS256
 > keypair, but auth-service is retired and its `auth-jwt-signing` ExternalSecret was
@@ -450,33 +456,52 @@ converted, the rest still use one path each.
 
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
-> **✅ Deployed — pattern-A static-role pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) records the pattern choice; [RFC-0008](../proposals/rfc/RFC-0008/) the roadmap).
-> The database secrets engine is **enabled** and serving one pilot role. Everything
-> below describing *per-request dynamic* roles or other services is still **planned** —
-> those services stay on KV v2 static credentials.
+> **✅ Deployed — pattern-A static roles on both clusters** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) records the pattern choice, [ADR-089](../proposals/adr/ADR-089-postgresql-access-contract/) the one-writer rule; [RFC-0008](../proposals/rfc/RFC-0008/) the roadmap).
+> The database secrets engine is **enabled** and rotates all ten service runtime
+> logins: four on platform-db and six on product-db. Everything below describing
+> *per-request dynamic* roles is still **planned**; migrators, `db_authz`, Temporal and
+> Keycloak stay on KV v2 static credentials.
 
-**What is deployed today.** The engine rotates the password of one *fixed* PostgreSQL
-role instead of minting per-request users:
+**What is deployed today.** The engine rotates the passwords of *fixed* PostgreSQL
+roles instead of minting per-request users:
 
 - The bootstrap pre-provisions the pieces the engine needs without root: the
   `db-configurator` policy + Kubernetes-auth role (bound to SA
-  `openbao-db-configurator`, ns `platform`) and an `eso-read` grant on
-  `database/static-creds/notification` (`openbao-bootstrap/configmap.yaml`).
-- The `openbao-db-config` Job (`configs/databases/clusters/platform-db/openbao-db-config.yaml`)
-  runs in the **databases wave** — after `platform-db` is up, because
-  `database/config` validates the live PG connection, which the bootstrap (secrets
-  wave) cannot. It logs in via Kubernetes auth (no root token), enables the engine,
-  reads its PostgreSQL administrator credential from the ESO-managed
-  `platform-db-vault-rotator-secret`, writes `database/config/platform-db`
-  (postgresql plugin, `allowed_roles=notification`), and creates static role
-  `notification` with `rotation_period=720h`.
+  `openbao-db-configurator` in ns `platform` and ns `product`) and `eso-read`
+  grants on `database/static-creds/<svc>-runtime` for all ten runtimes
+  (`openbao-bootstrap/configmap.yaml`).
+- One `openbao-db-config` Job per cluster
+  (`configs/databases/clusters/{platform-db,product-db}/openbao-db-config.yaml`),
+  each in its cluster's namespace so it reads its own `vault_rotator` Secret and
+  neither cluster can block the other. They run in the **databases wave** — after
+  the cluster is up, because `database/config` validates the live PG connection,
+  which the bootstrap (secrets wave) cannot. Each logs in via Kubernetes auth (no
+  root token), enables the engine, reads its PostgreSQL administrator credential
+  from the ESO-managed `<cluster>-vault-rotator-secret`, writes
+  `database/config/<cluster>` (postgresql plugin, `sslmode=require`,
+  `allowed_roles` its `<svc>-runtime` roles), and creates one static role per
+  runtime login with `rotation_period=720h`. `vault_rotator` holds `ADMIN` on
+  each runtime role (bootstrap SQL in `instance.yaml`), which is all
+  `ALTER ROLE … PASSWORD` needs.
 - ESO reads the rotated credential through a **second ClusterSecretStore `openbao-db`**
   (`configs/secrets/cluster-secret-store-db.yaml`): the default `openbao` store is
   pinned to the KV v2 mount, so this store uses `version: "v1"` with no `path` to read
-  the raw engine path `database/static-creds/notification` verbatim (KV-v2 semantics
+  the raw engine path `database/static-creds/<svc>-runtime` verbatim (KV-v2 semantics
   would insert `/data/` and 403).
-- The `platform-db-notification-secret` ExternalSecret (ns `notification`,
-  `refreshInterval: 1m`) materialises it for the service.
+- `<cluster>-<svc>-runtime-secret` ExternalSecrets (the cluster's namespace and
+  the service's namespace, `refreshInterval: 15s`) materialise it. The service mounts the Secret as
+  a directory and reads `DB_PASSWORD_FILE` on every new connection; its container has
+  no `DB_PASSWORD` env. The `DatabaseRole` has no `passwordSecret`, so OpenBAO is the
+  only writer.
+- **Rotation window.** OpenBAO changes the password in PostgreSQL at once; a pod
+  sees it after the ESO refresh (≤ 15 s) plus the kubelet's Secret-volume sync (up to
+  its sync period, 1 m by default). Open connections are unaffected; a *new*
+  connection inside that window fails authentication. Measured numbers live in the
+  ADR-089 history.
+
+The diagram draws platform-db. product-db is the same shape in namespace
+`product`: its own `vault_rotator`, `openbao-db-config` Job and
+`database/config/product-db` with six static roles.
 
 ```mermaid
 flowchart LR
@@ -484,18 +509,18 @@ flowchart LR
     adm["ExternalSecret → Secret<br/>platform-db-vault-rotator-secret<br/>(store openbao, ns platform)"]:::platform
     dbrole["DatabaseRole vault_rotator<br/>(CNPG sets its password)"]:::platform
     job["openbao-db-config Job<br/>(databases wave, k8s auth<br/>db-configurator — no root)"]:::platform
-    eng["database/config/platform-db<br/>static role notification<br/>rotation_period 720h"]:::platform
-    pg[("platform-db (CNPG)<br/>roles notification · vault_rotator")]:::data
+    eng["database/config/platform-db<br/>static roles notification · user<br/>shipping · review -runtime (720h)"]:::platform
+    pg[("platform-db (CNPG)<br/>&lt;svc&gt;_runtime · vault_rotator")]:::data
     store["ClusterSecretStore openbao-db<br/>(v1 — raw engine paths)"]:::platform
-    es["ExternalSecret<br/>platform-db-notification-secret<br/>(ns notification, 1m)"]:::service
+    es["ExternalSecrets<br/>platform-db-&lt;svc&gt;-runtime-secret<br/>(2 ns each, 15s)"]:::service
 
     kv --> adm
     adm -->|"passwordSecret"| dbrole
     dbrole --> pg
     adm -->|"admin credential (stdin)"| job
     job -->|"enable + configure"| eng
-    eng -->|"as vault_rotator (ADMIN on notification):<br/>ALTER ROLE ... PASSWORD (720h)"| pg
-    store -->|"read database/static-creds/notification"| eng
+    eng -->|"as vault_rotator (ADMIN on each runtime):<br/>ALTER ROLE ... PASSWORD (720h)"| pg
+    store -->|"read database/static-creds/&lt;svc&gt;-runtime"| eng
     es --> store
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
@@ -596,39 +621,47 @@ DROP ROLE IF EXISTS "{{name}}";
 
 ## 6. Database Credential Workflows
 
-> **⚠ Mixed state.** The `cart`/`order` owners are still created with hardcoded
-> passwords in CNPG `postInitSQL` (`instance.yaml`). An ExternalSecret for those
-> creds exists but is effectively **bypassed** — the same password is duplicated in
-> Git, so it is not a single source of truth and rotating it in OpenBAO would not
-> change the DB user. The "OpenBAO Solution" column below is the **planned** target;
-> per-request dynamic application users are not yet enabled — the deployed exception
-> is the `notification` static-role pilot (§5.2), whose password OpenBAO rotates.
+> **Current state.** No database password is in Git: migrator, `db_authz`,
+> `vault_rotator`, Temporal and Keycloak passwords are random per cluster in KV v2,
+> and OpenBAO rotates all ten service runtime passwords through static roles
+> (§5.2). Per-request dynamic application users (§6.2, §6.3 runtime part, §10) are
+> still **planned**.
 
-### 6.1 Current State Problems
+### 6.1 Original problems and how they were closed
+
+Historical: the problems below are the pre-RFC-0012 state that motivated this
+design. The right column says what is deployed today and what is still planned.
 
 ```mermaid
 flowchart TD
-    subgraph problem["Current Issues"]
+    subgraph problem["Original issues (historical)"]
         p1["❌ cart + order users\ncreated with hardcoded\nPASSWORD 'postgres'\nin postInitSQL"]
         p2["❌ All passwords = 'postgres'\nNo differentiation"]
         p3["❌ No rotation\nPasswords never change"]
         p4["❌ No team access\nDevs need DBA access\nto connect to DB"]
     end
 
-    subgraph solution["OpenBAO Solution"]
-        s1["✅ cart + order owners\nbacked by ExternalSecret\n(KV v2 static)"]
-        s2["✅ Application users\nare dynamic (1h TTL)\nv-k8s-{role}-{ts}"]
-        s3["✅ Auto-rotation\nESO refreshes (1h)\nOld user dropped"]
-        s4["✅ Team access\nDev team gets 8h creds\nData team gets read-only"]
+    subgraph solution["Resolution"]
+        s1["✅ deployed: owner, migrator, runtime\nroles per service (RFC-0029)\nno password in Git"]
+        s2["✅ deployed: random per-cluster\nKV passwords; runtime logins\nare static roles"]
+        s3["✅ deployed: static-role rotation\n720h, ESO refresh 15s"]
+        s4["planned: dev 8h creds\nand data-team read-only\n(OIDC itself is deployed)"]:::planned
     end
 
-    p1 -->|"Fix: CNPG managed.roles"| s1
-    p2 -->|"Fix: DB Engine + password policy"| s2
-    p3 -->|"Fix: Lease TTL + static role rotation"| s3
-    p4 -->|"Fix: OIDC + dynamic roles"| s4
+    p1 -->|"Fixed: DatabaseRole + catalog Job"| s1
+    p2 -->|"Fixed: random seeds + DB engine"| s2
+    p3 -->|"Fixed: static role rotation"| s3
+    p4 -.->|"planned: OIDC + dynamic roles"| s4
+
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 ```
 
-### 6.2 Database User Architecture
+### 6.2 Database User Architecture (planned end-state)
+
+**Planned** user model. Today the application user is the fixed
+`<svc>_runtime` login whose password a static role rotates (§5.2), and the
+owner is a `NOLOGIN` `<svc>_owner` that the migrator becomes at login
+([authorization](../databases/authorization.md)).
 
 ```mermaid
 erDiagram
@@ -674,77 +707,82 @@ erDiagram
 
 ### 6.3 CloudNativePG (product-db) — Credential Flow
 
+This sequence answers how a product-db runtime password is created and
+rotated today. platform-db follows the same steps in namespace `platform`.
+
 ```mermaid
 sequenceDiagram
     autonumber
     participant Flux as Flux (GitOps)
     participant BAO as OpenBAO
     participant ESO as ESO
+    participant Sec as Kubernetes Secrets
     participant CNPG as CloudNativePG Operator
-    participant PG as PostgreSQL
+    participant Cfg as openbao-db-config Job
+    participant PG as PostgreSQL (product-db)
+    participant App as Service pod
 
-    note over Flux,PG: Bootstrap Phase (cluster creation)
+    note over Flux,App: Bootstrap (cluster creation)
+    Flux->>ESO: Apply KV ExternalSecrets (bootstrap product, vault-rotator, db-authz, migrators)
+    ESO->>BAO: Read secret/local/databases/product-db/...
+    ESO->>Sec: Create basic-auth Secrets (cnpg.io/reload)
+    Flux->>CNPG: Apply Cluster product-db (initdb.secret product-db-secret)
+    CNPG->>PG: Runtime DatabaseRoles (attributes only), db_authz, vault_rotator, Databases
+    note over PG: The role catalog Job creates each owner and migrator
+    Flux->>Cfg: Apply Job in namespace product
+    Cfg->>BAO: Write database/config/product-db and six static roles (720h)
+    BAO->>PG: ALTER ROLE svc_runtime PASSWORD, as vault_rotator
 
-    Flux->>ESO: Apply ExternalSecret product-db-secret\n(namespace: product)
-    ESO->>BAO: Read secret/local/databases/product-db/product\n{username: product_owner, password: <strong>}
-    ESO->>K8s: Create K8s Secret product-db-secret
-    Flux->>CNPG: Apply Cluster product-db\nbootstrap.initdb.secret: product-db-secret
-    CNPG->>PG: CREATE DATABASE product OWNER product_owner
-    CNPG->>PG: CREATE DATABASE cart OWNER cart_owner  (via managed.roles)
-    CNPG->>PG: CREATE DATABASE "order" OWNER order_owner (via managed.roles)
+    note over Flux,App: Runtime
+    ESO->>BAO: Read database/static-creds/svc-runtime every 15 s
+    ESO->>Sec: Update product-db-svc-runtime-secret
+    Sec-->>App: kubelet refreshes the mounted file
+    App->>PG: New connection reads DB_PASSWORD_FILE (through PgDog, verify-full)
 
-    note over Flux,PG: Runtime Phase (ESO → dynamic creds)
-
-    ESO->>BAO: GET /v1/database/creds/product-app-rw
-    BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-{ts}" ...
-    BAO-->>ESO: {username, password, lease_id, ttl: 1h}
-    ESO->>K8s: Update Secret product-db-product-app-creds
-
-    note over Flux,PG: Rotation (every 1h refresh)
-
-    ESO->>BAO: GET /v1/database/creds/product-app-rw  (fresh)
-    BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-{new_ts}"
-    BAO-->>ESO: New credentials
-    ESO->>K8s: Update Secret
-    BAO->>PG: DROP ROLE "v-k8s-product-app-rw-{old_ts}"  (on old lease expiry)
+    note over Flux,App: Rotation (every 720h or bao write -f database/rotate-role/svc-runtime)
+    BAO->>PG: ALTER ROLE svc_runtime PASSWORD (new value)
+    ESO->>BAO: Next read returns the new password
+    ESO->>Sec: Update the Secret, the pod file follows
 ```
 
 ### 6.4 CloudNativePG (`platform-db`, `product-db`) — Credential Strategy
 
-Every cluster now runs on **CloudNativePG**, so credentials follow the same ESO-first
-pattern everywhere: owner/role passwords come from OpenBAO KV v2, synced by ESO, and
-each service's role + database are declared with the **RFC-0012 triplet** (`ExternalSecret`
-+ `DatabaseRole` + `Database`) that the operator applies. There are no operator-generated
-credential secrets to reconcile against.
+Every cluster now runs on **CloudNativePG**, so credentials follow the same
+pattern everywhere: runtime passwords come from the database engine's static
+roles, migrator, `db_authz`, `vault_rotator`, Temporal and Keycloak passwords from
+OpenBAO KV v2, all synced by ESO. Each service's runtime role and database are
+declared in its **RFC-0012 file** (`ExternalSecret`s + `DatabaseRole` + `Database`)
+that the operator applies; the owner and migrator roles come from the role catalog
+Job. There are no operator-generated credential secrets to reconcile against.
 
 > **Historical:** the retired Zalando operator managed its own K8s secrets
 > (`{user}.{cluster}.credentials.postgresql.acid.zalan.do`). The former `auth-db`,
 > `shared-db`, and `temporal-db` clusters were consolidated into **`platform-db`**
-> (RFC-0018). OpenBAO keeps **compat paths** `shared-db/*` for app credentials
-> (the `auth-db/*` seeds retired with auth-service); Temporal uses the new path
-> `platform-db/temporal`.
+> (RFC-0018). The `shared-db/*` compat paths were retired when the platform-db
+> services moved to the RFC-0029 roles; Temporal uses `platform-db/temporal`.
 
 ```mermaid
 flowchart LR
     subgraph cnpg_platform["platform-db (CloudNativePG)"]
-        p_shared["user / notification /\nshipping owners\n(compat: shared-db/*)"]
-        p_review["review runtime + migrator\n(platform-db/review-*)"]
+        p_shared["user / notification / shipping / review\nruntime: static-creds/svc-runtime\nmigrator: KV platform-db/svc-migrator"]
         p_temporal["temporal owner\n(platform-db/temporal)"]
         p_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 
     subgraph cnpg_product["product-db (CloudNativePG)"]
-        prod_owners["product / cart / order / payment owners\n(ExternalSecret → KV v2)"]
+        prod_owners["product / inventory / cart / order / checkout / payment\nruntime: static-creds/svc-runtime\nmigrator: KV product-db/svc-migrator"]
         prod_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 
     subgraph management["Management"]
-        eso_mgr["ESO\nsyncs owner creds from OpenBAO KV v2"]
+        eso_mgr["ESO\nKV v2 (1h) + database static-creds (15s)"]
+        bao_db["OpenBAO database engine\nrotates runtime passwords (720h)"]
         cnpg_op["CloudNativePG Operator\napplies Database + DatabaseRole CRDs"]
     end
 
     eso_mgr --> p_shared & p_temporal & prod_owners
     cnpg_op --> p_roles & prod_roles
+    bao_db -->|"ALTER ROLE as vault_rotator"| p_shared & prod_owners
 ```
 
 ---
@@ -799,7 +837,7 @@ spec:
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
-      type: Opaque
+      type: kubernetes.io/basic-auth   # CNPG requires basic-auth for passwordSecret
       metadata:
         labels:
           cnpg.io/reload: "true"    # Triggers CNPG to reload on rotation
@@ -819,17 +857,20 @@ spec:
 ```mermaid
 flowchart TD
     subgraph eso_flow["ESO Reconciliation Loop"]
-        trigger["Timer: refreshInterval elapsed\n(default: 1h)"]
+        trigger["Timer: refreshInterval elapsed\n(KV 1h · database static-creds 15s)"]
         auth["Authenticate to OpenBAO\nvia K8s SA token → Vault token"]
-        read["Read secret from OpenBAO\n(KV or dynamic DB creds)"]
+        read["Read secret from OpenBAO\n(KV v2 or database static-creds)"]
         compare["Compare hash with\nexisting K8s Secret"]
         update["Update K8s Secret\n(if changed)"]
-        reload["Trigger reload label\n(cnpg.io/reload: true)"]
+        reload["CNPG reloads a passwordSecret\nwith cnpg.io/reload: true\n(db_authz, vault_rotator)"]
+        file["kubelet refreshes a mounted\nruntime Secret · pod reads\nDB_PASSWORD_FILE"]
         nochange["No-op\n(secret unchanged)"]
     end
 
     trigger --> auth --> read --> compare
-    compare -->|"Changed"| update --> reload
+    compare -->|"Changed"| update
+    update -->|"KV Secret CNPG consumes"| reload
+    update -->|"runtime Secret"| file
     compare -->|"Same"| nochange
 ```
 
@@ -852,7 +893,7 @@ flowchart TD
     end
 
     subgraph service["Service Policies"]
-        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/static-creds/notification\nUsed by: ESO K8s auth role"]
+        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/static-creds/svc-runtime (10)\nUsed by: ESO K8s auth role"]
         svc_product["service-product\nRead database/creds/product-app-rw\nUsed by: product SA (future direct auth)"]
     end
 
@@ -893,10 +934,13 @@ path "secret/data/local/auth/*" {
 path "secret/metadata/local/auth/*" {
   capabilities = ["read", "list"]
 }
-# Database engine static-role pilot (ADR-025) — the only database/ grant today
-path "database/static-creds/notification" {
+# Database engine static roles (ADR-025, ADR-089): one read grant per runtime,
+# ten in all (notification, user, shipping, review, product, inventory, cart,
+# order, checkout, payment)
+path "database/static-creds/notification-runtime" {
   capabilities = ["read"]
 }
+# ... one block per remaining <svc>-runtime
 
 # dev-team-rw: Developer policy with identity templating
 path "secret/data/local/services/{{identity.entity.name}}/*" {
@@ -982,9 +1026,8 @@ bao lease revoke -prefix database/creds/product-app-rw/
 
 A custom password policy can enforce strength requirements for dynamically
 generated credentials. **Reference — not deployed:** no manifest writes
-`db-strong` and no role sets `password_policy`. Today the one dynamic
-credential (notification) uses OpenBAO's default generator (letters, digits,
-`-`).
+`db-strong` and no role sets `password_policy`. Today the ten runtime static
+roles use OpenBAO's default generator (letters, digits, `-`).
 
 > [!WARNING]
 > Do not wire this policy (or any symbol set with `%`, `@`, `#`, `&`, `=`,
@@ -1120,8 +1163,8 @@ Operational commands are kept out of this architecture document so the learning 
 | `kubernetes/infra/configs/secrets/cluster-secret-store.yaml` | ClusterSecretStore (openbao — KV v2 mount) |
 | `kubernetes/infra/configs/secrets/cluster-secret-store-db.yaml` | ClusterSecretStore (openbao-db — raw `database/` engine paths, v1 semantics) |
 | `kubernetes/infra/configs/secrets/payment-webhook-external-secrets.yaml` | `payment-webhook-hmac` ExternalSecret (ns payment) |
-| `kubernetes/infra/configs/databases/clusters/platform-db/openbao-db-config.yaml` | `openbao-db-config` Job — enables DB engine + static role `notification` (ADR-025 pilot) |
-| `kubernetes/infra/configs/databases/clusters/platform-db/vault-rotator.yaml` | ESO credential projection + CNPG `DatabaseRole` for the database-engine administrator |
+| `kubernetes/infra/configs/databases/clusters/{platform-db,product-db}/openbao-db-config.yaml` | `openbao-db-config` Job + ServiceAccount per cluster — enables the DB engine, writes `database/config/<cluster>` and the cluster's runtime static roles (ADR-025, ADR-089) |
+| `kubernetes/infra/configs/databases/clusters/{platform-db,product-db}/vault-rotator.yaml` | ESO credential projection + CNPG `DatabaseRole` for each cluster's database-engine administrator |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/` | ClusterExternalSecret definitions |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` | `ExternalSecret` (per-namespace) for cert-manager DNS-01 — file lives in CES dir but is `kind: ExternalSecret` since cert-manager only needs the Secret in one namespace |
 | `kubernetes/infra/configs/databases/clusters/*/secrets/` | Per-cluster ExternalSecret definitions |

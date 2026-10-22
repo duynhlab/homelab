@@ -1,6 +1,6 @@
 # platform-db — consolidated CNPG cluster (RFC-0018).
 # Merges auth-db + shared-db + temporal-db persistence.
-# App databases: user, notification, shipping, review (RFC-0012 triplets);
+# App databases: user, notification, shipping, review (three roles each, ADR-088);
 # temporal + temporal_visibility (Temporal server, direct :5432);
 # keycloak (identity provider, direct :5432 — RFC-0022 / RFC-0024 P1).
 # HA: 3 instances, quorum sync ANY 1 (either standby acknowledges).
@@ -12,6 +12,11 @@ metadata:
   namespace: platform
 spec:
   instances: 3
+  # ADR-089: serve the homelab-ca certificate (server-tls.yaml); the operator
+  # keeps managing the replication client certificates.
+  certificates:
+    serverTLSSecret: platform-db-server-tls
+    serverCASecret: platform-db-server-tls
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   plugins:
@@ -26,26 +31,50 @@ spec:
       synchronizeLogicalDecoding: true
 
   postgresql:
+    # pg_stat_ch image-volume extension — same image and reasoning as
+    # product-db/instance.yaml; move the reference on both clusters together.
+    extensions:
+      - name: pg_stat_ch
+        image:
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:0a7595c74478972efc25b43c79cd5c6f7b9f35decb793f22d7722bb3caed6c7b
+
     shared_preload_libraries:
       - pgaudit
       - pg_stat_statements
       - auto_explain
+      - pg_stat_ch
 
     pg_hba:
-      - host user         user         all scram-sha-256
-      - host notification notification all scram-sha-256
-      - host shipping     shipping     all scram-sha-256
-      # review: runtime and migrator only; review_owner never logs in (RFC-0029).
-      - host review       review_runtime  all scram-sha-256
-      - host review       review_migrator all scram-sha-256
+      # Each app database admits its runtime and migrator only; <svc>_owner
+      # never logs in (RFC-0029, docs/databases/authorization.md). hostssl:
+      # PgBouncer and migrate both verify this server (ADR-089), so a
+      # plaintext login falls through to the reject.
+      - hostssl user         user_runtime          all scram-sha-256
+      - hostssl user         user_migrator         all scram-sha-256
+      - hostssl notification notification_runtime  all scram-sha-256
+      - hostssl notification notification_migrator all scram-sha-256
+      - hostssl shipping     shipping_runtime      all scram-sha-256
+      - hostssl shipping     shipping_migrator     all scram-sha-256
+      - hostssl review       review_runtime        all scram-sha-256
+      - hostssl review       review_migrator       all scram-sha-256
+      # db_authz applies the role catalog in `postgres` and each service's
+      # in-database grants, as the Job or as pgroles (ADR-088). One line per
+      # database it manages.
+      - hostssl postgres     db_authz     all scram-sha-256
+      - hostssl user         db_authz     all scram-sha-256
+      - hostssl notification db_authz     all scram-sha-256
+      - hostssl shipping     db_authz     all scram-sha-256
+      - hostssl review       db_authz     all scram-sha-256
+      # Still `host` (#1296): Temporal connects in plaintext, Keycloak and
+      # OpenBAO encrypt without verifying the server.
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
       # Keycloak connects direct to :5432 like temporal — its Agroal pool needs
       # long-lived connections + server-side prepared statements, which the
       # transaction pooler breaks (RFC-0022 OQ#8 / ADR-041).
       - host keycloak            keycloak all scram-sha-256
-      # RFC-0008 / ADR-025 pilot: OpenBAO's rotation admin connects to the
-      # notification DB to ALTER notification's password (static-role rotation).
+      # ADR-025: OpenBAO's rotation admin connects to the notification DB
+      # (sslmode=require) to ALTER the four runtime passwords.
       - host notification        vault_rotator all scram-sha-256
       - host all                 all      all reject
 
@@ -108,6 +137,17 @@ spec:
       # JSON (Plan / Query Text / Planning Time keys) — the PG default `text`
       # sends every plan to the pg_parse_failures debug sink instead.
       auto_explain.log_format: "json"
+      # pg_stat_ch — see product-db/instance.yaml for the credential and sizing
+      # reasoning; the password is Flux-substituted, never a literal.
+      pg_stat_ch.clickhouse_host: "clickhouse-clickhouse.monitoring.svc.cluster.local"
+      pg_stat_ch.clickhouse_port: "9000"
+      pg_stat_ch.clickhouse_user: "pg_stat_ch"
+      pg_stat_ch.clickhouse_password: "${PG_STAT_CH_CLICKHOUSE_PASSWORD}"
+      pg_stat_ch.clickhouse_database: "pg_stat_ch"
+      pg_stat_ch.queue_capacity: "8192"
+      pg_stat_ch.string_area_size: "16"
+      pg_stat_ch.flush_interval_ms: "1000"
+      pg_stat_ch.batch_max: "8192"
       hot_standby_feedback: "on"
       sync_replication_slots: "on"
 
@@ -118,10 +158,11 @@ spec:
 
   bootstrap:
     initdb:
-      database: user
-      owner: user
-      secret:
-        name: platform-db-user-secret
+      # A neutral bootstrap database: every service database is a Database CR
+      # owned by a catalog role (ADR-088). An initdb-created service owner would
+      # be created by the superuser, which authz_admin cannot administer.
+      database: platform
+      owner: platform
       dataChecksums: true
       walSegmentSize: 64
       encoding: "UTF8"
@@ -131,21 +172,30 @@ spec:
         - CREATE ROLE temporal WITH LOGIN
         - CREATE DATABASE temporal OWNER temporal
         - CREATE DATABASE temporal_visibility OWNER temporal
-        # RFC-0008 / ADR-025 pattern-A pilot (notification): pre-create the
-        # notification role (the DatabaseRole CR then adopts it, same as
-        # temporal above) and a least-privilege rotation admin so OpenBAO can
-        # rotate notification's password. PG18 requires ADMIN OPTION on the
-        # target role (not bare CREATEROLE); postInitSQL runs as the initdb
-        # superuser, so the GRANT is done here (no persistent superuser access).
-        - CREATE ROLE notification WITH LOGIN
+        # ADR-025 pattern A: OpenBAO rotates every runtime password through
+        # vault_rotator, which needs ADMIN OPTION on each (PG18). The roles are
+        # created here so the GRANTs can carry ADMIN; the DatabaseRole CRs then
+        # adopt them.
+        - CREATE ROLE notification_runtime WITH LOGIN
+        - CREATE ROLE user_runtime WITH LOGIN
+        - CREATE ROLE shipping_runtime WITH LOGIN
+        - CREATE ROLE review_runtime WITH LOGIN
         # Password and ordinary attributes converge through DatabaseRole from a
         # per-cluster OpenBAO value. SQL retains only the ADMIN OPTION that the
         # DatabaseRole API cannot express or audit.
         - CREATE ROLE vault_rotator WITH LOGIN CREATEROLE NOINHERIT
         # ALTER ROLE needs CREATEROLE plus ADMIN on the target. INHERIT/SET are
         # deliberately false: the administrator rotates a credential but must
-        # not inherit notification data access or become the notification role.
-        - GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        # not inherit the runtime's data access or become it.
+        - GRANT notification_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT user_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT shipping_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        - GRANT review_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        # Creator of every catalog role (ADR-088). Unmanaged by CNPG on purpose:
+        # CNPG revokes undeclared memberships of the roles it manages, and this
+        # role is a member of every role it creates. db_authz reaches it via SET
+        # ROLE. An existing cluster runs this once by hand (runbook).
+        - CREATE ROLE authz_admin NOLOGIN CREATEROLE INHERIT
 
   storage:
     size: 10Gi

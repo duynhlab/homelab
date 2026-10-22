@@ -54,7 +54,7 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-083     # 83 records; status per record in the ADR index
+│   │   └── ADR-001 … ADR-088     # 89 records; status per record in the ADR index
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
@@ -90,7 +90,8 @@ docs/
 │   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)
 │   │       ├── README.md
 │   │       ├── builtin-metrics.md
-│   │       └── custom-metrics.md
+│   │       ├── custom-metrics.md
+│   │       └── query-telemetry.md  # pg_stat_ch per-execution events in ClickHouse
 │   ├── tracing/                  # Pillar 2: Distributed Tracing
 │   │   ├── README.md             # Tracing guide (VictoriaTraces + OTel)
 │   │   ├── architecture.md       # Trace topology: VictoriaTraces + ClickHouse
@@ -245,7 +246,9 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 
 3. **[PostgreSQL metrics hub](./observability/metrics/postgresql/README.md)** - CNPG custom queries, workflows, signal guides
 
-4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (36 alert files + a plan-regression guide)
+4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (41 alert files + a plan-regression guide)
+
+4a. **[PostgreSQL query telemetry](./observability/metrics/postgresql/query-telemetry.md)** - Per-execution events from pg_stat_ch in ClickHouse: percentiles over time, errors, top statements
 
 4b. **[Microservices alert runbooks](./observability/runbooks/microservices/README.md)** - Per-alert RED/Golden investigation (50 files) + cross-signal workflows and threshold tuning
 
@@ -353,7 +356,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 2. **[PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md)** - Backup and restore procedures (CNPG Barman)
 3. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 4. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
-5. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+5. **[Rotate a service database password](./databases/runbooks/rotate-cnpg-service-password.md)** - Automatic OpenBAO rotation, forcing it, emergency rotation, migrators
 6. **[Rotate the OpenBAO database administrator](./databases/runbooks/rotate-vault-rotator-credential.md)** - Pre-seed, converge, and prove revocation of `vault_rotator`
 6. **[Pooler operations](./databases/runbooks/pooler-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
@@ -460,7 +463,8 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Restore & Failover Drills](./databases/runbooks/restore-and-failover-drills.md) - Drill cadence, roles, and evidence log
 - [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - Planned roadmap to independent failure domains
 - [Declarative Role & Database Management](./databases/declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
-- [Database Authorization](./databases/authorization.md) - Owner / migrator / runtime roles per service, naming, migration contract and gates (RFC-0029; conventions accepted, not deployed)
+- [Database Authorization](./databases/authorization.md) - Owner / migrator / runtime roles per service, applied by the platform (role catalog Job and pgroles); services receive credentials only (RFC-0029, ADR-088; every service on both clusters)
+- [RFC-0029 access contract](./proposals/rfc/RFC-0029/) - Planned direct migration, pooled consumers, verified TLS and workload attribution; current routing remains in the database architecture guide.
 - [PostgreSQL Further Reading](./databases/reference/further-reading.md) - Curated external references
 - [PostgreSQL internals learning path](./databases/fundamentals/README.md) - Fourteen explanation-first chapters from processes through capacity, grounded in the deployed CNPG clusters with read-only evidence labs
 - [PostgreSQL observability and troubleshooting](./databases/observability-and-troubleshooting.md) - Symptom-to-evidence-to-runbook map
@@ -479,7 +483,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, and trust-manager CA bundle distribution (§11)
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
-- [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
+- [Git Branching & Release](./platform/gitflow.md) - Microservice target model (dev/uat/main + immutable tags); homelab conventions live in the [git-commits skill](../.agents/skills/git-commits/SKILL.md)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Envoy Gateway](./platform/envoy-gateway.md) - The platform edge: Gateway API resource model, policy attachment, Kubernetes vs standalone providers, edge JWT, and the telemetry the proxy itself produces
 - [Worker Autoscaling](./platform/worker-autoscaling.md) - How a versioned Temporal worker gets its replica count (KEDA + Worker Controller), and five mechanics a Kind drill exposed: the two-writer replica trap, API-poll vs scrape latency, the 17-series backlog metric, why `up == 0` cannot see a vanished target, and sunset delays that add
@@ -515,7 +519,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md) - Backup and restore procedures
 - [Logging troubleshooting](./observability/logging/vector.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
-- [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
+- [Rotate a service database password](./databases/runbooks/rotate-cnpg-service-password.md) - Automatic, forced and emergency rotation
 
 ---
 
@@ -536,7 +540,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - VictoriaTraces + ClickHouse (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
-- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for the production edge (**planned** — no production cluster yet); self-signed `homelab-ca` signs the local (Kind) edge certificate and is distributed via trust-manager `homelab-ca-bundle`; internal TLS on it is **planned** (RFC-0020)
+- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for the production edge (**planned** — no production cluster yet); self-signed `homelab-ca` signs the local (Kind) edge certificate and is distributed via trust-manager `homelab-ca-bundle`; it also signs the PostgreSQL server and pooler certificates, which every service database hop verifies (ADR-089); other internal TLS on it is **planned** (RFC-0020)
 - **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster
 
 ---
@@ -544,4 +548,5 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 ## Additional Resources
 
 - **[AGENTS.md](../AGENTS.md)** - AI agent guide for navigating the codebase
+- **[Git commits](../.agents/skills/git-commits/SKILL.md)** - Homelab commit messages, squash messages and branch names
 - **[README.md](../README.md)** - Project overview and quick start

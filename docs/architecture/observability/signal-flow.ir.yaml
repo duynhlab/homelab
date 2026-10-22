@@ -4,6 +4,12 @@
 # (service.pipelines, exporter endpoints, the otlp/vector receiver), controllers/logging/vector/vector.yaml
 # (sinks victorialogs_all + otel_clickhouse), the OpenBao ServiceMonitor, the VMSingle/VLSingle/VTSingle
 # retentionPeriod, the Pyroscope compactor retention and the clickhouse-schema DDL TTL.
+# Re-verified on 2026-10-19 (repository review, no cluster): the collector HelmRelease and its
+# Service live in the monitoring namespace (Vector's sink URI ...monitoring.svc:4319), RustFS in
+# the rustfs namespace; added the pg_stat_ch path -- product-db and platform-db preload the
+# extension and INSERT into ClickHouse database pg_stat_ch over native :9000 (instance.yaml,
+# clickhouse-schema Job DATABASES="otel pg_stat_ch", docs/observability/metrics/postgresql/
+# query-telemetry.md: events_raw 7 d hot -> cold, 90 d). Retentions and pipelines unchanged.
 diagram:
   id: signal-flow
   title: "duynhlab homelab — Observability signal flow and retention"
@@ -28,38 +34,40 @@ layers: [producers, receiver, pipelines, derived, ingest, stores, cold, view]
 boundaries:
   - {id: f_cluster, label: "Kind cluster · homelab"}
   - {id: f_src, label: "Producers", parent: f_cluster}
-  - {id: f_col, label: "OTel Collector (tracing namespace)", parent: f_cluster}
-  - {id: f_store, label: "Storage (monitoring namespace)", parent: f_cluster}
+  - {id: f_col, label: "OTel Collector (monitoring namespace)", parent: f_cluster}
+  - {id: f_store, label: "Stores (monitoring namespace)", parent: f_cluster}
+  - {id: f_rustfs, label: "rustfs namespace", parent: f_cluster}
 
 nodes:
-  # Listed in the order dot starts from: the fewest crossings (8) of ~600
-  # orderings measured with validate.py on 2026-09-29, with pin_order off.
-  - {id: pyrosdk, label: "Same Go processes\nPyroscope SDK", role: service, layer: producers, parent: f_src, icon: go}
+  # Listed in the order dot starts from: the fewest crossings (8) of ~460
+  # random orderings measured with validate.py on 2026-10-19, with pin_order off.
+  - {id: pgch, label: "product-db · platform-db\npg_stat_ch extension", role: data, layer: producers, parent: f_src, icon: postgresql}
   - {id: targets, label: "Scrape targets\nkube-state-metrics · cAdvisor\nCNPG · Temporal · OpenBao", role: platform, layer: producers, parent: f_src}
   - {id: svc, label: "Go services ×10 · 2 workers · mockpay\ntraces · metrics · logs", role: service, layer: producers, parent: f_src, icon: go}
-  - {id: vector, label: "Vector DaemonSet\nother pods' stdout · OpenBao audit", role: collector, layer: producers, parent: f_src}
+  - {id: vector, label: "Vector DaemonSet\nother pods' stdout · OpenBao audit", role: collector, layer: producers, parent: f_src, icon: vector}
+  - {id: pyrosdk, label: "Same Go processes\nPyroscope SDK", role: service, layer: producers, parent: f_src, icon: go}
   - {id: edge, label: "Envoy Gateway\nedge spans · access logs", role: edge, layer: producers, parent: f_src, icon: envoy}
 
   - {id: otel_vec, label: "otlp/vector receiver\nHTTP :4319 · Vector only", role: collector, layer: receiver, parent: f_col, icon: opentelemetry}
   - {id: otel, label: "OTLP receiver\ngRPC :4317 · HTTP :4318", role: collector, layer: receiver, parent: f_col, icon: opentelemetry}
 
   - {id: p_traces, label: "traces\nmemory_limiter · transform/privacy · batch", role: trace, layer: pipelines, parent: f_col}
-  - {id: p_metrics, label: "metrics\nmemory_limiter · delta_to_cumulative", role: metric, layer: pipelines, parent: f_col}
-  - {id: p_logsch, label: "logs/clickhouse\nprivacy · k8sattributes (all logs)", role: log, layer: pipelines, parent: f_col}
-  - {id: p_logsvec, label: "logs/vector\nprivacy · ClickHouse only", role: log, layer: pipelines, parent: f_col}
   - {id: p_logs, label: "logs\ndrop edge access logs · privacy · k8sattributes", role: log, layer: pipelines, parent: f_col}
+  - {id: p_metrics, label: "metrics\nmemory_limiter · delta_to_cumulative", role: metric, layer: pipelines, parent: f_col}
+  - {id: p_logsvec, label: "logs/vector\nprivacy · ClickHouse only", role: log, layer: pipelines, parent: f_col}
+  - {id: p_logsch, label: "logs/clickhouse\nprivacy · k8sattributes (all logs)", role: log, layer: pipelines, parent: f_col}
 
   - {id: p_span, label: "metrics/spanmetrics\nspan_metrics connector · RED per span", role: metric, layer: derived, parent: f_col}
 
   - {id: vmagent, label: "vmagent\nscrape · OTLP ingest · remote write", role: metric, layer: ingest, parent: f_store, icon: victoriametrics}
 
   - {id: vm, label: "VictoriaMetrics (VMSingle)\n7 d", role: metric, layer: stores, parent: f_store, icon: victoriametrics}
-  - {id: ch, label: "ClickHouse otel_traces · otel_logs\n7 d hot, cold volume, deleted at 90 d", role: data, layer: stores, parent: f_store, icon: clickhouse}
-  - {id: vt, label: "VictoriaTraces\n7 d", role: trace, layer: stores, parent: f_store, icon: victoriametrics}
+  - {id: ch, label: "ClickHouse otel_traces · otel_logs\npg_stat_ch.events_raw\n7 d hot, cold volume, deleted at 90 d", role: data, layer: stores, parent: f_store, icon: clickhouse}
   - {id: vl, label: "VictoriaLogs\n7 d", role: log, layer: stores, parent: f_store, icon: victoriametrics}
+  - {id: vt, label: "VictoriaTraces\n7 d", role: trace, layer: stores, parent: f_store, icon: victoriametrics}
   - {id: pyro, label: "Pyroscope\n7 d (168 h)", role: profile, layer: stores, parent: f_store, icon: pyroscope}
 
-  - {id: rustfs, label: "RustFS buckets\nclickhouse-otel · pyroscope-profiles", role: data, layer: cold, parent: f_store, shape: datastore}
+  - {id: rustfs, label: "RustFS buckets\nclickhouse-otel · pyroscope-profiles", role: data, layer: cold, parent: f_rustfs, shape: datastore}
 
   - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_cluster, icon: grafana}
 
@@ -85,6 +93,7 @@ edges:
   - {id: b_vecotlp, source: vector, target: otel_vec, type: telemetry, signal: log, label: "OTLP/HTTP"}
   - {id: r_logsvec, source: otel_vec, target: p_logsvec, type: telemetry, signal: log}
   - {id: x_chv, source: p_logsvec, target: ch, type: telemetry, signal: log}
+  - {id: b_pgch, source: pgch, target: ch, type: telemetry, label: "native :9000"}
   - {id: b_pyro, source: pyrosdk, target: pyro, type: telemetry, signal: profile, label: "SDK push"}
   - {id: s_vm, source: vmagent, target: vm, type: telemetry, signal: metric, label: "remote write"}
 
@@ -100,7 +109,7 @@ edges:
 notes:
   - id: note
     title: "Retention"
-    text: "VictoriaMetrics, VictoriaLogs, VictoriaTraces and Pyroscope keep 7 days. ClickHouse keeps the same traces and logs for 90 days (7 days on the hot volume, then the RustFS cold volume), which is where a question older than a week goes. Edge access logs reach ClickHouse only: the VictoriaLogs pipeline drops them. Vector writes each pod line twice on purpose — straight to VictoriaLogs and, through its own otlp/vector receiver, to ClickHouse — so the shared OTLP receiver never routes those lines into VictoriaLogs a second time. Every arrow into Grafana is a query, one datasource per backend."
+    text: "VictoriaMetrics, VictoriaLogs, VictoriaTraces and Pyroscope keep 7 days. ClickHouse keeps the same traces and logs for 90 days (7 days on the hot volume, then the RustFS cold volume), which is where a question older than a week goes. Edge access logs reach ClickHouse only: the VictoriaLogs pipeline drops them. Vector writes each pod line twice on purpose — straight to VictoriaLogs and, through its own otlp/vector receiver, to ClickHouse — so the shared OTLP receiver never routes those lines into VictoriaLogs a second time. product-db and platform-db bypass the collector: their pg_stat_ch extension inserts one event per statement straight into ClickHouse (database pg_stat_ch, same 7 / 90-day tiering). Every arrow into Grafana is a query, one datasource per backend."
 
 tests:
   - {rule: telemetry-has-destination}

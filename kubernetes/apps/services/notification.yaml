@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: notification
-    image_tag: "2.4.1" # {"$imagepolicy": "flux-system:notification:tag"}
+    image_tag: "2.4.4" # {"$imagepolicy": "flux-system:notification:tag"}
     namespace: notification
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -20,8 +20,12 @@ spec:
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
     db_port: "5432"
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
-    db_secret: "platform-db-notification-secret"
-    db_sslmode: "disable"
+    db_runtime_secret: "platform-db-notification-runtime-secret"
+    db_migrator_secret: "platform-db-notification-migrator-secret"
+    # ADR-089: TLS to PgBouncer, and from migrate to the primary, verified
+    # against the CA in db_ca_secret.
+    db_sslmode: "verify-full"
+    db_ca_secret: "platform-db-ca-trust"
     pool_max: "30"
     # RFC-0008 / ADR-025 pattern A: presence of this input makes the domain
     # template mount the DB Secret as a directory and set DB_PASSWORD_FILE, so

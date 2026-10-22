@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: review
-    image_tag: "2.5.0" # {"$imagepolicy": "flux-system:review:tag"}
+    image_tag: "2.6.4" # {"$imagepolicy": "flux-system:review:tag"}
     namespace: review
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -22,5 +22,11 @@ spec:
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
     db_runtime_secret: "platform-db-review-runtime-secret"
     db_migrator_secret: "platform-db-review-migrator-secret"
-    db_sslmode: "disable"
+    # ADR-089: TLS to PgBouncer, and from migrate to the primary, verified
+    # against the CA in db_ca_secret.
+    db_sslmode: "verify-full"
+    db_ca_secret: "platform-db-ca-trust"
+    # ADR-025 pattern A: the runtime reads its rotated password from this file
+    # (OpenBAO static role → ESO → mounted Secret), never from the env.
+    db_password_file: "/etc/db/secret/password"
     pool_max: "30"

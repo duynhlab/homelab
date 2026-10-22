@@ -103,7 +103,12 @@ export const IDENTITIES = {
     { username: 'carol', password: 'password123' },
     { username: 'david', password: 'password123' },
   ],
-  staff: [{ username: 'duyne', password: 'p@ss1234' }],
+  // duyne-viewer signs in to the staff realm but holds no realm role: the
+  // identity behind every "valid staff token, wrong role → 403" assertion.
+  staff: [
+    { username: 'duyne', password: 'p@ss1234' },
+    { username: 'duyne-viewer', password: 'p@ss1234' },
+  ],
 };
 
 export function identityFor(kind, index) {

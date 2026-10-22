@@ -49,6 +49,7 @@ sources:
       - local-stack-checkout-1
       - local-stack-checkout-worker-1
       - local-stack-inventory-1
+      - local-stack-analytics-1
       - local-stack-gateway-1
 
 transforms:

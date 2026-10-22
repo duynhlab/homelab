@@ -8,10 +8,11 @@
 # answer: an explicit FQDN endpoint, resolved by Envoy through the Compose
 # network's DNS, where the hostname IS the compose service name.
 #
-# Nine backends for ten services: `inventory` is gRPC-only (inventory.v1,
+# Ten backends for eleven services: `inventory` is gRPC-only (inventory.v1,
 # :9090) and has never been reachable from the edge — order, checkout and
 # product dial it east-west. `mockpay` likewise: it calls IN to the edge webhook
-# route, it is never a route target. There is no identity backend either — the
+# route, it is never a route target. `analytics` (RFC-0030) is routed for its
+# protected audience only. There is no identity backend either — the
 # realm is reached by the browser directly, and by the edge only for its JWKS.
 #
 # Every application container listens on 8080 (PORT in x-svc-env).
@@ -35,6 +36,18 @@ spec:
   endpoints:
     - fqdn:
         hostname: inventory
+        port: 8080
+---
+# analytics (RFC-0030 / ADR-069): the read-only commerce overview, protected
+# audience only; it has no public or private surface.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: analytics
+spec:
+  endpoints:
+    - fqdn:
+        hostname: analytics
         port: 8080
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1

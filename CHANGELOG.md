@@ -694,6 +694,11 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **PgDog runs without a CPU limit** (was 200m), as the rest of the platform;
+  `cpu: null` drops the chart's 1000m default. During a roll the new pods were
+  throttled through the login burst. Measured on Kind: no more throttling, but
+  the roll's checkout timeouts did not drop (#1350 stays open).
+
 - **A fresh bring-up no longer stalls on the authz policies.** `db_authz` had
   `CONNECTION LIMIT 10`, but pgroles keeps about three idle connections per
   PostgresPolicy. product-db's six policies needed ~18, so the last ones failed

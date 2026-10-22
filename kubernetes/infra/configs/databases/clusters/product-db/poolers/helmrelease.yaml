@@ -154,7 +154,9 @@ spec:
         cpu: 50m
         memory: 64Mi
       limits:
-        cpu: 200m
+        # No CPU limit, as elsewhere: throttling hit the login burst of a roll (#1350).
+        # null drops the chart's 1000m default; omitting the key would keep it.
+        cpu: null
         memory: 128Mi
 
     serviceMonitor:

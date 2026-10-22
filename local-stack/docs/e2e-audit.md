@@ -1717,7 +1717,7 @@ FOUND=$(curl -s "$CH" -u default:otel --data-binary "
   WHERE Timestamp > now() - INTERVAL 45 MINUTE
     AND ServiceName NOT IN ('user','product','inventory','cart','order','review',
                             'shipping','notification','payment','checkout','mockpay',
-                            'order-worker','checkout-worker','keycloak')
+                            'order-worker','checkout-worker','keycloak','analytics')
   FORMAT TSV" | tr -d '[:space:]')
 echo "C2 discovered edge service.name: '${FOUND:-<none>}' (expected '$EDGE')"
 [ -n "$FOUND" ] || echo "C2 FAIL: the edge is emitting no spans — run the isolation steps below"
@@ -1867,7 +1867,7 @@ for q in 'sum(http_server_request_duration_seconds_count)' \
   curl -s "$VM" --data-urlencode "query=$q" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
       v=float(r[0]['value'][1]) if r else 0; \
-      ok = v == 13 if '$q'.startswith('count(go_') else v > 0; \
+      ok = v == 14 if '$q'.startswith('count(go_') else v > 0; \
       print('C8', '$q', '=>', ('OK %g' if ok else 'FAIL %g') % v)"
 done
 # The `inventory` row carries weight beyond itself: inventory is gRPC-only with no

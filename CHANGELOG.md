@@ -231,6 +231,15 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **Opt-in stale reads through PgDog** (#1304). PgDog runs
+  `read_write_split = "prefer_primary"` with `ban_replica_lag = 2000`; the
+  `product` database lists `product-db-ro`, and product-service reads related
+  products from it (`DB_READ_REPLICA=true`, startup option
+  `-c pgdog.role=replica`). Everything else stays on the primary. A banned
+  replica falls back to the primary. The PgDog reload sidecar now also
+  reloads `pgdog.toml` and `users.toml`, so a config change reaches running
+  pods without a roll.
+
 - **A PgDog certificate renewal reloads in place instead of rolling** (#1350).
   The HelmRelease no longer copies `tls.crt` into a pod annotation; a
   `tls-reload` sidecar (PgDog's own image, added through `postRenderers` with

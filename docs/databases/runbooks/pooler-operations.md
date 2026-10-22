@@ -57,8 +57,10 @@ before expiry). A renewal needs no manual step and **no roll**:
 - kubelet updates the mounted Secret in place (no `subPath`), typically within
   a minute.
 - The `tls-reload` sidecar (added to the Deployment by the HelmRelease's
-  `postRenderers`, with `shareProcessNamespace`) compares the certificate's
-  checksum every 30 s and sends PgDog `SIGHUP` when it changes.
+  `postRenderers`, with `shareProcessNamespace`) compares the checksum of the
+  certificate, `pgdog.toml` and `users.toml` every 30 s and sends PgDog `SIGHUP`
+  when any of them changes. The chart has no config checksum annotation, so
+  this is also how a HelmRelease config change reaches running pods.
 - On `SIGHUP` PgDog re-reads its TLS files (`TLS certificate reloaded` in its
   log). Open sessions keep their handshake; every new one gets the new
   certificate.

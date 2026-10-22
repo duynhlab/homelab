@@ -48,6 +48,7 @@ stack, and the other layers, start at the [metrics hub](README.md).
 | DB errors (app view) | `db_client_operation_errors_total` | `DBClientErrorRate` | [DBClientErrorRate](../runbooks/microservices/DBClientErrorRate.md) |
 | Pool pinned | `pgxpool_acquired_connections` | `PgxPoolNearExhaustion` | [PgxPoolNearExhaustion](../runbooks/microservices/PgxPoolNearExhaustion.md) |
 | Pool waits | `pgxpool_empty_acquire_total` | `PgxPoolAcquireWaitHigh` | [PgxPoolAcquireWaitHigh](../runbooks/microservices/PgxPoolAcquireWaitHigh.md) |
+| Connect failures | `pgx_pool_connect_failures_total` | `PgxPoolConnectFailures` | [PgxPoolConnectFailures](../runbooks/microservices/PgxPoolConnectFailures.md) |
 
 Full catalog: [alert-catalog §1](../alerting/alert-catalog.md#1-microservices-red-metrics).
 

@@ -58,7 +58,7 @@ spec:
         - name: worker
           # Worker and API pins may differ to freeze workflow code. The API owns schema
           # migrations; widen version skew only after replay and migration checks.
-          image: ghcr.io/duynhlab/order-service/order-service:2.10.3
+          image: ghcr.io/duynhlab/order-service/order-service:2.10.4
           imagePullPolicy: IfNotPresent
           args: ["worker"]
           ports:

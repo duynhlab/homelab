@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: cart
-    image_tag: "2.4.2" # {"$imagepolicy": "flux-system:cart:tag"}
+    image_tag: "2.4.3" # {"$imagepolicy": "flux-system:cart:tag"}
     namespace: cart
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

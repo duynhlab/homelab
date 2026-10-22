@@ -80,12 +80,18 @@ drain both fit. With 3 replicas and PDB `minAvailable: 2` a restart is
 rolling, one pod at a time.
 
 The drain does not reach the idle connections a client's pgx pool holds to the
-pod being stopped: the next statement on one gets `FATAL: PgDog is shutting
-down (SQLSTATE 57P01)`, and the service answers that request with a fail-closed
-503. Measured on Kind (2026-10-17): 5 of 1993 server requests during one
-rollout under 2 orders/s, all in checkout. A retry on a fresh connection in
-`pkg/dbx` (duynhlab/pkg#124) closes it; until then expect a few 503s per roll,
-including the automatic roll on a certificate renewal.
+pod being stopped: PgDog sends them `FATAL: PgDog is shutting down (SQLSTATE
+57P01)` and closes them. Since `pkg/dbx` v0.39.0 the pool checks each
+connection before handing it out and replaces one the pooler has already
+closed, so no request draws such a connection; `pgx_pool_acquire_evictions_total`
+counts the replacements. Measured on Kind (2026-10-22, 2 orders/s for 180 s
+through the edge): 0 `57P01` during a roll (5 before), 39 connections replaced.
+
+A roll still fails about 21 requests (24 server 5xx against 3 at baseline,
+nearly all checkout 503). They are `context deadline exceeded` on checkout
+queries, in one burst as each old pod receives SIGINT at the end of its
+`preStop`. Expect them on every roll, including the automatic one on a
+certificate renewal, until #1350 is fixed.
 
 Verified on Kind (2026-10-17): `cmctl renew` rolled the three pods in about
 87 s with no manual step, and six fresh TLS handshakes all presented the new

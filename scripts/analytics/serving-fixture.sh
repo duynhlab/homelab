@@ -32,7 +32,8 @@ case "$action" in
     echo "seed Job started (orders=$orders); waiting..."
     kubectl -n "$ns" wait --for=condition=complete job/analytics-fixture-seed --timeout=15m
     kubectl -n "$ns" rollout status deploy/analytics-heartbeat --timeout=2m
-    echo "fixture up: $(kubectl -n "$ns" exec -i clickhouse-otel-0-0-0 -c clickhouse -- clickhouse-client --password "$(kubectl -n "$ns" get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)" -q 'SELECT count() FROM analytics.payment_ledger_entries_live') ledger entries visible through the views"
+    pod="$(kubectl -n "$ns" get pods -l clickhouse.altinity.com/chi=clickhouse -o jsonpath='{.items[0].metadata.name}')"
+    echo "fixture up: $(kubectl -n "$ns" exec -i "$pod" -c clickhouse -- clickhouse-client --password "$(kubectl -n "$ns" get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)" -q 'SELECT count() FROM analytics.payment_ledger_entries_live') ledger entries visible through the views"
     ;;
   down)
     sed "s/__ORDERS__/0/" scripts/analytics/fixture.yaml | kubectl delete -f - --ignore-not-found >/dev/null

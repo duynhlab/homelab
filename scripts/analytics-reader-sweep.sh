@@ -12,7 +12,8 @@ set -euo pipefail
 
 if [ -z "${CH_PASSWORD:-}" ]; then
   CH_PASSWORD="$(kubectl -n monitoring get secret clickhouse-analytics-reader -o jsonpath='{.data.password}' | base64 -d)"
-  runner() { kubectl -n monitoring exec -i clickhouse-otel-0-0-0 -c clickhouse -- clickhouse-client --host clickhouse-clickhouse.monitoring.svc.cluster.local "$@"; }
+  pod="$(kubectl -n monitoring get pods -l clickhouse.altinity.com/chi=clickhouse -o jsonpath='{.items[0].metadata.name}')"
+  runner() { kubectl -n monitoring exec -i "$pod" -c clickhouse -- clickhouse-client --host clickhouse-clickhouse.monitoring.svc.cluster.local "$@"; }
 else
   runner() { clickhouse-client --host "${CH_HOST:-localhost}" "$@"; }
 fi

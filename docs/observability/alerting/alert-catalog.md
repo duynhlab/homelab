@@ -250,6 +250,16 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 
 > 💤 **Inactive on this homelab** — logical replication has no subscriptions configured, so `cnpg_pg_stat_subscription_*` has no series; these arm automatically once a subscription exists.
 
+### 4c. PgDog pooler (product-db)
+
+`prometheusrules/pooler/pgdog-alerts.yaml`, from PgDog's OpenMetrics (`pgdog_*`, labels `user`/`database`/`role`). The client side of the same hop is `PgxPoolConnectFailures` (§1).
+
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| PgDogClientsWaiting | warning | `max by (database) (pgdog_cl_waiting) > 0` | Clients queue for a server connection; requests slow down | 5m | [PgDogClientsWaiting](../runbooks/postgresql/PgDogClientsWaiting.md) |
+| PgDogCheckoutTimeouts | warning | `increase(pgdog_total_checkout_timeouts[5m]) > 0` | A client gave up after `checkout_timeout` (5 s): a request failed (also a wrong password under passthrough) | — | [PgDogCheckoutTimeouts](../runbooks/postgresql/PgDogCheckoutTimeouts.md) |
+| PgDogPoolBanned | warning | `max by (database, role) (pgdog_banned) > 0` | A backend pool is banned (errors, or replica lag); its traffic falls back or fails | 1m | [PgDogPoolBanned](../runbooks/postgresql/PgDogPoolBanned.md) |
+
 ### 4b. Deep-signal alerts (hand-authored)
 
 `prometheusrules/postgres/deep-signals-alerts.yaml` (ns `monitoring`) — **not** chart-generated.

@@ -19,6 +19,9 @@ alerts, and operator health. One file per alert name — each file covers both
 | Alert | Sev | Source | Status | Runbook |
 |-------|-----|--------|--------|---------|
 | CNPGClusterOffline | critical | chart | active | [CNPGClusterOffline.md](CNPGClusterOffline.md) |
+| PgDogClientsWaiting | warning | homelab-authored | active | [PgDogClientsWaiting.md](PgDogClientsWaiting.md) |
+| PgDogCheckoutTimeouts | warning | homelab-authored | active | [PgDogCheckoutTimeouts.md](PgDogCheckoutTimeouts.md) |
+| PgDogPoolBanned | warning | homelab-authored | active | [PgDogPoolBanned.md](PgDogPoolBanned.md) |
 | CNPGDRClusterOffline | critical | homelab-authored | active | [CNPGDRClusterOffline.md](CNPGDRClusterOffline.md) |
 | CnpgClusterFenced | critical | homelab-extra | active | [CnpgClusterFenced.md](CnpgClusterFenced.md) |
 | CNPGClusterHACritical | critical | chart | active | [CNPGClusterHACritical.md](CNPGClusterHACritical.md) |

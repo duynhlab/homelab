@@ -260,6 +260,37 @@ def freshness_state(lags):
     return 'stale' if max(lags) > 120 else 'healthy'
 
 
+def assert_true(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+
+def inspect_staged_avro():
+    data = json.loads(compose('run', '--rm', '--no-deps', '--entrypoint', 'aws',
+        'analytics-service-cdc-bootstrap', '--endpoint-url', 'http://analytics-service-cdc-storage:9000',
+        's3api', 'list-objects-v2', '--bucket', 'analytics-service-cdc', '--output', 'json'))
+    keys = [x['Key'] for x in data.get('Contents', []) if x['Key'].endswith('.avro')]
+    assert_true(bool(keys), 'no retained Avro artifacts to inspect')
+    inspected = set()
+    for key in keys:
+        match = [(db, table, cols) for db, tables in ALLOW.items() for table, cols in tables.items()
+                 if f'clone_analytics_service_{db}_public_{table}_' in key]
+        if not match:
+            fn = f"s3({quote('http://analytics-service-cdc-storage:9000/analytics-service-cdc/' + key)},'analytics-service-cdc','analytics-service-cdc-local-secret','Avro')"
+            assert_true('RFC0030_FORBIDDEN_PII' not in ch('SELECT * FROM ' + fn + ' FORMAT JSONEachRow'), 'PII in CDC staging')
+            continue
+        db, table, cols = match[0]
+        fn = f"s3({quote('http://analytics-service-cdc-storage:9000/analytics-service-cdc/' + key)},'analytics-service-cdc','analytics-service-cdc-local-secret','Avro')"
+        # PeerDB Avro field names encode source ordinal: completed_at_5.
+        names = {re.sub(r'_\d+$', '', line.split('\t')[0])
+                 for line in ch('DESCRIBE TABLE ' + fn).splitlines()}
+        assert_true(names <= set(cols) | {'_peerdb_synced_at','_peerdb_is_deleted','_peerdb_version'}, 'unexpected Avro column: ' + db + '.' + table)
+        assert_true('RFC0030_FORBIDDEN_PII' not in ch('SELECT * FROM ' + fn + ' FORMAT JSONEachRow'), 'PII in staged snapshot')
+        inspected.add((db, table))
+    expected = {(db, table) for db, tables in ALLOW.items() for table in tables}
+    assert_true(inspected == expected, 'snapshot Avro coverage incomplete')
+
+
 def gate():
     rows = []
     def check(name, fn):
@@ -271,9 +302,6 @@ def gate():
             rows.append({'gate': name, 'result': 'FAIL', 'reason': str(error)[:500]})
         rows[-1]['duration_seconds'] = round(time.monotonic() - started, 3)
         print(name, rows[-1]['result'], flush=True)
-    def assert_true(condition, message):
-        if not condition:
-            raise RuntimeError(message)
     def snapshot_counts():
         assert_true(int(pg('postgres', "SELECT concurrent_writes FROM analytics_snapshot_evidence WHERE source='order'")) > 1, 'snapshot under writes not exercised')
         for db, tables in ALLOW.items():
@@ -339,30 +367,6 @@ def gate():
         compose('restart', 'analytics-flow-worker')
         freshness(after=start)
         assert_true(ch('SELECT count() FROM analytics.order_orders_live WHERE id=-30000') == '1', 'duplicate live order')
-    def staging():
-        data = json.loads(compose('run', '--rm', '--no-deps', '--entrypoint', 'aws',
-            'analytics-service-cdc-bootstrap', '--endpoint-url', 'http://analytics-service-cdc-storage:9000',
-            's3api', 'list-objects-v2', '--bucket', 'analytics-service-cdc', '--output', 'json'))
-        keys = [x['Key'] for x in data.get('Contents', []) if x['Key'].endswith('.avro')]
-        assert_true(bool(keys), 'no retained Avro artifacts to inspect')
-        inspected = set()
-        for key in keys:
-            match = [(db, table, cols) for db, tables in ALLOW.items() for table, cols in tables.items()
-                     if f'clone_analytics_{db}_public_{table}_' in key]
-            if not match:
-                fn = f"s3({quote('http://analytics-service-cdc-storage:9000/analytics-service-cdc/' + key)},'analytics-service-cdc','analytics-service-cdc-local-secret','Avro')"
-                assert_true('RFC0030_FORBIDDEN_PII' not in ch('SELECT * FROM ' + fn + ' FORMAT JSONEachRow'), 'PII in CDC staging')
-                continue
-            db, table, cols = match[0]
-            fn = f"s3({quote('http://analytics-service-cdc-storage:9000/analytics-service-cdc/' + key)},'analytics-service-cdc','analytics-service-cdc-local-secret','Avro')"
-            # PeerDB Avro field names encode source ordinal: completed_at_5.
-            names = {re.sub(r'_\d+$', '', line.split('\t')[0])
-                     for line in ch('DESCRIBE TABLE ' + fn).splitlines()}
-            assert_true(names <= set(cols) | {'_peerdb_synced_at','_peerdb_is_deleted','_peerdb_version'}, 'unexpected Avro column: ' + db + '.' + table)
-            assert_true('RFC0030_FORBIDDEN_PII' not in ch('SELECT * FROM ' + fn + ' FORMAT JSONEachRow'), 'PII in staged snapshot')
-            inspected.add((db, table))
-        expected = {(db, table) for db, tables in ALLOW.items() for table in tables}
-        assert_true(inspected == expected, 'snapshot Avro coverage incomplete')
     def response_states():
         pg('postgres', "UPDATE cron.job SET active=false WHERE jobname IN ('analytics-order','analytics-checkout','analytics-payment')")
         try:
@@ -393,7 +397,7 @@ def gate():
     check('source roles and cron jobs', source_privileges)
     check('reader view access and raw/write denial', reader_privileges)
     check('raw column allowlist and PII fixture', schema)
-    check('retained snapshot staging PII exclusion', staging)
+    check('retained snapshot staging PII exclusion', inspect_staged_avro)
     check('three target-observed heartbeats', freshness)
     check('CDC updates, NULLs and deletes', update_delete)
     check('worker restart and latest-row uniqueness', restart)
@@ -401,7 +405,7 @@ def gate():
     for service in ['analytics-service-cdc-storage', 'clickhouse']:
         check(service + ' outage and catch-up', lambda service=service: outage(service))
     check('post-recovery raw PII exclusion', schema)
-    check('post-CDC staging PII exclusion', staging)
+    check('post-CDC staging PII exclusion', inspect_staged_avro)
     def logs():
         value = compose('logs', '--no-color', 'analytics-flow-api', 'analytics-flow-worker', 'analytics-snapshot-worker')
         assert_true('RFC0030_FORBIDDEN_PII' not in value, 'PII marker in PeerDB logs')

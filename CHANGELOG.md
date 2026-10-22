@@ -342,6 +342,11 @@ Skeleton (copy what you need):
   observes the new Secret revision; repository state alone does not claim that
   live revocation has happened.
 
+#### Local-stack
+
+- Match RFC-0030 snapshot Avro objects using the renamed `analytics_service_*`
+  mirrors so both PII gates check column allowlists across all ten tables.
+
 #### Docs
 
 - Link RFC-0030's four accepted ADRs to dedicated tracking issues and native

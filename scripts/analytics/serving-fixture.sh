@@ -10,11 +10,11 @@
 #   scripts/analytics/serving-fixture.sh up [ORDERS]   # default 2000; 500000 ≈ 1M ledger facts (G8.5)
 #   scripts/analytics/serving-fixture.sh down
 #
-# The seed Job runs clickhouse-client against the load-balancer Service as
-# `default` (clickhouse-credentials); the views are DEFINER
-# analytics_view_owner, which the SQL creates. The CHI already declares
+# The seed Job creates the `analytics` database as Replicated on every
+# replica, then runs serving.sql against the load-balancer Service as
+# `default` (clickhouse-credentials). The CHI already declares
 # analytics_reader with its view grants, so the fixture never touches that
-# identity.
+# identity (users are config on the CHI; CREATE USER is refused).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 action="${1:-up}"

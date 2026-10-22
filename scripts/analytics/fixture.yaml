@@ -26,13 +26,33 @@ spec:
       containers:
         - name: seed
           image: clickhouse/clickhouse-server:26.9
-          command: ["clickhouse-client"]
+          command: ["bash", "-ec"]
+          # The database must be Replicated and exist on every replica (the
+          # service reaches the load balancer, which fans out across all three);
+          # the schema Job does the same for otel and pg_stat_ch. A plain
+          # database left by an earlier attempt is dropped first. Tables and
+          # views then land through the Replicated DDL from one replica.
           args:
-            - --host=clickhouse-clickhouse.monitoring.svc.cluster.local
-            - --password=$(CLICKHOUSE_PASSWORD)
-            - --multiquery
-            - --param_orders=__ORDERS__
-            - --queries-file=/fixture/serving.sql
+            - |
+              lb=clickhouse-clickhouse.monitoring.svc.cluster.local
+              cli() { clickhouse-client --host "$1" --password "$CLICKHOUSE_PASSWORD" "${@:2}"; }
+              for h in $(cli "$lb" -q "SELECT DISTINCT host_name FROM system.clusters WHERE cluster='otel'"); do
+                host="$h.monitoring.svc.cluster.local"
+                engine=$(cli "$host" -q "SELECT engine FROM system.databases WHERE name='analytics'")
+                if [ -n "$engine" ] && [ "$engine" != Replicated ]; then
+                  echo "dropping non-Replicated analytics on $h ($engine)"; cli "$host" -q "DROP DATABASE analytics SYNC"
+                fi
+                cli "$host" -q "CREATE DATABASE IF NOT EXISTS analytics ENGINE = Replicated('/clickhouse/databases/analytics', '{shard}', '{replica}')"
+                echo "analytics database Replicated on $h"
+              done
+              # Replicated DDL fans the CREATE out, but a plain MergeTree engine is not
+              # converted: the data would live on one replica only. Use the Replicated
+              # engine here; compose keeps the plain one (no Keeper).
+              sed 's/ENGINE = ReplacingMergeTree(/ENGINE = ReplicatedReplacingMergeTree(/' /fixture/serving.sql > /tmp/serving.sql
+              cli "$lb" --multiquery --param_orders=__ORDERS__ --queries-file /tmp/serving.sql
+              for h in $(cli "$lb" -q "SELECT DISTINCT host_name FROM system.clusters WHERE cluster='otel'"); do
+                echo "$h: $(cli "$h.monitoring.svc.cluster.local" -q "SELECT count() FROM system.tables WHERE database='analytics'") analytics objects"
+              done
           env:
             - name: CLICKHOUSE_PASSWORD
               valueFrom:

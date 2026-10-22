@@ -1545,6 +1545,63 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-10-23 — analytics dark launch, edge route and Admin page (RFC-0030 phases 8–9)
+
+Cluster: kind `homelab`, Kubernetes 1.35.8, fresh
+Host: Linux + Docker (`/var/lib/docker` on ZFS), arch amd64
+Revision: `feat/rfc0030-dark-launch` (#1360) at `16f433a2` on top of `main`
+`540d99b1`; **DR replica off** (working-tree patch, not committed), so 29
+declared + `flux-system` = 30 Kustomizations. Images asserted:
+`analytics-service:sha-8e4667f` (main `8e4667fb`, signed) and
+`admin-service:sha-bae236d` (main `bae236db`; its main build fails Trivy,
+admin-service#52, so the image is **unsigned**).
+Preconditions: compose gate on the same trees passed A25 25/25, both drills,
+B11, C4/C6/C12/C16 on all eleven services, C23 and C22 (0 violations) on
+2026-10-22 · scope is the RFC-0030 rows (K3.12, K4.12–K4.14, K5.11) plus
+bring-up.
+
+The serving layer is **fixture-backed** (`scripts/analytics/serving-fixture.sh`,
+PeerDB's table shape, CDC not deployed); every row below reads it.
+
+| Group | Result | Evidence |
+|---|---|---|
+| K1 bring-up | PASS | `make up` exit 0; **30/30 Ready**; `rs-analytics` Ready; `analytics` pod Running on `sha-8e4667f`; 5 Kyverno PolicyReports in `analytics` all `fail=0` |
+| K3.12 reader isolation | PASS | `scripts/analytics-reader-sweep.sh` **28/28**: ten `*_live` views readable, ten raw tables refused, INSERT/CREATE/DROP refused, `otel.*`, `pg_stat_ch.*`, `system.query_log` and `SHOW GRANTS FOR default` refused, per-query settings accepted under `readonly=2` |
+| K4.12 dark launch | PASS (functional) / **FAIL (G8.5)** | edge 404 before the route; probe pod from `checkout` times out; direct k6 **26/26**; freshness drill stale **+123 s**, unavailable **+303 s**, healthy **+6 s** after restart; failure drill 503 `ANALYTICS_UNAVAILABLE` in 0.28 s, `/ready` 503, `/health` 200, recovered +2 s. Performance on 1M facts: **150/150 calls 503** at ~2.1 s (ClickHouse cancels at the 2 s budget), p95 of the queries that finish 146 ms, CH restarts 0/0/0, memory ≤ 152 MiB — analytics-service#4 |
+| K4.13 edge route | PASS | `make e2e-analytics-api GATE=kind` **25/25**: tokenless 401 at the edge, customer token 401 wrong-issuer, `duyne-viewer` 403 `FORBIDDEN`, `duyne` 200 with the contract, 400 matrix, `Cache-Control: no-store` |
+| K4.14 Admin page | PASS | `duyne` → `/analytics` from the **eighth** navigation item: freshness region with three lags, five formatted KPIs, the trend and the funnel; heartbeat scaled to 0 → **Delayed data** at +121 s and **Analytics is unavailable** with *Try again* at +302 s (figures hidden), fresh again **+45 s** after scaling back; `duyne-viewer` lands on `/forbidden` ("does not hold the backoffice_admin role") |
+| K5.11 signals | PASS | idle: 3 lag + 12 state + 1 last-success gauges per pod; at 2 replicas two `k8s_pod_name` values per gauge, every one-hot sum 1, analytics + DB series **112/376** per replica (the 540 total on the long-lived pod is spanmetrics and `http_server_*`, collector- and middleware-owned); DB duration histogram present; `analytics.overview` trace with the ClickHouse client child and the trace id in `system.opentelemetry_span_log` |
+
+Findings:
+
+1. **G8.5 FAIL — the read path does not scale** (analytics-service#4, view
+   cost also on #1333). The `*_live` views recompute `GROUP BY id` +
+   `argMax` over every row per call (2.6 s for `count()` on 1M entries vs
+   0.03 s with `FINAL`), and `toString()` on both sides of each join defeats
+   the typed hash join. Even on the 2,000-order seed each overview query
+   costs ~330 ms CPU on the CHI (p95 424–511 ms), so the page answers in
+   1.0–1.45 s. `v0.1.0` is not tagged until the owner picks a fix.
+2. **Fixture heartbeat versions restarted at 1 per process life**, so after
+   any restart the views kept the pre-restart row and the service never left
+   *unavailable* (both drills failed at recovery). Fixed in #1360 (`16f433a2`,
+   millisecond-timestamp versions, PeerDB's monotonic shape).
+3. **The Kind failure drill waited for a rollout that never completes**: with
+   `maxUnavailable: 0` a pod whose ClickHouse is unreachable never becomes
+   Ready, so the healthy pod keeps serving. The drill now probes the
+   replacement pod directly; the fencing itself is correct platform
+   behaviour and is worth stating in the ADR-069 runbook.
+4. **K4.14 named the Admin host `admin.duynh.me`**; the route is
+   `backoffice.duynh.me`. Fixed in the row.
+5. `admin-service` main builds fail Trivy on CVE-2026-107891 since
+   2026-10-18 (admin-service#52): `sha-bae236d` runs unsigned on Kind.
+
+Rows not run: K4.12's probe-pod check was run once before the route landed;
+the alert and dashboard promotion for analytics (`docs/observability/analytics/`)
+stays planned.
+
+**Decision: BLOCKED** for the analytics-service tag (G8.5); the route, the
+Admin page and the fixture-backed dark launch are ELIGIBLE on their rows.
+
 ### 2026-10-16 — RFC-0029 fleet gate: every service on the three-role split
 
 Cluster: kind `homelab`, Kubernetes 1.35.8, Kind CLI v0.33.0, fresh

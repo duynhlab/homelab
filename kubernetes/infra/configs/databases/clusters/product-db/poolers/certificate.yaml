@@ -1,8 +1,8 @@
 # Client-side TLS for PgDog (ADR-089). Every client verifies it
 # (sslmode=verify-full) against product-db-ca-trust, so dnsNames must keep the
 # name the clients dial; PgDog refuses plaintext.
-# A renewal rolls PgDog: the watch label makes helm-controller reconcile on a
-# Secret change, and the HelmRelease puts tls.crt in a pod annotation.
+# A renewal does not roll PgDog: the mounted Secret updates in place and the
+# tls-reload sidecar in the HelmRelease sends PgDog SIGHUP (#1350).
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -10,9 +10,6 @@ metadata:
   namespace: product
 spec:
   secretName: pgdog-product-tls
-  secretTemplate:
-    labels:
-      reconcile.fluxcd.io/watch: Enabled
   duration: 2160h # 90 days
   renewBefore: 360h # 15 days
   privateKey:

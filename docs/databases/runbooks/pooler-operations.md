@@ -52,23 +52,31 @@ PgDog needs no action. Full procedure: [rotate-cnpg-service-password.md](rotate-
 
 `pgdog-product` terminates client TLS with the cert-manager `Certificate`
 `pgdog-product-tls` (ClusterIssuer `homelab-ca`, 90 days, renewed 15 days
-before expiry). A renewal needs no manual step:
+before expiry). A renewal needs no manual step and **no roll**:
 
-- The Secret carries `reconcile.fluxcd.io/watch: Enabled`, so helm-controller
-  reconciles `pgdog-product` when cert-manager rewrites it.
-- The HelmRelease copies `tls.crt` into the pod annotation `pgdog-tls-crt`
-  (`valuesFrom`), so a new certificate changes the pod template and the
-  Deployment rolls, draining each pod (below).
+- kubelet updates the mounted Secret in place (no `subPath`), typically within
+  a minute.
+- The `tls-reload` sidecar (added to the Deployment by the HelmRelease's
+  `postRenderers`, with `shareProcessNamespace`) compares the certificate's
+  checksum every 30 s and sends PgDog `SIGHUP` when it changes.
+- On `SIGHUP` PgDog re-reads its TLS files (`TLS certificate reloaded` in its
+  log). Open sessions keep their handshake; every new one gets the new
+  certificate.
 
 To check or force it:
 
 1. `kubectl get certificate pgdog-product-tls -n product` — Ready, with the new `notAfter`. `cmctl renew pgdog-product-tls -n product` forces a renewal.
-2. The pods roll on their own; `kubectl rollout status deploy/pgdog-product -n product`. If they did not, `flux reconcile helmrelease pgdog-product -n product`.
-3. Verify: the serial PgDog presents (`openssl s_client -starttls postgres -connect pgdog-product.product.svc:6432 </dev/null | openssl x509 -noout -serial`, from a pod the NetworkPolicy admits) matches the Secret's.
+2. `kubectl logs -n product <pod> -c tls-reload` shows `sent SIGHUP`, and `-c pgdog` shows `TLS certificate reloaded`, on every pod. Pod restart counts stay 0.
+3. Verify: the serial PgDog presents (`openssl s_client -starttls postgres -connect <pod IP>:6432 </dev/null | openssl x509 -noout -serial`, from a pod the NetworkPolicy admits) matches the Secret's, on each pod.
 
-PgDog itself can reload the certificate without a restart (`SIGHUP` or the
-admin `RELOAD`), but nothing in the chart can send either, so the roll is the
-mechanism.
+If a pod never reloads (the sidecar is down), `kubectl rollout restart
+deploy/pgdog-product -n product` picks the certificate up with a drained roll
+(below).
+
+Verified on Kind (2026-10-22): a forced renewal under 2 orders/s reached all
+three pods within about a minute of the Secret change, each logged one
+`TLS certificate reloaded`, fresh handshakes on all three pod IPs presented the
+new serial, no container restarted, and no request failed with `57P01`.
 
 ## Rolling restarts drain
 
@@ -90,12 +98,8 @@ through the edge): 0 `57P01` during a roll (5 before), 39 connections replaced.
 A roll still fails about 21 requests (24 server 5xx against 3 at baseline,
 nearly all checkout 503). They are `context deadline exceeded` on checkout
 queries, in one burst as each old pod receives SIGINT at the end of its
-`preStop`. Expect them on every roll, including the automatic one on a
-certificate renewal, until #1350 is fixed.
-
-Verified on Kind (2026-10-17): `cmctl renew` rolled the three pods in about
-87 s with no manual step, and six fresh TLS handshakes all presented the new
-serial.
+`preStop`. Expect them on every roll until #1350 is fixed; a certificate
+renewal no longer rolls PgDog (above).
 
 ## Add a database backend (new service)
 

@@ -32,16 +32,60 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  valuesFrom:
-    # The serving certificate as a pod annotation: a renewal changes the pod
-    # template, so the pods roll onto it (the Secret carries
-    # reconcile.fluxcd.io/watch). Optional: cert-manager may not have issued
-    # it yet on the first install.
-    - kind: Secret
-      name: pgdog-product-tls
-      valuesKey: tls.crt
-      targetPath: "podAnnotations.pgdog-tls-crt"
-      optional: true
+  # A renewed certificate is reloaded in place, not rolled (#1350): kubelet
+  # updates the mounted Secret, and the tls-reload sidecar sends PgDog SIGHUP,
+  # which re-reads the TLS files; open sessions keep their handshake.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: pgdog-product
+            patch: |
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: pgdog-product
+              spec:
+                template:
+                  spec:
+                    # The sidecar must see the pgdog process to signal it.
+                    shareProcessNamespace: true
+                    containers:
+                      - name: tls-reload
+                        # PgDog's own image: it ships sh, sha256sum, pidof and kill.
+                        image: ghcr.io/pgdogdev/pgdog:v0.1.61
+                        command:
+                          - sh
+                          - -c
+                          - |
+                            f=/etc/pgdog-tls/tls.crt
+                            last=$(sha256sum "$f")
+                            while true; do
+                              sleep 30
+                              cur=$(sha256sum "$f")
+                              if [ "$cur" != "$last" ] && p=$(pidof pgdog); then
+                                kill -HUP $p && echo "tls.crt changed: sent SIGHUP to pgdog $p" && last=$cur
+                              fi
+                            done
+                        volumeMounts:
+                          - name: pgdog-tls
+                            mountPath: /etc/pgdog-tls
+                            readOnly: true
+                        livenessProbe:
+                          exec:
+                            command: ["test", "-r", "/etc/pgdog-tls/tls.crt"]
+                          periodSeconds: 30
+                        readinessProbe:
+                          exec:
+                            command: ["test", "-r", "/etc/pgdog-tls/tls.crt"]
+                          periodSeconds: 30
+                        resources:
+                          requests:
+                            cpu: 5m
+                            memory: 8Mi
+                          limits:
+                            memory: 32Mi
   values:
     replicas: 3
     port: 6432

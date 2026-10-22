@@ -226,6 +226,14 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **A PgDog certificate renewal reloads in place instead of rolling** (#1350).
+  The HelmRelease no longer copies `tls.crt` into a pod annotation; a
+  `tls-reload` sidecar (PgDog's own image, added through `postRenderers` with
+  `shareProcessNamespace`) sends PgDog `SIGHUP` when the mounted certificate
+  changes, and PgDog re-reads its TLS files. Renewals were the most frequent
+  PgDog roll and each cost checkout requests. Verified on Kind: new serial on
+  all three pods, no restart.
+
 - **OpenBAO rotates every product-db runtime password.** The six runtimes
   (`product`, `inventory`, `cart`, `order`, `checkout`, `payment`) move to
   OpenBAO static roles (720h) like platform-db's (#1310): product-db gets its

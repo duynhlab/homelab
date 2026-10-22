@@ -13,7 +13,7 @@ spec:
     # The API and order worker must support unknown payment outcomes before rollout.
     # The migration init container must use this image before the app starts.
     # Compatibility gates: docs/proposals/rfc/RFC-0021/cutover-rollback.md.
-    image_tag: "2.8.2" # {"$imagepolicy": "flux-system:payment:tag"}
+    image_tag: "2.8.3" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

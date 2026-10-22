@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: shipping
-    image_tag: "1.10.2" # {"$imagepolicy": "flux-system:shipping:tag"}
+    image_tag: "1.10.3" # {"$imagepolicy": "flux-system:shipping:tag"}
     namespace: shipping
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
     # pairs belong in the manifest rather than in compiled defaults.

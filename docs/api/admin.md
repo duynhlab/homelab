@@ -19,7 +19,7 @@ consequence worth being able to see in one place.
 | **HTTP server** | Static assets + `/health`; no business API | Implemented | [Platform contract](../frontend/admin-portal/README.md#deployment) |
 | **Edge exposure** | `backoffice.duynh.me` · `PathPrefix /` | Implemented | [`backoffice.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/backoffice.yaml) |
 | **API served** | None | None | — |
-| **API clients** | 26 operations over 23 paths across 6 owning services | Implemented | [Consumer matrix](#what-it-calls-by-feature) |
+| **API clients** | 27 operations over 24 paths across 7 owning services | Implemented | [Consumer matrix](#what-it-calls-by-feature) |
 | **Worker** | None | None | — |
 | **Temporal** | None | None | — |
 | **Events** | None | None | — |
@@ -29,7 +29,7 @@ Known gaps: [three platform gaps](../frontend/admin-portal/README.md#known-gaps)
 | Attribute | Value |
 |-----------|-------|
 | **Owns** | Operator UX, browser-side routing/query orchestration, and the inventory of protected operations it consumes |
-| **Does not own** | Business data, protected API behavior, authorization decisions, or a BFF; those stay with the six serving services |
+| **Does not own** | Business data, protected API behavior, authorization decisions, or a BFF; those stay with the seven serving services |
 | **Database** | None |
 | **Cache** | None authoritative; TanStack Query holds disposable browser state only |
 | **Sensitive data** | Staff access token, held in browser memory only and sent as `Authorization: Bearer` |
@@ -79,6 +79,7 @@ so the mapping is exactly one-to-one.
 | `orders` | order | 3 | 3 | Orders, order detail | [order.md](./order.md) |
 | `customers` | user | 2 | 2 | Customers, customer detail | [user.md](./user.md) |
 | `shipments` | shipping | 2 | 2 | Shipments, shipment detail | [shipping.md](./shipping.md) |
+| `analytics` | analytics | 1 | 1 | Analytics | [analytics.md](./analytics.md) |
 
 `catalog` is the only module where operations outnumber paths: the catalog is the
 one place the portal **writes**, so several paths carry more than one verb.
@@ -145,6 +146,12 @@ Read-only. The portal never moves money.
 |--------|------|--------|
 | `GET` | `/shipping/v1/protected/shipments` | Shipments |
 | `GET` | `/shipping/v1/protected/shipments/:id` | Shipment detail |
+
+### analytics — [analytics.md](./analytics.md)
+
+| Method | Path | Screen |
+|--------|------|--------|
+| `GET` | `/analytics/v1/protected/commerce/overview` | Analytics |
 
 ## Why the surface looks like this
 

@@ -4,10 +4,14 @@ Analytics must reveal stale commerce data even when nobody opens the portal.
 Its sampler measures target-observed CDC freshness; it does not replace the
 per-request freshness checks that authorize an API response.
 
-**Status: planned, not deployed.** ADR-069 and RFC-0030 own the rollout.
-The assets in this directory are reviewable candidates, deliberately not wired
-into Flux or local-stack. Install them with the dark launch after the registry
-and service changes land and the Linux backend checks below pass.
+**Status: the signals are deployed; the alert rules and dashboard in this
+directory are still candidates.** The sampler, its three gauges, the DB duration
+histogram and the ClickHouse client spans ship with `analytics-service`
+(`sha-8e4667f`) in local-stack (row C23) and on Kind (row K5.11, run
+2026-10-23). `alerts.yaml` and `dashboard.json` are reviewable candidates,
+deliberately not wired into Flux: promote them with the metric names
+VictoriaMetrics stores (`analytics_source_state_ratio`, not `_state`) once the
+read-path finding (analytics-service#4) settles the service's release.
 
 | Fact | Contract |
 |---|---|

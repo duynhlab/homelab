@@ -12,7 +12,7 @@ GitOps (Flux).
 
 > **New to the stack?** Start with [OTel fundamentals](opentelemetry/fundamentals.md) — plain-language concepts plus the RFC-0014 old-vs-new migration story, in diagrams.
 
-- [Analytics telemetry](analytics/) — planned RFC-0030 signals, alert/dashboard candidates and Linux qualification.
+- [Analytics telemetry](analytics/) — RFC-0030 signals as deployed (sampler gauges, DB histogram, ClickHouse client spans), the Linux qualification, and the alert/dashboard candidates still planned.
 
 ## Architecture
 

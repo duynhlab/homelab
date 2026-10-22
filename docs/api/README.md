@@ -181,8 +181,8 @@ not its availability. Record them under the service's **Known gaps** section.
 | checkout-worker | ✓ | ✓ | Implemented | — |
 | mockpay provider | ✓ | ✓ | Implemented | — |
 | frontend SPA | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
-| [Backoffice app service](./admin.md) | ✓ | ✓ | Implemented — React SPA served by Nginx; consumes six owning services and serves no business API | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
-| [analytics API](./analytics.md) | — | — | **Planned** — draft read-only implementation; Linux qualification pending | — |
+| [Backoffice app service](./admin.md) | ✓ | ✓ | Implemented — React SPA served by Nginx; consumes seven owning services and serves no business API | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
+| [analytics API](./analytics.md) | ✓ | ✓ | Implemented — staff-only read model on a fixture-backed serving layer; `v0.1.0` waits on the read-path finding (analytics-service#4) | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
 | gRPC mTLS east-west | — | — | Planned | — |
 
 | Service | One-line responsibility | Contract |
@@ -198,8 +198,8 @@ not its availability. Record them under the service's **Known gaps** section.
 | Shipping | Quotes, tracking, and shipment lifecycle | [shipping.md](./shipping.md) |
 | Checkout | Purchase sessions, totals, promo, and confirm | [checkout.md](./checkout.md) |
 | Payment | Payment state, ledger, refunds, and reconciliation | [payments.md](./payments.md) |
-| Analytics (**Planned**) | Staff-only bounded commerce read model; draft implementation, not deployed | [analytics.md](./analytics.md) |
-| Backoffice | Operator SPA and client-side orchestration across six owning services; owns no business API or data | [admin.md](./admin.md) |
+| Analytics | Staff-only bounded commerce read model from ClickHouse serving views (fixture-backed until the CDC mirrors land) | [analytics.md](./analytics.md) |
+| Backoffice | Operator SPA and client-side orchestration across seven owning services; owns no business API or data | [admin.md](./admin.md) |
 
 ## Architecture and Workflow Guides
 

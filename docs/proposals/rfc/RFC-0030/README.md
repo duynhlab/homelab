@@ -635,6 +635,18 @@ by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
 
 ## Implementation history
 
+- 2026-10-23 — Phases 8–10 (the consumer half) landed on a **fixture-backed
+  serving layer**: analytics-service `8e4667fb` reads `analytics.*_live` as
+  `analytics_reader` in local-stack and on Kind, the `api-analytics-protected`
+  route sits under `jwt-edge-staff`, and the Backoffice `/analytics` page is the
+  eighth navigation item (homelab#1361, #1360; admin-service `bae236db`). The
+  compose rows A25/B11/C23 and the Kind rows K3.12, K4.12–K4.14, K5.11 pass;
+  C22 reports zero registry violations. The one-million-fact performance bar
+  (G8.5) **fails** — the views' per-call `argMax` and the reader's `toString()`
+  joins — and holds the first service tag (analytics-service#4). Phases 1–7
+  (pooled CDC, PeerDB, mirrors) remain unstarted; the fixture is replaced by the
+  mirrors when they land.
+
 - 2026-10-18 — Owner aligned the source-access target with RFC-0029: snapshot
   SQL and replication use a qualified pooler profile with verified TLS on both
   hops. The direct Compose baseline remains unqualified for this path; issue

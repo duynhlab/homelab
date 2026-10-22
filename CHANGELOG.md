@@ -107,6 +107,17 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **analytics-service runs on Kind, dark-launched then routed** (#1360,
+  RFC-0030 phases 8–9 / ADR-069). The `analytics` namespace (app tier), its
+  domain ResourceSet (no DB, no migrate, no gRPC; ClickHouse reader from an ESO
+  Secret; staff JWKS pair; probes, resources, SLO), the `analytics_reader` CHI
+  user with SELECT on the ten reviewed `analytics.*_live` views under a
+  `readonly=2` profile, the OpenBAO seed and `ClusterExternalSecret`, and
+  `duyne-viewer` in the staff realm. The serving layer is **fixture-backed**
+  (`scripts/analytics/serving-fixture.sh`, PeerDB's table shape, outside Flux)
+  until the CDC mirrors land; `scripts/analytics-reader-sweep.sh` is row K3.12.
+  Pinned to `sha-8e4667f`: the one-million-fact performance bar fails
+  (analytics-service#4) and holds the first tag.
 - **Service Deployments select on the chart's own labels only.** The `app`
   label kept from `mop` (`extraSelectorLabels`) is dropped from the five domain
   ResourceSets, `rs-frontend`, `rs-backoffice` and `mockpay`; the selector is
@@ -142,6 +153,14 @@ Skeleton (copy what you need):
   rendered — names, selector, ports, `appProtocol`, env, probes, resources, init
   container and volumes; the only differences are a ServiceAccount per release
   (no token mounted) and `maxUnavailable: 0` rollouts.
+
+#### Gateway
+
+- **`api-analytics-protected`** routes `/analytics/v1/protected` to the
+  `analytics` namespace under `jwt-edge-staff` (#1360, RFC-0030 phase 9): the
+  thirteenth API route and the seventh target of the staff policy; no
+  BackendTrafficPolicy, like the other `/protected/` routes. Kind K4.13 asserts
+  the guard chain at the edge (25 checks).
 
 #### Observability
 
@@ -514,6 +533,11 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Kind-safe analytics drills and fixture** (#1360). The fixture heartbeat
+  versions rows by millisecond timestamp (a counter restarting at 1 per process
+  left the pre-restart row visible and the service never recovered); the Kind
+  failure drill probes the never-Ready replacement pod instead of waiting for a
+  rollout `maxUnavailable: 0` never completes.
 - **Lighter, closed-off bring-up.** Each service repository now builds one
   image (`local-stack/<repo>:dev`); its migrate, seed, worker and mockpay
   containers reuse it, so a cold build is 10 builds instead of ~31. Every
@@ -528,6 +552,13 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The analytics contract is as-built.** `docs/api/analytics.md` moves from
+  *Planned* to live on a fixture-backed serving layer with the compose and Kind
+  evidence rows and the open read-path finding (analytics-service#4); the API
+  index, the Backoffice consumer map (seventh service, `analytics` module,
+  eighth screen), the repositories table and the observability index follow;
+  the Kind audit gains its 2026-10-23 run record and the `backoffice.duynh.me`
+  host in K4.14.
 - Document the draft RFC-0030 analytics API: exact money strings, USD-only v1,
   event-date ledger totals, cohort semantics and fail-closed freshness. Backend
   code and UI preview remain undeployed pending Linux qualification.
@@ -593,6 +624,12 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-069 Adoption `Not started` → `Partial`; RFC-0030 phases 8–10 landed**
+  (#1360, #1361). The service, the edge route and the Backoffice page are
+  deployed on a fixture-backed serving layer and pass their compose and Kind
+  rows; the performance bar (G8.5) fails on one million facts and holds the
+  first tag (analytics-service#4). Phases 1–7 (pooled CDC, PeerDB, mirrors)
+  remain unstarted.
 - **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
   allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
   Keep the accepted architecture separate from pending cluster qualification.

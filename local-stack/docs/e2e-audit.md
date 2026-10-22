@@ -2291,13 +2291,14 @@ curl -s "$CH" -u default:otel --data-binary "
   GROUP BY TraceId HAVING server > 0 AND overview > 0 AND client > 0 LIMIT 1 FORMAT TSV" \
   | python3 -c "import sys; l=sys.stdin.read().split(); print('C23 server→overview→client ancestry:', 'OK trace '+l[0] if l else 'FAIL no complete trace'); open('/tmp/c23-trace','w').write(l[0] if l else '')"
 curl -s "$CH" -u default:otel --data-binary "
-  SELECT count() FROM system.query_log
-  WHERE user='analytics_reader' AND type='QueryFinish' AND event_time > now() - INTERVAL 45 MINUTE
-    AND opentelemetry_trace_id = reinterpretAsUUID(unhex('$(cat /tmp/c23-trace)')) FORMAT TSV" \
-  | python3 -c "import sys; n=int(sys.stdin.read() or 0); print('C23 ClickHouse query_log carries the trace id:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+  SELECT count() FROM system.opentelemetry_span_log
+  WHERE lower(replaceAll(toString(trace_id), '-', '')) = lower('$(cat /tmp/c23-trace)') FORMAT TSV" \
+  | python3 -c "import sys; n=int(sys.stdin.read() or 0); print('C23 ClickHouse span log carries the trace id:', 'OK %d server-side spans' % n if n > 0 else 'FAIL 0')"
 # want: three gauge families with series, exactly one state = 1 per source, a
 # DB duration histogram for clickhouse, one trace with all three spans, and
-# the same trace id on the server-side query_log row (clickhouse-go WithSpan).
+# the same trace id on ClickHouse's own server-side spans (clickhouse-go
+# WithSpan propagates the context; the engine records it in
+# system.opentelemetry_span_log, not in query_log).
 
 # C22. EVERY NAME THE FLEET EMITTED IS IN THE REGISTRY (ADR-076). Weaver has been
 #      listening to a copy of the gate's OTLP since Preconditions step 2 (the
@@ -2387,7 +2388,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 | C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all six jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005), `temporal` (server :8000) and `keycloak` (management :9000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **18 alerting** rules (8 ClickHouse engine + 2 collector + 3 inventory + 4 keycloak + Watchdog) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
-| C23 | Analytics signals (RFC-0030 / ADR-069) | `analytics_source_lag_seconds`, `analytics_source_state` (exactly one `1` per source) and `analytics_freshness_last_success_time_seconds` have series for `service_name="analytics"` with no API traffic; `db_client_operation_duration_seconds` for `db_system_name="clickhouse"` is present; one trace holds the HTTP server span → `analytics.overview` → a `SELECT analytics.*` client span, and ClickHouse `system.query_log` carries that trace id for the reader's query |
+| C23 | Analytics signals (RFC-0030 / ADR-069) | `analytics_source_lag_seconds`, `analytics_source_state` (exactly one `1` per source) and `analytics_freshness_last_success_time_seconds` have series for `service_name="analytics"` with no API traffic; `db_client_operation_duration_seconds` for `db_system_name="clickhouse"` is present; one trace holds the HTTP server span → `analytics.overview` → a `SELECT analytics.*` client span, and ClickHouse `system.opentelemetry_span_log` carries that trace id for the reader's query |
 | C22 | Names conform to the registry | `make e2e-conformance` (Weaver `registry live-check` on the gate's OTLP, `--fail-on violation`) exits 0: every attribute, metric and event the fleet emitted is declared in `duynhlab/pkg` `semconv/registry`, with the declared unit and instrument, and no deprecated upstream key — `improvement`/`information` advice is allowed |
 
 Any failed row blocks the release tag. **C14** empty while C12 and C13 are

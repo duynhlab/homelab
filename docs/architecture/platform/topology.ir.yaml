@@ -12,6 +12,8 @@
 # Fixed: SQL edge labels named the wrong domains (review is catalog but on
 # platform-db; inventory is fulfillment on PgDog); added the missing
 # workers -> PgDog edge; OpenBao now also serves the rotated DB credentials.
+# 2026-10-22 (#1339): Keycloak and Temporal SQL edges name their TLS state (JDBC
+# prefer, unverified; Temporal plaintext, #1296), as in docs/secrets/cert-manager.md §12.
 diagram:
   id: topology
   title: "duynhlab homelab — Request-path topology"
@@ -79,8 +81,8 @@ edges:
   - {id: e_wkdb, source: wk, target: pgdog, type: data, label: "SQL"}
   - {id: e_prod, source: pgdog, target: productdb, type: data, label: "pooled SQL"}
   - {id: e_plat, source: cnpgpool, target: platformdb, type: data, label: "pooled SQL"}
-  - {id: e_kcdb, source: keycloak, target: platformdb, type: data, label: "direct SQL"}
-  - {id: e_tmpdb, source: tmp, target: platformdb, type: data, label: "direct SQL"}
+  - {id: e_kcdb, source: keycloak, target: platformdb, type: data, label: "direct SQL · TLS unverified"}
+  - {id: e_tmpdb, source: tmp, target: platformdb, type: data, label: "direct SQL · PLAINTEXT (#1296)"}
   - {id: e_cnpg1, source: cnpg, target: productdb, type: control, label: manages}
   - {id: e_cnpg2, source: cnpg, target: platformdb, type: control, label: manages}
 

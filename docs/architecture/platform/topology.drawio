@@ -197,7 +197,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_kcdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.81;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="keycloak" target="platformdb">
+        <mxCell id="e_kcdb" value="direct SQL · TLS unverified" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.81;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="keycloak" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="-0.69">
             <Array as="points">
               <mxPoint x="1250" y="340" />
@@ -211,8 +211,8 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_tmpdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.86;exitY=1;exitDx=0;exitDy=0;entryX=0.19;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmp" target="platformdb">
-          <mxGeometry relative="1" as="geometry" x="-0.51">
+        <mxCell id="e_tmpdb" value="direct SQL · PLAINTEXT (#1296)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.86;exitY=1;exitDx=0;exitDy=0;entryX=0.19;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmp" target="platformdb">
+          <mxGeometry relative="1" as="geometry" x="0.96">
             <Array as="points">
               <mxPoint x="933.83" y="670" />
               <mxPoint x="820" y="670" />

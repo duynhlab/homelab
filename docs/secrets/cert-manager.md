@@ -681,14 +681,23 @@ slice applied**). This section only links to it. The secrets pipeline
 | Trust bundle | `homelab-ca-bundle` reaches `monitoring` only, and nothing mounts it (§11.2) |
 | local-stack | plaintext end to end, by design (an RFC-0020 non-goal). The only TLS there is Envoy Gateway xDS (`certgen --local`) |
 
-In the Draw.io view below, every edge
+The two Draw.io views below split this section's question in two; in both, every edge
 names its state: `TLS verified`, `TLS unverified` (encrypted, but the client
 does not check who answers), `PLAINTEXT`, or `planned`. No edge is left
 `unconfirmed`: every database hop was read from `pg_stat_ssl` on Kind (2026-10-01, re-read 2026-10-19 on `main` 0ffaf2cc: every TCP session on both primaries is TLS 1.3 except `temporal`'s, including `vault_rotator`, `db_authz`, PgBouncer's `auth_query` and streaming replication). Telemetry and datasource hops are collapsed
 to one edge per pair of tiers; §12.1 lists each hop with its evidence.
 
-<p align="center"><a href="../architecture/security/tls-topology.svg"><img src="../architecture/security/tls-topology.svg" alt="TLS topology of the Kind cluster: browser to Envoy Gateway, the two id.duynh.me hairpins and every service, worker, migration and pooler database hop carry verified TLS from homelab-ca; Keycloak, the OpenBao DB engine and pgroles database hops are encrypted but unverified; gRPC, Temporal, OpenBao, Keycloak HTTP, Valkey, telemetry and RustFS are plaintext; the remaining RFC-0020 slices are planned" width="960"></a></p>
-<p align="center"><sub>Source <a href="../architecture/security/tls-topology.drawio"><code>security/tls-topology.drawio</code></a> · <a href="../architecture/security/img/tls-topology.png">PNG</a></sub></p>
+**PKI, edge and east-west** answers who issues each certificate and which request,
+identity and service-to-service hops are encrypted:
+
+<p align="center"><a href="../architecture/security/tls-pki-edge.svg"><img src="../architecture/security/tls-pki-edge.svg" alt="TLS of the PKI, the edge and east-west hops on the Kind cluster: homelab-ca signs the ClusterIssuer, which issues the edge certificate and the two OIDC trust anchors; the browser reaches Envoy Gateway over verified TLS and the OpenBao and Flux OIDC hairpins verify against the live CA; every hop behind the edge (Envoy to services, JWKS, OAuth, gRPC, Temporal, OTLP, ESO to OpenBao, the KMS seal, the OCI pull) is plaintext; the remaining RFC-0020 slices are planned" width="960"></a></p>
+<p align="center"><sub>Source <a href="../architecture/security/tls-pki-edge.drawio"><code>security/tls-pki-edge.drawio</code></a> · <a href="../architecture/security/img/tls-pki-edge.png">PNG</a></sub></p>
+
+**Data tier** answers which database, pooler and store hops are encrypted and whether
+the client verifies the server:
+
+<p align="center"><a href="../architecture/security/tls-data-tier.svg"><img src="../architecture/security/tls-data-tier.svg" alt="TLS of the data tier on the Kind cluster: homelab-ca issues the pooler leaves and both clusters' server certificates; every service, worker, migration, seed and authz hop and both pooler upstreams are verified TLS; Keycloak, the OpenBao DB engine and pgroles are encrypted but unverified; Temporal SQL, Valkey, telemetry stores and RustFS S3 are plaintext; CNPG's own client CA signs replication and the PgBouncer auth_query certificate" width="960"></a></p>
+<p align="center"><sub>Source <a href="../architecture/security/tls-data-tier.drawio"><code>security/tls-data-tier.drawio</code></a> · <a href="../architecture/security/img/tls-data-tier.png">PNG</a></sub></p>
 
 ### 12.1 Hop inventory
 

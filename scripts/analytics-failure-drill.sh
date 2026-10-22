@@ -35,7 +35,7 @@ esac
 
 TOKEN="$(token)"
 URL="$ANALYTICS_URL/analytics/v1/protected/commerce/overview?currency=USD&from=$(date -u -d '7 days ago' +%F)&to=$(date -u +%F)"
-timed() { curl -sk -o "$1" -w '%{http_code} %{time_total}' "${@:2}"; }
+timed() { curl -sk -o "$1" -w '%{http_code} %{time_total}\n' "${@:2}"; }
 
 fail() { echo "FAIL: $*" >&2; restore_dep || true; exit 1; }
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -49,6 +49,7 @@ echo "overview while down: $code in ${secs}s ($(python3 -c 'import json;print(js
 [ "$code" = 503 ] || fail "overview is $code, want 503"
 python3 -c 'import json,sys;sys.exit(0 if json.load(open(sys.argv[1])).get("code")=="ANALYTICS_UNAVAILABLE" else 1)' "$tmp/down" || fail "503 without ANALYTICS_UNAVAILABLE"
 awk "BEGIN{exit !($secs <= 5.5)}" || fail "overview took ${secs}s, want <=5 s"
+down_secs="$secs"
 if [ -n "$READY_URL" ]; then
   read -r rcode rsecs < <(timed "$tmp/ready" "$READY_URL/ready")
   read -r hcode _ < <(timed "$tmp/health" "$READY_URL/health")
@@ -65,4 +66,4 @@ while :; do
   [ "$age" -gt 30 ] && fail "not recovered 30 s after restore"
   sleep 2
 done
-echo "PASS: 503 ANALYTICS_UNAVAILABLE in ${secs}s while down, 200 again +${age}s after restore"
+echo "PASS: 503 ANALYTICS_UNAVAILABLE in ${down_secs}s while down, 200 again +${age}s after restore"

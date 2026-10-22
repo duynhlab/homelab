@@ -12,8 +12,8 @@ rejected at the edge as wrong-issuer before any role logic runs.
 | **Cluster** | ns `backoffice`, `HTTPRoute` on `backoffice.duynh.me` |
 | **local-stack** | `:3009` — served directly, **not** through the edge |
 | **Realm · client** | `duynhlab-staff` · `admin-portal` — public client, PKCE `S256`, Direct Access Grants **off** |
-| **Role gate** | realm role `backoffice_admin`; enforced **in-service** (`staffauthmw: true` on six services), not at the edge |
-| **Audience it calls** | `/{service}/v1/protected/…` on six services |
+| **Role gate** | realm role `backoffice_admin`; enforced **in-service** (`staffauthmw: true` on seven services), not at the edge |
+| **Audience it calls** | `/{service}/v1/protected/…` on seven services |
 | **Decisions** | [ADR-048](../../proposals/adr/ADR-048-admin-portal-no-bff/) (no BFF) · [ADR-049](../../proposals/adr/ADR-049-admin-portal-tanstack-spa/) (the stack) · [ADR-047](../../proposals/adr/ADR-047-protected-apis-on-owning-services/) (`/protected/`) · [ADR-050](../../proposals/adr/ADR-050-separate-staff-identity-realm/) (the staff realm) |
 | **Manifests** | [`backoffice-rs.yaml`](../../../kubernetes/apps/backoffice-rs.yaml) · [`routes/backoffice.yaml`](../../../kubernetes/infra/configs/envoy-gateway/routes/backoffice.yaml) |
 

@@ -220,14 +220,14 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | Checkout | [checkout-service](https://github.com/duynhlab/checkout-service) | [checkout.md](./api/checkout.md) | `ghcr.io/duynhlab/checkout-service/checkout-service` | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) |
 | Payment | [payment-service](https://github.com/duynhlab/payment-service) | [payments.md](./api/payments.md) | `ghcr.io/duynhlab/payment-service/payment-service` | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) |
 | Frontend | [frontend](https://github.com/duynhlab/frontend) | [frontend/](./frontend/README.md) — platform view; no API contract of its own | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
-| Commerce analytics (**planned**) | [analytics-service](https://github.com/duynhlab/analytics-service) | [analytics.md](./api/analytics.md) — draft Go reader; not deployed | — | — |
+| Commerce analytics | [analytics-service](https://github.com/duynhlab/analytics-service) | [analytics.md](./api/analytics.md) — staff-only ClickHouse read model; fixture-backed serving layer until the CDC mirrors land | `ghcr.io/duynhlab/analytics-service/analytics-service` | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
 | Backoffice portal | [admin-service](https://github.com/duynhlab/admin-service) | [frontend/admin-portal/](./frontend/admin-portal/README.md) — operator SPA; the reads it calls are in each service's contract | `ghcr.io/duynhlab/admin-service/admin-service` | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
 
 Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Observability
 
-- [Analytics telemetry and audit](./observability/analytics/) — planned RFC-0030 sampler, metrics and runtime qualification.
+- [Analytics telemetry and audit](./observability/analytics/) — RFC-0030 sampler, metrics and the Linux runtime qualification; alert and dashboard candidates still planned.
 
 Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./observability/audits/2026-09-16-telemetry-standards.md)** - logs, traces, metrics, profiling and the ClickHouse consumers.
 

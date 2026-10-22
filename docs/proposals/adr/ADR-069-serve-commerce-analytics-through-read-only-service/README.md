@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1331](https://github.com/duynhlab/homelab/issues/1331) — native Task sub-issues and tradeoff log |
-| **Adoption** | Not started |
+| **Adoption** | Partial — service, route and Admin page live on a fixture-backed serving layer (2026-10-23); the performance bar (G8.5) and the first tag are open on [analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4) |
 
 ## Context
 
@@ -108,12 +108,19 @@ The protected analytics route and portal navigation remain absent until the
 service passes dark-launch correctness, authorization, freshness, and failure
 gates.
 
-The [draft contract](../../../api/analytics.md) selects USD-only v1, decimal
-integer JSON strings for money, ledger event-date totals, and checkout-created
-cohorts with current observed stages. Backend code and the isolated UI preview
-are under review. Adoption remains **Not started** for deployment: Linux data,
-security and runtime gates are tracked in
-[#1266](https://github.com/duynhlab/homelab/issues/1266).
+The [contract](../../../api/analytics.md) selects USD-only v1, decimal integer
+JSON strings for money, ledger event-date totals, and checkout-created cohorts
+with current observed stages. The service (`sha-8e4667f`), the
+`api-analytics-protected` route under `jwt-edge-staff`, and the Backoffice
+`/analytics` page are deployed in local-stack and on Kind on a **fixture-backed
+serving layer** (PeerDB's table shape, CDC not yet deployed); the Linux
+evidence is on [#1332](https://github.com/duynhlab/homelab/issues/1332),
+[#1334](https://github.com/duynhlab/homelab/issues/1334) and
+[#1335](https://github.com/duynhlab/homelab/issues/1335). Adoption is
+**Partial**: the one-million-fact performance bar fails because the serving
+views and the reader's joins recompute over every row per call
+([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4));
+the service is not tagged until that is settled.
 
 ### Decision rules
 
@@ -242,3 +249,4 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
+| 2026-10-23 | Accepted / Partial | Service, edge route and Admin page deployed on a fixture-backed serving layer; compose A25/B11/C23 and Kind K3.12, K4.12–K4.14, K5.11 pass (homelab#1361, #1360); the one-million-fact performance bar fails (analytics-service#4) and holds the first tag |

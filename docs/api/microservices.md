@@ -65,7 +65,7 @@ Composition changes the response shape, not the underlying authority.
 | Checkout session and confirm | checkout | cart quantities; product prices; inventory availability; shipping quote | Checkout snapshots and validates; successful confirm hands one idempotent command to order | [checkout contract](./checkout.md) |
 | Order details | order | shipping state; payment state; inventory reservation | Order authorizes the owned record first, then soft-fails optional enrichment | [order contract](./order.md) |
 | Fulfillment and cancellation | order | inventory, shipping, payment, notification, and cart | Order owns workflow state; every participant owns and idempotently applies its side effect | [workflow registry](./workflows.md) |
-| Backoffice operations | Backoffice browser | six serving services | The browser calls `/protected/` contracts directly; no BFF or shared admin database exists | [admin consumer index](./admin.md) |
+| Backoffice operations | Backoffice browser | seven serving services | The browser calls `/protected/` contracts directly; no BFF or shared admin database exists | [admin consumer index](./admin.md) |
 
 Exact synchronous edges and transports live only in
 [api.md § Current East-West Call Graph](./api.md#current-east-west-call-graph).

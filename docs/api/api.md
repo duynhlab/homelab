@@ -268,9 +268,9 @@ Resources use plural nouns after the audience segment.
 | `/payments/:id/refunds` | `/refundPayment` | A refund is a subordinate resource |
 | `/checkout/sessions/:id/confirm` | A forced generic noun | Confirm is an explicit process transition |
 
-The planned ADR-069 analytics route `/analytics/v1/protected/commerce/overview`
-is a read-model exception: one bounded report resource, not a CRUD collection.
-It is not deployed; its owning contract is [analytics.md](analytics.md).
+The ADR-069 analytics route `/analytics/v1/protected/commerce/overview` is a
+read-model exception: one bounded report resource, not a CRUD collection. Its
+owning contract is [analytics.md](analytics.md).
 
 Auth and checkout are deliberate process-oriented exceptions. Do not copy
 those exceptions into ordinary CRUD services.

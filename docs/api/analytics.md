@@ -1,21 +1,22 @@
 # Commerce analytics API
 
-The planned analytics service provides one staff-only commerce overview from
+The analytics service provides one staff-only commerce overview from
 ClickHouse serving views. PostgreSQL remains authoritative; this read model is
 bounded-eventual and never handles commands.
 
 | Attribute | Value |
 |---|---|
-| Availability | **Planned — draft Go implementation; not deployed or runtime-qualified** |
-| Repository | [analytics-service](https://github.com/duynhlab/analytics-service) |
-| Consumer | [Backoffice portal](./admin.md); isolated preview only |
+| Availability | **Live on a fixture-backed serving layer** — deployed in local-stack and on Kind (namespace `analytics`, route `api-analytics-protected`), consumed by the Backoffice **Analytics** page; the `analytics.*` tables are seeded by a fixture in PeerDB's shape until the CDC mirrors (RFC-0030 phases 1–7) land |
+| Repository | [analytics-service](https://github.com/duynhlab/analytics-service) — image `sha-8e4667f`; `v0.1.0` waits on the read-path finding below |
+| Consumer | [Backoffice portal](./admin.md) `/analytics` (eighth navigation item) |
 | Storage access | Native ClickHouse, restricted `analytics_reader`, reviewed `analytics.*_live` views only |
 | Design | [RFC-0030](../proposals/rfc/RFC-0030/), [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) |
-| Verification | [Linux handoff #1266](https://github.com/duynhlab/homelab/issues/1266) |
+| Verification | compose rows A25 / B11 / C23 ([runbook](../../local-stack/docs/e2e-audit.md)); Kind rows K3.12, K4.12–K4.14, K5.11 ([run 2026-10-23](../platform/kind-e2e-audit.md#2026-10-23--analytics-dark-launch-edge-route-and-admin-page-rfc-0030-phases-89)) |
 
-There is no deployed Envoy route, Admin navigation, gRPC API, migration runner,
-source-database access or write endpoint for this service. This contract describes
-the draft implementation to qualify, not a new live platform dependency.
+There is no gRPC API, migration runner, source-database access or write endpoint
+for this service. The Envoy route and the Admin navigation exist; the data behind
+the views is fixture-seeded until the mirrors phase, and every gate row that
+reads it says so.
 
 ## Request and authorization
 
@@ -137,14 +138,28 @@ the explicit local development opt-out is set.
 
 ## Verification and rollout
 
-Repository review and Mac tests on **2026-10-14** cover draft request/auth,
-exact arithmetic, source-age boundaries, cancellation and isolated UI behavior.
-The ClickHouse integration suite is compiled locally; **SQL execution, actual
-grants, CDC, TLS, performance and real-stack acceptance remain Linux gates**.
-See [#1266](https://github.com/duynhlab/homelab/issues/1266) for exact PR heads and
-results; passing unit tests must not be described as runtime qualification.
+Linux runtime qualification on **2026-10-22/23** (main `8e4667fb`, compose and
+Kind, fixture-backed serving layer): the ClickHouse integration suite runs in CI
+against ClickHouse 26.9; compose A25 asserts the guard chain and the contract
+(25 checks), the freshness drill meets the 120 s / 300 s / ≤60 s clocks and the
+failure drill fails closed in under a second; B11 shows the page's live, delayed,
+unavailable and forbidden states; C23 finds the three gauges, the DB duration
+histogram and the ClickHouse client span. On Kind the dark launch (K4.12), the
+edge route (K4.13, 25 checks) and the Admin page (K4.14) pass the same rows, and
+`analytics_reader` reads exactly the ten views (K3.12). Evidence sits on
+[#1332](https://github.com/duynhlab/homelab/issues/1332),
+[#1334](https://github.com/duynhlab/homelab/issues/1334) and
+[#1335](https://github.com/duynhlab/homelab/issues/1335).
 
-After those gates: deploy dark, verify direct-backend authorization and telemetry,
-then add the Envoy route and real Admin consumer under their existing guards.
-The UI must validate string money, format via exact integer arithmetic, and show
+**Open — the read path does not scale (G8.5).** On one million ledger entries
+every overview call exceeds the 2 s query budget and answers `503
+ANALYTICS_UNAVAILABLE`: the `*_live` views recompute `GROUP BY id` + `argMax`
+over every row per call (no window predicate reaches the scan) and the ledger
+CTE joins on `toString()` keys. Even the 2,000-order seed costs ~330 ms of
+ClickHouse CPU per query on Kind. The fix is a design decision — `FINAL`-based
+views, typed join keys and a daily rollup — tracked in
+[analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4);
+until it lands the service runs from the `sha-` image and is not tagged.
+
+The UI validates string money, formats via exact integer arithmetic, and shows
 an exact table when values are too large for safe chart coordinates.

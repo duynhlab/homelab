@@ -1,4 +1,4 @@
-# HTTPRoutes — the entire local edge surface: 12 routes over 10 backends.
+# HTTPRoutes — the entire local edge surface: 13 routes over 11 backends.
 #
 # What this exposes: /{service}/v1/{public|private}/... pass-through. There is no
 # path rewrite anywhere in this file, which is Gateway API's default — a
@@ -110,6 +110,26 @@ spec:
         - group: gateway.envoyproxy.io
           kind: Backend
           name: inventory
+---
+# analytics — protected Backoffice read model (RFC-0030 / ADR-069). Staff-realm
+# edge JWT (jwt-edge-staff); the backoffice_admin role gate is in-service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-analytics-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /analytics/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: analytics
 ---
 # order — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge JWT
 # (jwt-edge-staff); role gate in-service.

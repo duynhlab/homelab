@@ -415,6 +415,9 @@ services:
     environment:
       CLICKHOUSE_DB: otel
       CLICKHOUSE_PASSWORD: otel # dev password (CH ≥25.3 requires one for default); cluster uses an ESO secret
+      # The analytics fixture below creates its own users; the cluster declares
+      # them in the CHI instead.
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
     volumes:
@@ -1046,6 +1049,61 @@ services:
       inventory-authz: { condition: service_completed_successfully }
       inventory-seed: { condition: service_completed_successfully }
 
+  # ---- Analytics (RFC-0030 / ADR-069): the read-only commerce overview on
+  # /analytics/v1/protected behind the staff-realm edge JWT. It reads ClickHouse
+  # serving views as `analytics_reader`; no database of its own. CDC is NOT
+  # deployed in local-stack: `analytics-fixture` creates the serving layer in
+  # PeerDB's shape with representative facts and `analytics-heartbeat` refreshes
+  # the three source heartbeats every 30 s (local-stack/analytics/fixture/).
+  # Stop the heartbeat container to drive the stale/unavailable states.
+  analytics-fixture:
+    image: clickhouse/clickhouse-server:26.9
+    mem_limit: *oneshot-mem
+    entrypoint: ["clickhouse-client"]
+    command: ["--host", "clickhouse", "--password", "otel", "--multiquery", "--param_orders=2000", "--queries-file", "/fixture/serving.sql"]
+    volumes:
+      - ./analytics/fixture:/fixture:ro
+    depends_on:
+      clickhouse: { condition: service_healthy }
+
+  analytics-heartbeat:
+    image: clickhouse/clickhouse-server:26.9
+    mem_limit: 64m
+    entrypoint: ["sh", "/fixture/heartbeat.sh"]
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PASSWORD: otel
+    volumes:
+      - ./analytics/fixture:/fixture:ro
+    depends_on:
+      analytics-fixture: { condition: service_completed_successfully }
+
+  analytics:
+    image: local-stack/analytics-service:dev
+    mem_limit: *go-mem
+    build: { context: ../../analytics-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: analytics
+      OTEL_SERVICE_NAME: analytics
+      HTTP_ADDR: ":8080"
+      CLICKHOUSE_ADDR: clickhouse:9000
+      # Local ClickHouse has no TLS listener, as on the cluster (ADR-069 records
+      # the network fence as the control); the service logs this once at start.
+      CLICKHOUSE_TLS: "false"
+      CLICKHOUSE_USER: analytics_reader
+      CLICKHOUSE_PASSWORD: analytics-reader-local
+      # ADR-050: the protected surface verifies the STAFF realm (split-horizon
+      # like OIDC_ISSUER above — issuer is the browser-facing origin, JWKS
+      # fetch is in-network).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
+    healthcheck: *svc-healthcheck
+    depends_on:
+      keycloak: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      analytics-fixture: { condition: service_completed_successfully }
+
   # ---- Checkout (RFC-0015): session orchestrator — client-only, reached only
   # through the edge (no host port, platform convention). Snapshots the cart via
   # cart.v1/GetCart and re-validates prices via product.v1/GetProducts.
@@ -1319,6 +1377,7 @@ services:
       payment: { condition: service_healthy }
       checkout: { condition: service_healthy }
       inventory: { condition: service_healthy } # backend of the inventory routes
+      analytics: { condition: service_healthy } # backend of the analytics route
       # The realm must be reachable before the edge starts: Envoy fetches the
       # JWKS for the jwt_authn filter and a private route cannot be served
       # until it has one.

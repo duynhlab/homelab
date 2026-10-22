@@ -143,6 +143,11 @@ e2e-operator: ## Operator resolve of a parked order (compose A20)
 	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/operator.js
 
+.PHONY: e2e-analytics-api
+e2e-analytics-api: ## The analytics protected surface: guard chain + contract (compose A25, kind K4.12/K4.13)
+	@mkdir -p scripts/k6/out
+	GATE=$(E2E_GATE) k6 run scripts/k6/analytics.js
+
 .PHONY: e2e-conformance
 e2e-conformance: ## Row C22: stop Weaver's live-check, save its report, fail on a violation (needs compose.weaver.yaml)
 	@cd local-stack && curl -sf -X POST localhost:4320/stop -o .weaver-live-check.json \

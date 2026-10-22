@@ -931,6 +931,15 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **Fleet patch release for the telemetry shutdown budget** (#1359): user
+  2.5.6, product 1.16.7, inventory 0.9.6, cart 2.4.6, order 2.10.7, review
+  2.6.5, shipping 1.10.5, notification 2.4.5, payment 2.8.5 (and mockpay),
+  checkout 0.13.7 — each flushes OTel on a fresh 5 s context after the HTTP
+  drain. **Backoffice 0.5.0** ships the Analytics page (replacing the
+  `sha-bae236d` pin; image unsigned while admin-service#52 is open).
+  analytics-service stays on `sha-8e4667f` (analytics-service#4). Gate:
+  full local-stack A/B/C + C22 on the merged SHAs, 2026-10-23.
+
 - **Ten services on `pkg/dbx` v0.39.0** (#1338): user 2.5.3, product 1.16.4,
   inventory 0.9.3, cart 2.4.3, order 2.10.4, review 2.6.2, shipping 1.10.2,
   notification 2.4.2, payment 2.8.2 (mockpay with it, up from 2.8.0) and

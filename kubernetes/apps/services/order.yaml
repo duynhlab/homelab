@@ -13,7 +13,7 @@ spec:
     # Legacy product-participant orders are refused, not rerouted to inventory.
     # Keep API/worker compatibility; the controller owns worker activation.
     # See docs/api/temporal.md and the FulfillmentStartOutboxFailed runbook.
-    image_tag: "2.10.6" # {"$imagepolicy": "flux-system:order:tag"}
+    image_tag: "2.10.7" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

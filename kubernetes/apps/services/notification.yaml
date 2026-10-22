@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: notification
-    image_tag: "2.4.4" # {"$imagepolicy": "flux-system:notification:tag"}
+    image_tag: "2.4.5" # {"$imagepolicy": "flux-system:notification:tag"}
     namespace: notification
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

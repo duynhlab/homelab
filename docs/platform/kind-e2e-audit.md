@@ -768,6 +768,21 @@ cannot be derived from a single file — they get their own row (K2.3).
 
 ---
 
+- [ ] **K3.12** The analytics reader sees the serving views and nothing else
+  (RFC-0030 / ADR-069). `analytics_reader` is the only identity
+  analytics-service accepts; the CHI grants it SELECT on the ten reviewed
+  `analytics.*_live` views by name under a `readonly=2` profile. The sweep
+  proves the ten positives and the negatives that matter: every raw table,
+  `otel.*`, `pg_stat_ch.*`, `system.query_log`, INSERT, CREATE, DROP, another
+  user's grants.
+  ```bash
+  scripts/analytics/serving-fixture.sh up        # the serving layer is FIXTURE-BACKED until the mirrors phase
+  scripts/analytics-reader-sweep.sh
+  ```
+  **FAIL:** any `FAIL` line. A raw table that reads means the grant list
+  widened; a view that refuses means the fixture (or, later, the mirrors) did
+  not create it.
+
 ## K4 — The real edge and identity
 
 > **Run these rows with one command.** `make e2e-smoke GATE=kind` asserts
@@ -1038,6 +1053,57 @@ breaks a command copied from the Compose audit:
   > for a run the suite reports as failing.
 
 ---
+
+- [ ] **K4.12** The dark launch is dark (RFC-0030 phase 8). `analytics` runs
+  with no HTTPRoute and no Admin navigation: the edge answers **404** for its
+  path, a pod in another app namespace cannot reach it (deny-all plus the
+  envoy-gateway-only ingress rule), and only a port-forward reaches the
+  Service. Through that port-forward the guard chain and the contract hold
+  exactly as on compose, and the two drills meet their clocks.
+  ```bash
+  curl -sk -o /dev/null -w '%{http_code}\n' "https://gateway.duynh.me/analytics/v1/protected/commerce/overview?currency=USD&from=$(date -u -d '7 days ago' +%F)&to=$(date -u +%F)"
+  # want 404
+  kubectl -n checkout run -it --rm --restart=Never --image=curlimages/curl:8.17.0 probe -- \
+    curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://analytics.analytics.svc.cluster.local:8080/health
+  # want a timeout (exit 28), not 200
+  kubectl -n analytics port-forward svc/analytics 18080:8080 &
+  GATE=kind ANALYTICS_BASE=http://127.0.0.1:18080 make e2e-analytics-api
+  GATE=kind ANALYTICS_URL=http://127.0.0.1:18080 scripts/analytics-freshness-drill.sh
+  GATE=kind ANALYTICS_URL=http://127.0.0.1:18080 scripts/analytics-failure-drill.sh
+  ```
+  Performance (G8.5) on the 1M-fact fixture (`serving-fixture.sh up 500000`):
+  50 overview calls each on 7-, 30- and 90-day windows, then
+  ```sql
+  SELECT quantile(0.95)(query_duration_ms), max(memory_usage)
+  FROM system.query_log WHERE user = 'analytics_reader' AND type = 'QueryFinish' AND event_time > now() - INTERVAL 15 MINUTE
+  ```
+  **Want:** p95 ≤ 500 ms, max memory ≤ 512 MiB, the ClickHouse pods' restart
+  count unchanged, and the API totals equal to the same sums run as `default`.
+  **FAIL:** a 200 at the edge or from the probe pod (the launch is not dark),
+  any A25-shaped assertion failing, a drill transition off its clock, or a
+  performance bar missed.
+
+- [ ] **K4.13** The analytics route holds at the edge (RFC-0030 phase 9).
+  Once `api-analytics-protected` and its `jwt-edge-staff` policy exist:
+  tokenless **401** at the edge, a customer-realm token **401 wrong-issuer**,
+  `duyne-viewer` **403 `FORBIDDEN`** (a valid staff login without the role),
+  `duyne` **200** with the contract. Asserted as **K4.13**.
+  ```bash
+  make e2e-analytics-api GATE=kind
+  ```
+  **FAIL:** a 403 for the customer token (the edge let it through), or any
+  assertion in the row.
+
+- [ ] **K4.14** The Admin page shows the server's verdict (RFC-0030 phase 9).
+  In the browser, `duyne` reaches `/analytics` from the eighth navigation item
+  and sees the freshness region with three source lags, formatted money, the
+  trend and the funnel; with the heartbeat Deployment scaled to 0 the banner
+  reads **Delayed data** after ~2.5 min and the **unavailable** state with
+  Retry after ~5.5 min, fresh again within a minute of scaling it back;
+  `duyne-viewer` lands on `/forbidden`. Same shape as compose B11, against
+  `https://backoffice.duynh.me`.
+  **FAIL:** a figure shown while the API answers 503, or a rendered page for
+  the role-less account.
 
 ## K5 — The four signals
 
@@ -1408,6 +1474,29 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 
 ---
 
+- [ ] **K5.11** Analytics signals, idle and busy (RFC-0030 / ADR-069). With
+  **no** API traffic the sampler's gauges exist per replica; after K4.12's
+  calls the DB duration histogram and a complete trace exist; the ClickHouse
+  server carries the trace id.
+  ```bash
+  VM=http://localhost:8428   # port-forward svc/vmsingle (or the Grafana datasource)
+  for m in analytics_source_lag_seconds analytics_source_state_ratio analytics_freshness_last_success_time_seconds; do
+    curl -s "$VM/api/v1/query?query=count($m{service_name=\"analytics\"})%20by%20(k8s_pod_name)"; echo
+  done
+  curl -s "$VM/api/v1/query?query=sum(analytics_source_state_ratio{service_name=\"analytics\"})%20by%20(k8s_pod_name,analytics_source_name)"   # every value 1
+  curl -s "$VM/api/v1/query?query=count(db_client_operation_duration_seconds_count{service_name=\"analytics\",db_system_name=\"clickhouse\"})"
+  ```
+  Then scale `analytics` to 2 and repeat: two `k8s_pod_name` values per gauge,
+  the one-hot sums still 1, and the series count per replica at or under the
+  **376** budget (3 lag + 12 state + 1 last-success + ≤360 DB).
+  Trace ancestry and server-side correlation: the same SQL as compose C23
+  against `otel.otel_traces` and `system.opentelemetry_span_log` on the CHI
+  (the span log, not `query_log`, is where ClickHouse records the client's
+  trace id).
+  **FAIL:** a gauge missing at idle, a one-hot sum other than 1, a replica
+  whose series collide (same `k8s_pod_name`), or a trace whose client span is
+  missing.
+
 ## K6 — Evidence and teardown
 
 - [ ] **K6.1** Fill this in and paste it into the pull request or release record.
@@ -1425,9 +1514,9 @@ Preconditions: Compose gate <link/date> · tags pinned · previous cluster torn 
 | K0 machine | 8 | | tools present; ports free; N/N route hostnames resolve; multi-arch legs |
 | K1 bring-up | 8 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8; worker version Current |
 | K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 7/7 ResourceSets Ready |
-| K3 admission/secrets | 9 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.4 84/84; K3.7 guard 2/2; K3.8–K3.9 db-authz 10/10 |
-| K4 edge/identity | 10 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
-| K5 signals | 10 | | traces rooted at edge; both log legs; 33/33 dashboards resolve; N VERIFY-AT-KIND markers closed |
+| K3 admission/secrets | 10 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.4 84/84; K3.7 guard 2/2; K3.8–K3.9 db-authz 10/10 |
+| K4 edge/identity | 13 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
+| K5 signals | 11 | | traces rooted at edge; both log legs; 33/33 dashboards resolve; N VERIFY-AT-KIND markers closed |
 | K6 wrap | 3 | | `make down` removes cluster **and** registry |
 
 **Image ↔ pin comparison (K2.2), one line per workload:**
@@ -1455,6 +1544,63 @@ Rows not run: <list, with why> — outstanding, not passed.
 ---
 
 ## Previous runs
+
+### 2026-10-23 — analytics dark launch, edge route and Admin page (RFC-0030 phases 8–9)
+
+Cluster: kind `homelab`, Kubernetes 1.35.8, fresh
+Host: Linux + Docker (`/var/lib/docker` on ZFS), arch amd64
+Revision: `feat/rfc0030-dark-launch` (#1360) at `16f433a2` on top of `main`
+`540d99b1`; **DR replica off** (working-tree patch, not committed), so 29
+declared + `flux-system` = 30 Kustomizations. Images asserted:
+`analytics-service:sha-8e4667f` (main `8e4667fb`, signed) and
+`admin-service:sha-bae236d` (main `bae236db`; its main build fails Trivy,
+admin-service#52, so the image is **unsigned**).
+Preconditions: compose gate on the same trees passed A25 25/25, both drills,
+B11, C4/C6/C12/C16 on all eleven services, C23 and C22 (0 violations) on
+2026-10-22 · scope is the RFC-0030 rows (K3.12, K4.12–K4.14, K5.11) plus
+bring-up.
+
+The serving layer is **fixture-backed** (`scripts/analytics/serving-fixture.sh`,
+PeerDB's table shape, CDC not deployed); every row below reads it.
+
+| Group | Result | Evidence |
+|---|---|---|
+| K1 bring-up | PASS | `make up` exit 0; **30/30 Ready**; `rs-analytics` Ready; `analytics` pod Running on `sha-8e4667f`; 5 Kyverno PolicyReports in `analytics` all `fail=0` |
+| K3.12 reader isolation | PASS | `scripts/analytics-reader-sweep.sh` **28/28**: ten `*_live` views readable, ten raw tables refused, INSERT/CREATE/DROP refused, `otel.*`, `pg_stat_ch.*`, `system.query_log` and `SHOW GRANTS FOR default` refused, per-query settings accepted under `readonly=2` |
+| K4.12 dark launch | PASS (functional) / **FAIL (G8.5)** | edge 404 before the route; probe pod from `checkout` times out; direct k6 **26/26**; freshness drill stale **+123 s**, unavailable **+303 s**, healthy **+6 s** after restart; failure drill 503 `ANALYTICS_UNAVAILABLE` in 0.28 s, `/ready` 503, `/health` 200, recovered +2 s. Performance on 1M facts: **150/150 calls 503** at ~2.1 s (ClickHouse cancels at the 2 s budget), p95 of the queries that finish 146 ms, CH restarts 0/0/0, memory ≤ 152 MiB — analytics-service#4 |
+| K4.13 edge route | PASS | `make e2e-analytics-api GATE=kind` **25/25**: tokenless 401 at the edge, customer token 401 wrong-issuer, `duyne-viewer` 403 `FORBIDDEN`, `duyne` 200 with the contract, 400 matrix, `Cache-Control: no-store` |
+| K4.14 Admin page | PASS | `duyne` → `/analytics` from the **eighth** navigation item: freshness region with three lags, five formatted KPIs, the trend and the funnel; heartbeat scaled to 0 → **Delayed data** at +121 s and **Analytics is unavailable** with *Try again* at +302 s (figures hidden), fresh again **+45 s** after scaling back; `duyne-viewer` lands on `/forbidden` ("does not hold the backoffice_admin role") |
+| K5.11 signals | PASS | idle: 3 lag + 12 state + 1 last-success gauges per pod; at 2 replicas two `k8s_pod_name` values per gauge, every one-hot sum 1, analytics + DB series **112/376** per replica (the 540 total on the long-lived pod is spanmetrics and `http_server_*`, collector- and middleware-owned); DB duration histogram present; `analytics.overview` trace with the ClickHouse client child and the trace id in `system.opentelemetry_span_log` |
+
+Findings:
+
+1. **G8.5 FAIL — the read path does not scale** (analytics-service#4, view
+   cost also on #1333). The `*_live` views recompute `GROUP BY id` +
+   `argMax` over every row per call (2.6 s for `count()` on 1M entries vs
+   0.03 s with `FINAL`), and `toString()` on both sides of each join defeats
+   the typed hash join. Even on the 2,000-order seed each overview query
+   costs ~330 ms CPU on the CHI (p95 424–511 ms), so the page answers in
+   1.0–1.45 s. `v0.1.0` is not tagged until the owner picks a fix.
+2. **Fixture heartbeat versions restarted at 1 per process life**, so after
+   any restart the views kept the pre-restart row and the service never left
+   *unavailable* (both drills failed at recovery). Fixed in #1360 (`16f433a2`,
+   millisecond-timestamp versions, PeerDB's monotonic shape).
+3. **The Kind failure drill waited for a rollout that never completes**: with
+   `maxUnavailable: 0` a pod whose ClickHouse is unreachable never becomes
+   Ready, so the healthy pod keeps serving. The drill now probes the
+   replacement pod directly; the fencing itself is correct platform
+   behaviour and is worth stating in the ADR-069 runbook.
+4. **K4.14 named the Admin host `admin.duynh.me`**; the route is
+   `backoffice.duynh.me`. Fixed in the row.
+5. `admin-service` main builds fail Trivy on CVE-2026-107891 since
+   2026-10-18 (admin-service#52): `sha-bae236d` runs unsigned on Kind.
+
+Rows not run: K4.12's probe-pod check was run once before the route landed;
+the alert and dashboard promotion for analytics (`docs/observability/analytics/`)
+stays planned.
+
+**Decision: BLOCKED** for the analytics-service tag (G8.5); the route, the
+Admin page and the fixture-backed dark launch are ELIGIBLE on their rows.
 
 ### 2026-10-16 — RFC-0029 fleet gate: every service on the three-role split
 

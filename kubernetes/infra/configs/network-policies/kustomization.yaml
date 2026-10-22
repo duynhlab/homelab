@@ -13,3 +13,4 @@ resources:
   - checkout.yaml
   - inventory.yaml
   - identity.yaml
+  - analytics.yaml

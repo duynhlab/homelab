@@ -56,7 +56,9 @@ spec:
             # untracked SKUs and the warn-never-gate publish notice (protected
             # balances read). gha-workflows pins aligned to e321897. Compose
             # gate 2026-08-19; Playwright bootstrap + publish-warning rows pass.
-            tag: "0.4.4" # {"$imagepolicy": "flux-system:admin-service:tag"}
+            # sha-bae236d: the Analytics page (RFC-0030 / ADR-069, #1335), the
+            # eighth navigation item; replaced by 0.5.0 after the release audit.
+            tag: "sha-bae236d" # {"$imagepolicy": "flux-system:admin-service:tag"}
             pullPolicy: IfNotPresent
           # Nginx listens on 80; the chart default containerPort is also 80,
           # but state it so a chart default change cannot move it silently.

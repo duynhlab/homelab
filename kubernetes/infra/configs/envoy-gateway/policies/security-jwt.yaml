@@ -3,11 +3,11 @@
 # Zero provisioned key material: Envoy fetches and refreshes the realm JWKS
 # itself, so key rotation needs no edge action.
 #
-# 13 SecurityPolicies: seven `jwt-edge` (customer realm `duynhlab`) on the
+# 14 SecurityPolicies: seven `jwt-edge` (customer realm `duynhlab`) on the
 # /private/ surfaces — user-private, cart, order, review-private,
-# notification, payment-private, checkout — plus six `jwt-edge-staff`
+# notification, payment-private, checkout — plus seven `jwt-edge-staff`
 # (workforce realm `duynhlab-staff`, ADR-050) on the /protected/ Backoffice
-# surfaces. One SecurityPolicy per namespace because targetRefs only resolve
+# surfaces, analytics included (RFC-0030). One SecurityPolicy per namespace because targetRefs only resolve
 # same-namespace objects.
 #
 # `mergeType: StrategicMerge` keeps the gateway-level CORS baseline
@@ -286,3 +286,23 @@ spec:
         issuer: https://id.duynh.me/realms/duynhlab
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# analytics (RFC-0030 / ADR-069): the overview route rides the same staff
+# provider; the backoffice_admin gate stays in-service.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge-staff
+  namespace: analytics
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-analytics-protected
+  jwt:
+    providers:
+      - name: keycloak-staff
+        issuer: https://id.duynh.me/realms/duynhlab-staff
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs

@@ -1,7 +1,7 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
 # these rules are LIVE. Any ingress not explicitly allowed below is dropped.
 # identity namespace hosts Keycloak (HTTP :8080 app, :9000 management). Both the
-# edge AND the seven services that run pkg/authmw reach :8080 — the edge for its
+# edge AND the eleven services that run pkg/authmw reach :8080 — the edge for its
 # route and remoteJWKS, the services because their own verifier is the
 # authoritative one (docs/api/api.md § edge exposure) and is fail-closed.
 # Keycloak connects DIRECT to platform-db-rw:5432 — no pooler (RFC-0022 OQ#8 /
@@ -80,10 +80,10 @@ spec:
     # Enumerating by which manifests happened to set a variable found the
     # symptom, not the set.
     #
-    # The ten now listed are every namespace running an in-service verifier
-    # against either realm. Still NOT listed: frontend and backoffice (SPAs
-    # served by nginx — the browser holds the token, nothing server-side
-    # verifies it).
+    # The eleven now listed are every namespace running an in-service verifier
+    # against either realm (analytics verifies the staff realm, RFC-0030).
+    # Still NOT listed: frontend and backoffice (SPAs served by nginx — the
+    # browser holds the token, nothing server-side verifies it).
     #
     # Port 8080 only. The management interface (:9000) stays reachable from
     # `monitoring` alone.
@@ -93,6 +93,7 @@ spec:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
+                  - analytics
                   - cart
                   - checkout
                   - inventory

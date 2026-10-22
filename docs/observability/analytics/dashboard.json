@@ -41,7 +41,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "analytics_source_lag_seconds{service_name=\"analytics-service\"}",
+          "expr": "analytics_source_lag_seconds{service_name=\"analytics\"}",
           "legendFormat": "{{analytics_source_name}} / {{k8s_pod_name}}"
         }
       ],
@@ -76,8 +76,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "analytics_source_state{service_name=\"analytics-service\"}",
-          "legendFormat": "{{analytics_source_name}} / {{analytics_source_state}} / {{k8s_pod_name}}"
+          "expr": "analytics_source_state_ratio{service_name=\"analytics\"}",
+          "legendFormat": "{{analytics_source_name}} / {{analytics_source_state_ratio}} / {{k8s_pod_name}}"
         }
       ],
       "fieldConfig": {
@@ -111,7 +111,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "time() - analytics_freshness_last_success_time_seconds{service_name=\"analytics-service\"}",
+          "expr": "time() - analytics_freshness_last_success_time_seconds{service_name=\"analytics\"}",
           "legendFormat": "{{k8s_pod_name}}"
         }
       ],
@@ -146,7 +146,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, db_query_summary, k8s_pod_name) (rate(db_client_operation_duration_seconds_bucket{service_name=\"analytics-service\",db_system_name=\"clickhouse\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, db_query_summary, k8s_pod_name) (rate(db_client_operation_duration_seconds_bucket{service_name=\"analytics\",db_system_name=\"clickhouse\"}[$__rate_interval])))",
           "legendFormat": "{{db_query_summary}} / {{k8s_pod_name}}"
         }
       ],

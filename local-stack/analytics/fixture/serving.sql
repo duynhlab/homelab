@@ -1,27 +1,24 @@
--- Fixture-backed serving layer for analytics-service in local-stack.
+-- Fixture-backed serving layer for analytics-service: local-stack and the
+-- Kind dark launch (scripts/analytics/serving-fixture.sh) run this same file.
 --
--- CDC is NOT deployed here: the raw tables are created in the shape PeerDB
--- produces (the allowlisted columns plus _peerdb_version, _peerdb_is_deleted
--- and _peerdb_synced_at, ReplacingMergeTree on the version) and seeded with
--- representative commerce facts, so the API, the Admin page and the telemetry
--- rows can be exercised end to end. The *_live views and the reader grants are
--- byte-for-byte the serving contract of RFC-0030 (local-stack/analytics/
+-- CDC is NOT deployed in either: the raw tables are created in the shape
+-- PeerDB produces (the allowlisted columns plus _peerdb_version,
+-- _peerdb_is_deleted and _peerdb_synced_at, ReplacingMergeTree on the
+-- version) and seeded with representative commerce facts, so the API, the
+-- Admin page and the telemetry rows can be exercised end to end. The *_live
+-- views are the serving contract of RFC-0030 (local-stack/analytics/
 -- control.py serving()); the opt-in PeerDB overlay creates the same objects
--- from real mirrors. The heartbeat rows are refreshed by the
--- analytics-heartbeat container every 30 seconds.
+-- from real mirrors. The heartbeat rows are refreshed every 30 seconds by
+-- the analytics-heartbeat container (compose) or Deployment (Kind).
+--
+-- Identities are NOT here: compose creates them from users.sql, the CHI
+-- declares them (users are config there, so CREATE USER is refused).
+-- The database is created outside this file as well: compose as a plain
+-- database, Kind as Replicated on every replica, so the tables below land
+-- on all three.
 --
 -- Re-runnable: the raw tables are replaced (a type change lands on the next
 -- run), the views recreated and the seed regenerated.
--- Passwords are disposable local-stack values, like every other credential in
--- compose.yaml; the cluster delivers the reader's from OpenBAO.
-
-CREATE DATABASE IF NOT EXISTS analytics;
-
--- Identities. The definer owns nothing a login can reach; the reader never
--- sees a raw table.
-CREATE USER IF NOT EXISTS analytics_view_owner IDENTIFIED WITH sha256_password BY 'view-owner-local' HOST NONE;
-CREATE USER IF NOT EXISTS analytics_reader IDENTIFIED WITH sha256_password BY 'analytics-reader-local'
-  SETTINGS max_memory_usage = 536870912, max_execution_time = 2;
 
 -- Raw tables, PeerDB shape. Key types follow the sources as PeerDB maps them:
 -- order ids are integer (Int32), checkout stores the order id as text
@@ -73,61 +70,51 @@ CREATE OR REPLACE TABLE analytics.checkout_analytics_cdc_heartbeat AS analytics.
 CREATE OR REPLACE TABLE analytics.payment_analytics_cdc_heartbeat AS analytics.order_analytics_cdc_heartbeat;
 
 -- Serving views: latest version per id, tombstones hidden. A tuple preserves
--- NULLs from the latest row; per-column argMax would skip NULL.
-GRANT SELECT ON analytics.* TO analytics_view_owner;
+-- NULLs from the latest row; per-column argMax would skip NULL. The fixture's
+-- definer is `default` (exists on every replica of the CHI and in compose);
+-- the mirrors phase introduces the non-login analytics_view_owner the ADR
+-- names, together with the real raw tables.
 
-CREATE OR REPLACE VIEW analytics.order_orders_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.order_orders_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS status, latest.3 AS version, latest.4 AS created_at, latest.5 AS updated_at, latest.6 AS completed_at
   FROM (SELECT id, argMax(tuple(id,status,version,created_at,updated_at,completed_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.order_orders GROUP BY id) WHERE latest.7 = 0;
-CREATE OR REPLACE VIEW analytics.order_order_items_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.order_order_items_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS order_id, latest.3 AS product_id, latest.4 AS product_name, latest.5 AS quantity, latest.6 AS price, latest.7 AS subtotal, latest.8 AS created_at
   FROM (SELECT id, argMax(tuple(id,order_id,product_id,product_name,quantity,price,subtotal,created_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.order_order_items GROUP BY id) WHERE latest.9 = 0;
-CREATE OR REPLACE VIEW analytics.checkout_checkout_sessions_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.checkout_checkout_sessions_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS status, latest.3 AS order_id, latest.4 AS currency, latest.5 AS created_at, latest.6 AS updated_at
   FROM (SELECT id, argMax(tuple(id,status,order_id,currency,created_at,updated_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.checkout_checkout_sessions GROUP BY id) WHERE latest.7 = 0;
-CREATE OR REPLACE VIEW analytics.payment_payments_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.payment_payments_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS order_id, latest.3 AS currency, latest.4 AS created_at, latest.5 AS updated_at
   FROM (SELECT id, argMax(tuple(id,order_id,currency,created_at,updated_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.payment_payments GROUP BY id) WHERE latest.6 = 0;
-CREATE OR REPLACE VIEW analytics.payment_ledger_transactions_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.payment_ledger_transactions_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS payment_id, latest.3 AS kind, latest.4 AS created_at
   FROM (SELECT id, argMax(tuple(id,payment_id,kind,created_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.payment_ledger_transactions GROUP BY id) WHERE latest.5 = 0;
-CREATE OR REPLACE VIEW analytics.payment_ledger_entries_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.payment_ledger_entries_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS transaction_id, latest.3 AS account_id, latest.4 AS direction, latest.5 AS amount_minor
   FROM (SELECT id, argMax(tuple(id,transaction_id,account_id,direction,amount_minor,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.payment_ledger_entries GROUP BY id) WHERE latest.6 = 0;
-CREATE OR REPLACE VIEW analytics.payment_ledger_accounts_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.payment_ledger_accounts_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS name, latest.3 AS type
   FROM (SELECT id, argMax(tuple(id,name,type,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.payment_ledger_accounts GROUP BY id) WHERE latest.4 = 0;
-CREATE OR REPLACE VIEW analytics.order_analytics_cdc_heartbeat_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.order_analytics_cdc_heartbeat_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS emitted_at
   FROM (SELECT id, argMax(tuple(id,emitted_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.order_analytics_cdc_heartbeat GROUP BY id) WHERE latest.3 = 0;
-CREATE OR REPLACE VIEW analytics.checkout_analytics_cdc_heartbeat_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.checkout_analytics_cdc_heartbeat_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS emitted_at
   FROM (SELECT id, argMax(tuple(id,emitted_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.checkout_analytics_cdc_heartbeat GROUP BY id) WHERE latest.3 = 0;
-CREATE OR REPLACE VIEW analytics.payment_analytics_cdc_heartbeat_live DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
+CREATE OR REPLACE VIEW analytics.payment_analytics_cdc_heartbeat_live DEFINER = default SQL SECURITY DEFINER AS
   SELECT latest.1 AS id, latest.2 AS emitted_at
   FROM (SELECT id, argMax(tuple(id,emitted_at,_peerdb_is_deleted), _peerdb_version) AS latest
         FROM analytics.payment_analytics_cdc_heartbeat GROUP BY id) WHERE latest.3 = 0;
-
--- The reader gets the views and nothing else.
-GRANT SELECT ON analytics.order_orders_live TO analytics_reader;
-GRANT SELECT ON analytics.order_order_items_live TO analytics_reader;
-GRANT SELECT ON analytics.checkout_checkout_sessions_live TO analytics_reader;
-GRANT SELECT ON analytics.payment_payments_live TO analytics_reader;
-GRANT SELECT ON analytics.payment_ledger_transactions_live TO analytics_reader;
-GRANT SELECT ON analytics.payment_ledger_entries_live TO analytics_reader;
-GRANT SELECT ON analytics.payment_ledger_accounts_live TO analytics_reader;
-GRANT SELECT ON analytics.order_analytics_cdc_heartbeat_live TO analytics_reader;
-GRANT SELECT ON analytics.checkout_analytics_cdc_heartbeat_live TO analytics_reader;
-GRANT SELECT ON analytics.payment_analytics_cdc_heartbeat_live TO analytics_reader;
 
 -- Representative seed: {orders} orders spread over the last 100 UTC days,
 -- one line each, every order captured, every twentieth refunded a day later,

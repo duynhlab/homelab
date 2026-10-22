@@ -55,7 +55,7 @@ spec:
       matchExpressions:
         - key: kubernetes.io/metadata.name
           operator: In
-          values: [inventory, user, product, cart, order, review, notification, shipping, payment, checkout]
+          values: [inventory, user, product, cart, order, review, notification, shipping, payment, checkout, analytics]
   matchConditions:
     - name: not-job-owned
       expression: >-

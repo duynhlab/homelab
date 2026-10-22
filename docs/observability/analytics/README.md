@@ -67,7 +67,7 @@ Public API errors remain `ANALYTICS_UNAVAILABLE`.
 
 ## Identity and cardinality budget
 
-Use `service.name=analytics-service` and the shared resource builder. Set the
+Use `service.name=analytics` (the fleet short name from `OTEL_SERVICE_NAME`, as compose and the ResourceSet set it) and the shared resource builder. Set the
 release version and a distinct pod identity on every replica. The current
 vmagent promotion allowlist preserves `k8s.pod.name`, **not**
 `service.instance.id`; the candidate dashboard therefore splits by
@@ -98,9 +98,12 @@ one-hot state, time since sampler success, and query p95. **Never sum lag across
 replicas**: summation makes two healthy replicas appear twice as stale.
 
 [alerts.yaml](alerts.yaml) contains Prometheus-format rule candidates, not a
-loaded `PrometheusRule`. The names assume OTLP-to-Prometheus unit suffixing;
-verify actual names in VictoriaMetrics at G8 before provisioning. The
-`service_name` label is retained on both platform and Compose OTLP paths.
+loaded `PrometheusRule`. The names are the ones VictoriaMetrics stores after
+OTLP-to-Prometheus unit suffixing, verified on local-stack 2026-10-22:
+`analytics_source_lag_seconds`, `analytics_source_state_ratio` (unit `1`
+becomes `_ratio`), `analytics_freshness_last_success_time_seconds` and
+`db_client_operation_duration_seconds`. The `service_name` label is
+retained on both platform and Compose OTLP paths.
 
 | Alert | Dwell | Meaning and first action | Recovery |
 |---|---|---|---|

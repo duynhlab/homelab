@@ -1059,8 +1059,11 @@ services:
   analytics-fixture:
     image: clickhouse/clickhouse-server:26.9
     mem_limit: *oneshot-mem
-    entrypoint: ["clickhouse-client"]
-    command: ["--host", "clickhouse", "--password", "otel", "--multiquery", "--param_orders=2000", "--queries-file", "/fixture/serving.sql"]
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        clickhouse-client --host clickhouse --password otel --multiquery --queries-file /fixture/users.sql
+        && clickhouse-client --host clickhouse --password otel --multiquery --param_orders=2000 --queries-file /fixture/serving.sql
     volumes:
       - ./analytics/fixture:/fixture:ro
     depends_on:

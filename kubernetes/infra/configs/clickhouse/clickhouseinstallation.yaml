@@ -88,10 +88,45 @@ spec:
       pg_stat_ch/quota: default
       pg_stat_ch/grants/query:
         - "GRANT INSERT ON pg_stat_ch.*"
+      # analytics_reader: analytics-service's identity (RFC-0030 / ADR-069).
+      # SELECT on the reviewed serving views by name — never a raw table, never
+      # another database — so a leaked password reads the overview and nothing
+      # else. The views are created by the serving layer (fixture today, the
+      # mirrors phase later); a grant on a not-yet-existing object is stored
+      # and takes effect once it exists. Password from the ESO-managed
+      # clickhouse-analytics-reader Secret (OpenBAO .../clickhouse/analytics_reader).
+      analytics_reader/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-analytics-reader
+            key: password
+      analytics_reader/networks/ip:
+        - "0.0.0.0/0"
+        - "::/0"
+      analytics_reader/profile: analytics_reader
+      analytics_reader/quota: default
+      analytics_reader/grants/query:
+        - "GRANT SELECT ON analytics.order_orders_live"
+        - "GRANT SELECT ON analytics.order_order_items_live"
+        - "GRANT SELECT ON analytics.checkout_checkout_sessions_live"
+        - "GRANT SELECT ON analytics.payment_payments_live"
+        - "GRANT SELECT ON analytics.payment_ledger_transactions_live"
+        - "GRANT SELECT ON analytics.payment_ledger_entries_live"
+        - "GRANT SELECT ON analytics.payment_ledger_accounts_live"
+        - "GRANT SELECT ON analytics.order_analytics_cdc_heartbeat_live"
+        - "GRANT SELECT ON analytics.checkout_analytics_cdc_heartbeat_live"
+        - "GRANT SELECT ON analytics.payment_analytics_cdc_heartbeat_live"
     # ClickHouse 26.x answers in ZSTD by default; the extension's client only
     # speaks LZ4, so the writer's profile pins the network codec.
     profiles:
       pg_stat_ch/network_compression_method: LZ4
+      # The reader's server-side belt: the service sends the same limits per
+      # query, the profile makes them hold even for a misconfigured client.
+      analytics_reader/max_memory_usage: "536870912"
+      analytics_reader/max_execution_time: "2"
+      # readonly=2: SELECT only, but the per-query settings the service sends
+      # (max_execution_time, max_result_rows, …) are still accepted.
+      analytics_reader/readonly: "2"
     # The engine's own Prometheus endpoint, finally enabled. At 1x1 the Altinity
     # metrics-exporter's chi_* series were the whole engine view and a per-pod
     # scrape would have duplicated them; with three replicas the per-pod series

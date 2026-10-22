@@ -4,21 +4,21 @@ groups:
     interval: 30s
     rules:
       - alert: AnalyticsSourceStale
-        expr: analytics_source_state{service_name="analytics-service",analytics_source_state="stale"} == 1
+        expr: analytics_source_state{service_name="analytics",analytics_source_state="stale"} == 1
         for: 1m
         labels: {severity: warning}
         annotations:
           summary: Analytics source heartbeat is stale
           runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
       - alert: AnalyticsSourceUnavailable
-        expr: analytics_source_state{service_name="analytics-service",analytics_source_state="unavailable"} == 1
+        expr: analytics_source_state{service_name="analytics",analytics_source_state="unavailable"} == 1
         for: 1m
         labels: {severity: critical}
         annotations:
           summary: Analytics source heartbeat is older than 300 seconds
           runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
       - alert: AnalyticsFreshnessUnknown
-        expr: analytics_source_state{service_name="analytics-service",analytics_source_state="unknown"} == 1
+        expr: analytics_source_state{service_name="analytics",analytics_source_state="unknown"} == 1
         for: 1m
         labels: {severity: warning}
         annotations:
@@ -26,16 +26,16 @@ groups:
           runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
       - alert: AnalyticsSamplerMissing
         expr: |
-          count by (service_name, k8s_pod_name) (last_over_time(go_goroutine_count{service_name="analytics-service"}[2m]))
+          count by (service_name, k8s_pod_name) (last_over_time(go_goroutine_count{service_name="analytics"}[2m]))
           unless on (service_name, k8s_pod_name)
-          count by (service_name, k8s_pod_name) (last_over_time(analytics_source_state{service_name="analytics-service"}[2m]))
+          count by (service_name, k8s_pod_name) (last_over_time(analytics_source_state{service_name="analytics"}[2m]))
         for: 1m
         labels: {severity: warning}
         annotations:
           summary: Analytics runtime exists without sampler telemetry
           runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
       - alert: AnalyticsServiceMissing
-        expr: absent_over_time(go_goroutine_count{service_name="analytics-service"}[2m])
+        expr: absent_over_time(go_goroutine_count{service_name="analytics"}[2m])
         for: 1m
         labels: {severity: critical}
         annotations:

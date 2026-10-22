@@ -5,16 +5,16 @@ tests:
 - name: stale fires and recovers
   interval: 30s
   input_series:
-  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+  - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="stale"}
+  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="stale"}
     values: 1+0x3 0+0x6
   alert_rule_test:
   - eval_time: 1m
     alertname: AnalyticsSourceStale
     exp_alerts:
     - exp_labels:
-        service_name: analytics-service
+        service_name: analytics
         k8s_pod_name: analytics-1
         analytics_source_name: order
         analytics_source_state: stale
@@ -28,16 +28,16 @@ tests:
 - name: unavailable fires and recovers
   interval: 30s
   input_series:
-  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+  - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unavailable"}
+  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unavailable"}
     values: 1+0x3 0+0x6
   alert_rule_test:
   - eval_time: 1m
     alertname: AnalyticsSourceUnavailable
     exp_alerts:
     - exp_labels:
-        service_name: analytics-service
+        service_name: analytics
         k8s_pod_name: analytics-1
         analytics_source_name: order
         analytics_source_state: unavailable
@@ -51,16 +51,16 @@ tests:
 - name: unknown fires and recovers
   interval: 30s
   input_series:
-  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+  - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unknown"}
+  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unknown"}
     values: 1+0x3 0+0x6
   alert_rule_test:
   - eval_time: 1m
     alertname: AnalyticsFreshnessUnknown
     exp_alerts:
     - exp_labels:
-        service_name: analytics-service
+        service_name: analytics
         k8s_pod_name: analytics-1
         analytics_source_name: order
         analytics_source_state: unknown
@@ -74,16 +74,16 @@ tests:
 - name: missing sampler and recovery
   interval: 30s
   input_series:
-  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+  - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1+0x10
-  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="healthy"}
+  - series: analytics_source_state{service_name="analytics",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="healthy"}
     values: _ _ _ _ 1+0x6
   alert_rule_test:
   - eval_time: 1m
     alertname: AnalyticsSamplerMissing
     exp_alerts:
     - exp_labels:
-        service_name: analytics-service
+        service_name: analytics
         k8s_pod_name: analytics-1
         severity: warning
       exp_annotations:
@@ -95,14 +95,14 @@ tests:
 - name: missing service and recovery
   interval: 30s
   input_series:
-  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+  - series: go_goroutine_count{service_name="analytics",k8s_pod_name="analytics-1"}
     values: 1 _ _ _ _ _ _ _ 1+0x2
   alert_rule_test:
   - eval_time: 3m
     alertname: AnalyticsServiceMissing
     exp_alerts:
     - exp_labels:
-        service_name: analytics-service
+        service_name: analytics
         severity: critical
       exp_annotations:
         summary: Analytics service or its telemetry export is missing

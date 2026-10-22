@@ -1490,7 +1490,9 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   the one-hot sums still 1, and the series count per replica at or under the
   **376** budget (3 lag + 12 state + 1 last-success + ≤360 DB).
   Trace ancestry and server-side correlation: the same SQL as compose C23
-  against `otel.otel_traces` and `system.query_log` on the CHI.
+  against `otel.otel_traces` and `system.opentelemetry_span_log` on the CHI
+  (the span log, not `query_log`, is where ClickHouse records the client's
+  trace id).
   **FAIL:** a gauge missing at idle, a one-hot sum other than 1, a replica
   whose series collide (same `k8s_pod_name`), or a trace whose client span is
   missing.

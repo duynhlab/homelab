@@ -67,7 +67,7 @@ Public API errors remain `ANALYTICS_UNAVAILABLE`.
 
 ## Identity and cardinality budget
 
-Use `service.name=analytics-service` and the shared resource builder. Set the
+Use `service.name=analytics` (the fleet short name from `OTEL_SERVICE_NAME`, as compose and the ResourceSet set it) and the shared resource builder. Set the
 release version and a distinct pod identity on every replica. The current
 vmagent promotion allowlist preserves `k8s.pod.name`, **not**
 `service.instance.id`; the candidate dashboard therefore splits by

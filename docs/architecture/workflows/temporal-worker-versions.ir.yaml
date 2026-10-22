@@ -23,6 +23,8 @@
 # values and apps-local (wait true, timeout 10m) are unchanged. The live-builds
 # frame title was shortened so the controller's edge to build A no longer crosses
 # it; ~120 orderings x pin re-measured and the current order stays best (4 crossings).
+# 2026-10-22 (#1339): release numbers dropped from node labels, since they went stale on
+# every bump; the versions live in the manifests the lines above name.
 diagram:
   id: temporal-worker-versions
   title: "duynhlab homelab — One worker release: builds, rollout and per-build scaling"
@@ -66,8 +68,8 @@ nodes:
   - {id: wd, label: "WorkerDeployment order-fulfillment\nthe release edits image: only\nProgressive 10 % → 50 % · 30 s each\nsunset 1 h · delete 0 s · no replicas", role: worker, layer: decl, parent: f_decl}
   - {id: wrt, label: "WorkerResourceTemplate\norder-fulfillment-scaler\nScaledObject: min 1 · max 3 · target 5", role: worker, layer: decl, parent: f_decl}
 
-  - {id: twc, label: "temporal-worker-controller 1.12.0\nowns builds, not replicas", role: platform, layer: ctl, parent: f_ctl, icon: temporal}
-  - {id: keda, label: "KEDA 2.21.0\ntemporal scaler · poll 15 s", role: platform, layer: ctl, parent: f_keda, icon: keda}
+  - {id: twc, label: "temporal-worker-controller\nowns builds, not replicas", role: platform, layer: ctl, parent: f_ctl, icon: temporal}
+  - {id: keda, label: "KEDA\ntemporal scaler · poll 15 s", role: platform, layer: ctl, parent: f_keda, icon: keda}
 
   - {id: so_a, label: "ScaledObject + HPA · build A\n1–3 pods = ceil(backlog A / 5)", role: worker, layer: live, parent: f_a}
   - {id: so_b, label: "ScaledObject + HPA · build B\n1–3 pods = ceil(backlog B / 5)", role: worker, layer: live, parent: f_b}
@@ -75,7 +77,7 @@ nodes:
   - {id: dep_a, label: "Deployment · build A\nnew runs: 90 % → 50 % → none\nkeeps its pinned runs · floor 1 pod", role: worker, layer: live, parent: f_a, icon: go}
   - {id: dep_b, label: "Deployment · build B\nnew runs: 10 % → 50 % → all\nfloor 1 pod from creation", role: worker, layer: live, parent: f_b, icon: go}
 
-  - {id: server, label: "Temporal server 1.32.1 · namespace mop\nworker deployment order/order-fulfillment\nCurrent · Ramping % · drainage per build", role: platform, layer: server, parent: f_temporal, icon: temporal}
+  - {id: server, label: "Temporal server · namespace mop\nworker deployment order/order-fulfillment\nCurrent · Ramping % · drainage per build", role: platform, layer: server, parent: f_temporal, icon: temporal}
 
 edges:
   - {id: e_pull, source: oci, target: flux, type: dependency, label: "pulled by Flux"}

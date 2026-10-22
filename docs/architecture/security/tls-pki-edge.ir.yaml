@@ -1,5 +1,5 @@
-# Source of docs/architecture/security/tls-topology.drawio -- edit this, then regenerate:
-#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/security/tls-topology.ir.yaml
+# Source of docs/architecture/security/tls-pki-edge.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/security/tls-pki-edge.ir.yaml
 # Verified on 2026-10-01 against: configs/cert-manager/{clusterissuers,bundles}.yaml,
 # configs/envoy-gateway/{gateway,certificate,coredns}.yaml + routes/ + policies/security-jwt.yaml,
 # clusters/local/envoy-gateway-config.yaml (local homelab-ca patch), configs/flux-web/certificate.yaml,
@@ -19,19 +19,18 @@
 # tlsVerify verify_full), apps/services/*.yaml + apps/*-worker.yaml (db_sslmode verify-full),
 # */authz/job.yaml (PGSSLMODE verify-full), */authz/policies/*.yaml (pgroles sslMode
 # require, #1306) and */openbao-db-config.yaml (sslmode=require). Not re-measured on Kind.
-# Visual review 2026-10-19: d_pgdogup and d_pgbup labels moved (label_pos) off the
-# client-CA and telemetry-store labels they overlapped; content unchanged.
+# Split from tls-topology on 2026-10-22 (#1339): this view keeps the PKI, the edge and
+# the east-west hops; database, pooler and store hops are in tls-data-tier.
 diagram:
-  id: tls-topology
-  title: "duynhlab homelab — TLS topology (Kind, as deployed)"
-  scope: "Which hops carry TLS today, who issues their certificates, and whether the client verifies them. The hop state is written on every edge: TLS verified / TLS unverified / PLAINTEXT / planned. Telemetry and datasource hops are collapsed to one edge per pair of tiers; the full per-hop list is the §12.1 table in docs/secrets/cert-manager.md. local-stack is plaintext by design and is not drawn."
+  id: tls-pki-edge
+  title: "duynhlab homelab — TLS: PKI, edge and east-west (Kind, as deployed)"
+  scope: "Who issues each certificate, and which request, identity and east-west hops are encrypted and verified. The hop state is written on every edge: TLS verified / TLS unverified / PLAINTEXT / planned. Database, pooler and store hops are in tls-data-tier; the full per-hop list is the §12.1 table in docs/secrets/cert-manager.md. local-stack is plaintext by design and is not drawn."
   question: domain-topology
   level: L4
-  animate: [traffic, data, telemetry]
+  animate: [traffic, telemetry]
   legend:
     roles:
       platform: "Platform / PKI component"
-      data: "Datastore / pooler"
       service: "Services · identity · Grafana"
       collector: "OTel Collector"
       edge: "Edge (TLS termination)"
@@ -41,14 +40,11 @@ diagram:
       traffic: "request (state on the label)"
       data: "reads / writes (state on the label)"
       trust: "identity fetch: JWKS · OIDC · OAuth"
-      control: "issues · signs · unseals · configures"
-      replication: "backups / WAL to S3"
-      telemetry: "OTLP · telemetry export"
+      control: "issues · signs · unseals"
+      telemetry: "OTLP export (stores: tls-data-tier)"
       dependency: "planned work (RFC-0020)"
-  assumptions:
-    - "Temporal's SQL plugin is drawn plaintext because neither datastore has a tls block."
 
-layers: [client, pki, edge, apps, platform, pooling, data, objects]
+layers: [client, pki, edge, apps, platform, objects]
 
 boundaries:
   - {id: f_cluster, label: "Kind cluster · homelab"}
@@ -56,90 +52,52 @@ boundaries:
   - {id: f_edge, label: "Edge", parent: f_cluster}
   - {id: f_apps, label: "East-west · no mesh", parent: f_cluster}
   - {id: f_platform, label: "Platform", parent: f_cluster}
-  - {id: f_data, label: "Data", parent: f_cluster}
 
 nodes:
   - {id: browser, label: "Browser\n*.duynh.me", role: external, layer: client}
-
   - {id: root, label: "homelab-ca root CA\nself-signed · 10y · no renewBefore\nregenerated every make up", role: platform, layer: pki, parent: f_pki}
   - {id: rfc, label: "RFC-0020 slices (planned)\nS0 · S1 · S5–S14 · provisional\nnot installed (S2–S4 via ADR-089)", role: planned, layer: pki, parent: f_pki, status: planned}
   - {id: issuer, label: "ClusterIssuer homelab-ca\n6 leaves + 13 ca.crt anchors\n90d · renew 15d", role: platform, layer: edge, parent: f_pki, icon: cert-manager}
   - {id: bundle, label: "trust-manager Bundle\ncommitted CA copy\nmonitoring only · no consumer", role: platform, layer: edge, parent: f_pki}
-
   - {id: eg, label: "Envoy Gateway\n:443 platform-edge-tls\n:80 → 301 https · HSTS", role: edge, layer: edge, parent: f_edge, icon: envoy}
-
   - {id: svc, label: "10 Go services + 2 workers\ngRPC :9090 between them:\nPLAINTEXT (insecure creds)", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: kc, label: "Keycloak\n:8080 HTTP in-cluster", role: service, layer: apps, parent: f_apps, icon: keycloak}
   - {id: graf, label: "Grafana\nOAuth via Keycloak", role: service, layer: apps, parent: f_apps, icon: grafana}
-
   - {id: eso, label: "External Secrets Operator\n+ OpenBao config Jobs", role: platform, layer: platform, parent: f_platform, icon: external-secrets}
-  - {id: pgroles, label: "pgroles operator\nin-database grants", role: platform, layer: platform, parent: f_platform}
   - {id: bao, label: "OpenBao HA Raft\n:8200 tls_disable = 1", role: platform, layer: platform, parent: f_platform, icon: openbao}
   - {id: floci, label: "floci KMS emulator\n:4566 HTTP", role: platform, layer: platform, parent: f_platform}
   - {id: temporal, label: "Temporal frontend\n:7233", role: platform, layer: platform, parent: f_platform, icon: temporal}
   - {id: otel, label: "OTel Collector\n:4317 · :4318", role: collector, layer: platform, parent: f_platform, icon: opentelemetry}
   - {id: fluxop, label: "Flux Operator\nsync + web UI", role: platform, layer: platform, parent: f_platform, icon: flux}
-
-  - {id: pgdog, label: "PgDog ×3 :6432\nproduct-db pooler · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data, icon: pgdog}
-  - {id: pgb, label: "CNPG PgBouncer :5432\nplatform-db pooler · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data}
-  - {id: valkey, label: "Valkey :6379\nauth disabled", role: data, layer: pooling, parent: f_data, shape: datastore}
-  - {id: opca, label: "CNPG client CA\noperator-managed, not homelab-ca", role: platform, layer: pooling, parent: f_data, icon: cloudnativepg}
-
-  - {id: proddb, label: "product-db (+ DR replica)\nCNPG · homelab-ca server cert", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
-  - {id: platdb, label: "platform-db\nCNPG · homelab-ca server cert", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
-  - {id: obsdb, label: "Telemetry stores\nVictoriaMetrics · Logs · Traces\nClickHouse :9000 · Pyroscope", role: data, layer: data, parent: f_data, shape: datastore}
-
-  - {id: rustfs, label: "RustFS S3\n:9000 HTTP", role: data, layer: objects, parent: f_data, shape: datastore}
   - {id: registry, label: "homelab-registry:5000\nOCI artifacts (Kind host)", role: external, layer: objects}
 
 edges:
   - {id: t_browser, source: browser, target: eg, type: traffic, label: "TLS verified · HTTPS\n(once homelab-ca is trusted)"}
-
   - {id: c_sign, source: root, target: issuer, type: control, label: "signs"}
   - {id: c_bundle, source: root, target: bundle, type: control, status: optional, label: "committed copy\nstale after rebuild"}
   - {id: p_rfc, source: rfc, target: issuer, type: dependency, status: planned, label: "planned · more leaves\nfrom homelab-ca"}
   - {id: c_edge, source: issuer, target: eg, type: control, label: "issues platform-edge-tls"}
   - {id: c_baoleaf, source: issuer, target: bao, type: control, label: "openbao-idp-trust\n(ca.crt only)"}
   - {id: c_fluxleaf, source: issuer, target: fluxop, type: control, label: "flux-web-idp-trust\n(ca.crt only)"}
-
   - {id: t_backends, source: eg, target: svc, type: traffic, label: "PLAINTEXT · HTTP\nno BackendTLSPolicy\n(admin UIs too)"}
   - {id: r_egjwks, source: eg, target: kc, type: trust, label: "PLAINTEXT\nroute + remoteJWKS"}
   - {id: r_svcjwks, source: svc, target: kc, type: trust, label: "PLAINTEXT · JWKS"}
   - {id: r_graf, source: graf, target: kc, type: trust, label: "PLAINTEXT\nOAuth token"}
   - {id: r_bao, source: bao, target: eg, type: trust, label: "TLS verified · live CA\nOIDC discovery hairpin"}
   - {id: r_flux, source: fluxop, target: eg, type: trust, label: "TLS verified · live CA\nOIDC hairpin"}
-
   - {id: t_temporal, source: svc, target: temporal, type: traffic, label: "PLAINTEXT · gRPC"}
   - {id: m_otel, source: svc, target: otel, type: telemetry, label: "PLAINTEXT · OTLP\n(services + Envoy)"}
   - {id: d_eso, source: eso, target: bao, type: data, label: "PLAINTEXT\nSA JWT + reads"}
   - {id: c_unseal, source: bao, target: floci, type: control, label: "PLAINTEXT · awskms seal"}
   - {id: d_oci, source: fluxop, target: registry, type: data, label: "PLAINTEXT · OCI pull\ninsecure · no cosign"}
 
-  - {id: d_pgdog, source: svc, target: pgdog, type: data, label: "TLS verified\nverify-full"}
-  - {id: d_pgb, source: svc, target: pgb, type: data, label: "TLS verified\nverify-full"}
-  - {id: d_valkey, source: svc, target: valkey, type: data, label: "PLAINTEXT · no auth"}
-  - {id: d_migrate, source: svc, target: proddb, type: data, label: "TLS verified · migrate,\nseeds, authz → both -rw"}
-
-  - {id: d_pgdogup, source: pgdog, target: proddb, type: data, label: "TLS verified\nverify_full", label_pos: -0.7}
-  - {id: d_pgbup, source: pgb, target: platdb, type: data, label: "TLS verified · verify-full\n+ auth_query client cert", label_pos: -0.9}
-  - {id: d_kc, source: kc, target: platdb, type: data, label: "TLS unverified\n(TLS 1.3 measured) · JDBC prefer"}
-  - {id: d_temporal, source: temporal, target: platdb, type: data, label: "PLAINTEXT · SQL"}
-  - {id: c_dbengine, source: bao, target: platdb, type: control, label: "TLS unverified · DB engine\nrequire (both clusters)"}
-  - {id: c_pgroles, source: pgroles, target: proddb, type: control, label: "TLS unverified\nrequire (both)"}
-  - {id: c_opca, source: opca, target: proddb, type: control, label: "client certs: replication\n+ auth_query (both)"}
-  - {id: m_stores, source: otel, target: obsdb, type: telemetry, label: "PLAINTEXT · HTTP + native\n(Grafana reads the same)"}
-
-  - {id: r_backup, source: proddb, target: rustfs, type: replication, label: "PLAINTEXT · S3 WAL +\nbackups · DR restore"}
-  - {id: d_cold, source: obsdb, target: rustfs, type: data, label: "PLAINTEXT · S3\ncold tier · profiles"}
-
 notes:
   - id: note_state
     title: "Reading the hop state"
-    text: "TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers (sslmode=require, or a driver default of prefer). PLAINTEXT: nothing is encrypted on the hop. Since ADR-089 both CNPG clusters and the DR replica serve <cluster>-server-tls from homelab-ca; every service, worker, migrate init container, seed and authz Job uses verify-full with the CA from its namespace's *-db-ca-trust Certificate, and both poolers refuse plaintext and verify the primary. Keycloak (JDBC prefer, TLS 1.3 measured 2026-10-01), the OpenBao DB engine and pgroles (sslmode=require) are encrypted but unverified, and Temporal is plaintext (pg_hba host, #1296). Operator-managed TLS (CNPG's client CA for replication and the PgBouncer auth_query cert, the OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA, not homelab-ca. platform-db's backups take the same plaintext S3 path as product-db's. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify."
+    text: "TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers. PLAINTEXT: nothing is encrypted on the hop. Behind the edge every request, identity and east-west hop is plaintext: Envoy has no BackendTLSPolicy, Keycloak serves HTTP in-cluster, gRPC between services uses insecure credentials, and OpenBao runs tls_disable. Only the two OIDC hairpins (OpenBao, Flux web UI) verify, against the live homelab-ca. Operator-managed TLS (OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify."
   - id: note_planned
     title: "Planned, not installed (RFC-0020, provisional)"
-    text: "S0 edge issuer decouple · S1 OpenBao listener TLS · S5 per-hop client certs · S6 gRPC + Temporal mTLS. S2 (CNPG server cert from homelab-ca), S3 (pooler TLS) and S4 (apps on verify-full through a pooler) shipped through ADR-089. Added 2026-10-01: S7 intermediate CA · S8 Keycloak HTTPS · S9 platform-db clients · S10 Envoy BackendTLSPolicy · S11 RustFS TLS · S12 Valkey auth + TLS · S13 OCI registry TLS + cosign · S14 KMS over HTTPS (production)."
+    text: "S0 edge issuer decouple · S1 OpenBao listener TLS · S6 gRPC + Temporal mTLS · S7 intermediate CA · S8 Keycloak HTTPS · S10 Envoy BackendTLSPolicy · S13 OCI registry TLS + cosign · S14 KMS over HTTPS (production). S2–S4 shipped through ADR-089 and are drawn in tls-data-tier."
 
 tests:
   - {rule: entry-via-edge}
-  - {rule: telemetry-has-destination}

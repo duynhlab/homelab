@@ -291,7 +291,10 @@ reference style.
 5. **Make state explicit.** Solid arrows are current paths. Dotted arrows mean
    optional, indirect, reference, or documented exceptions and must have a
    label. Planned nodes and edges must also contain the word `planned`; a dashed
-   border is supplementary, not the only signal.
+   border is supplementary, not the only signal. In Draw.io, **moving** dashes
+   (`flowAnimation`) mark a current primary flow and are not a dotted arrow; a
+   static PNG shows them as dashes, so read the legend (house style § Edges in
+   the [`homelab-drawio` skill](.agents/skills/homelab-drawio/references/house-style.md#edges)).
 6. **Provide a legend at the right level.** A platform-wide architecture with
    four or more semantic classes needs a compact legend. Area-level and smaller
    diagrams may rely on the nearest area legend when they use exactly the same

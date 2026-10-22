@@ -504,6 +504,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The TLS topology is two diagrams** (#1339): `security/tls-pki-edge` (who
+  issues each certificate, and the request, identity and east-west hops) and
+  `security/tls-data-tier` (every database, pooler and store hop, with the
+  issuer → server and pooler certificate edges drawn instead of implied). The
+  combined view had 52 edge crossings; the two have 7 and 24. Moving dashes
+  (`flowAnimation`) are documented as a current primary flow, not a dashed
+  edge, in AGENTS.md and the house style. The two Temporal diagrams drop the
+  release numbers that went stale on every bump, and `platform/topology` names
+  the TLS state of the Keycloak and Temporal SQL edges.
+
 - **ADR-089 records its parameters and the rotation runbook covers both
   clusters.** ADR-089 lists the certificate lifetimes, renewal pickup, expiry
   alerts, the planned CA-overlap procedure, the rotation error budget (zero

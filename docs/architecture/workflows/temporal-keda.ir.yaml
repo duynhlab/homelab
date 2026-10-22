@@ -36,6 +36,8 @@
 # ~200 orderings x pin, plus three re-tiers; the current order stays best at 5
 # crossings. The poll labels sit on the right-hand run, outside the cluster frame;
 # moving them next to the workers (label_pos) collides with the controller labels.
+# 2026-10-22 (#1339): release numbers dropped from node labels, since they went stale on
+# every bump; the versions live in the manifests the lines above name.
 diagram:
   id: temporal-keda
   title: "duynhlab homelab — Temporal work layer and KEDA autoscaling"
@@ -74,13 +76,13 @@ nodes:
   - {id: order_api, label: "order-service API (order)\nCreateOrder · cancel", role: service, layer: api, parent: f_api, icon: go}
 
   - {id: web, label: "temporal-web UI\ntemporal.duynh.me", role: edge, layer: server, parent: f_temporal, icon: temporal}
-  - {id: server, label: "Temporal server 1.32.1 · namespace mop\nfrontend :7233 · history · matching · worker", role: platform, layer: server, parent: f_temporal, icon: temporal}
+  - {id: server, label: "Temporal server · namespace mop\nfrontend :7233 · history · matching · worker", role: platform, layer: server, parent: f_temporal, icon: temporal}
   - {id: db, label: "platform-db\ntemporal · temporal_visibility", role: data, layer: server, parent: f_platform, shape: datastore, icon: postgresql}
 
-  - {id: controller, label: "temporal-worker-controller 1.12.0\nchart 0.31.0 · owns builds, not replicas", role: platform, layer: ctl, parent: f_temporal, icon: temporal}
-  - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service 0.13.3 worker\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
-  - {id: wd_order, label: "order-fulfillment (order)\norder-worker · order-service 2.10.3\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
-  - {id: keda, label: "KEDA 2.21.0\noperator · metrics apiserver", role: platform, layer: ctl, parent: f_keda, icon: keda}
+  - {id: controller, label: "temporal-worker-controller\nowns builds, not replicas", role: platform, layer: ctl, parent: f_temporal, icon: temporal}
+  - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service worker\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: wd_order, label: "order-fulfillment (order)\norder-worker · order-service\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: keda, label: "KEDA\noperator · metrics apiserver", role: platform, layer: ctl, parent: f_keda, icon: keda}
 
   - {id: grpc_targets, label: "inventory · shipping · notification · payment\ngRPC :9090", role: service, layer: targets, parent: f_targets, icon: go}
   - {id: cart, label: "cart\nREST :8080 (ClearCart)", role: service, layer: targets, parent: f_targets, icon: go}

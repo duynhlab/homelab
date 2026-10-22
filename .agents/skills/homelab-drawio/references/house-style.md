@@ -93,6 +93,13 @@ Solid = a current path. Dashed = optional, planned, or a documented exception â€
 and a dashed edge must carry a label saying which. A planned edge's label
 contains the word `planned` (same rule as nodes).
 
+Moving dashes are not a dashed edge. An animated edge (`flowAnimation`, see
+[Flow animation](#flow-animation-flowanimation1)) is a current path whose dashes
+travel to mark the primary flow; its style has no `dashed=1`. The static PNG
+draws those moving dashes as a plain dash pattern, so in a PNG the legend sample
+is what tells the two apart: a planned or optional edge is slate, has an open
+arrow and is labelled, while an animated edge keeps its type's colour.
+
 ### Relationship types
 
 An IR edge carries one of eight types (`assets/homelab.json` â†’ `edges`). Each

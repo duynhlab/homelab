@@ -26,6 +26,12 @@ prove every expression matched data.
   before firing. **Impact** explains the real-world consequence — the reason the metric is
   worth paging on.
 
+## Planned analytics rules
+
+The five [ADR-069 analytics rule candidates](../analytics/) are not deployed
+and are excluded from the inventory below. Install them with the analytics
+dark launch after backend-name and failure/recovery verification.
+
 ## Summary
 
 **243 statically defined alerts** exist in `.yaml` files under

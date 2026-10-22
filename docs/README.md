@@ -226,6 +226,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Observability
 
+- [Analytics telemetry and audit](./observability/analytics/) — planned RFC-0030 sampler, metrics and runtime qualification.
+
 Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./observability/audits/2026-09-16-telemetry-standards.md)** - logs, traces, metrics, profiling and the ClickHouse consumers.
 
 #### Metrics

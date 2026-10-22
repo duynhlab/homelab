@@ -677,3 +677,11 @@ by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
 - [`pg_cron` scheduler and operations](https://github.com/citusdata/pg_cron)
 - [CNPG shared preload configuration](https://cloudnative-pg.io/docs/1.30/postgresql_conf/#shared-preload-libraries)
 - [ClickHouse platform guide](../../../observability/clickhouse/README.md)
+
+## Analytics telemetry qualification
+
+The [ADR-069 telemetry decision](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/)
+and [operations guide](../../../observability/analytics/) define the planned
+idle sampler, standard DB instrumentation, bounded diagnostics and C22/G8/G10
+checks. Source review is recorded in the [telemetry audit](../../../observability/analytics/audit.md).
+Implementation evidence does not complete Adoption or the Linux runtime gates.

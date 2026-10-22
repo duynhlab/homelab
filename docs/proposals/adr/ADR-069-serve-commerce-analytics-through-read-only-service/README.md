@@ -50,6 +50,30 @@ a component that does not own them.
 - PeerDB control APIs and ClickHouse raw-table access.
 - The Admin page's visual implementation details.
 
+## Telemetry decision (implementation planned)
+
+The service owns a 30-second background freshness sampler with a 2-second
+query budget, immediate startup sampling and no overlapping queries. Observable
+gauges read an atomic in-memory snapshot; they never query ClickHouse during
+collection. A snapshot older than 65 seconds or an invalid/failed batch produces
+`unknown`, with lag omitted. All four states are emitted as 0/1 per source.
+Response freshness remains independently checked on every request.
+
+The analytics namespace is registered in `pkg/semconv` before first release.
+`analytics.source.lag` becomes a seconds gauge, `analytics.source.state` a
+unit-1 one-hot gauge, and `analytics.freshness.last_success.time` a seconds Unix
+timestamp. Request-driven observation counters are removed. The existing
+ClickHouse adapter owns standard `db.client.operation.duration` and one client
+span per query, using shared DB buckets and bounded query summaries.
+
+`analytics.overview` carries a bounded unavailable reason. Shared HTTP middleware
+remains the sole owner of access logs and HTTP metrics; its 503 record links to
+the operation span by trace ID. Cancellation is distinguished from timeout;
+raw driver errors, SQL and parameters are never attached. See the
+[telemetry contract, candidates and Linux gates](../../../observability/analytics/)
+for exact boundaries, cardinality budget, alert recovery and sampler lifecycle.
+T1 (transport flag separation / ClickHouse TLS) remains a separate follow-up.
+
 ## Decision drivers
 
 | Priority | Driver | Why it matters |

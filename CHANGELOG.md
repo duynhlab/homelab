@@ -130,6 +130,8 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **RFC-0030 telemetry qualification:** document the planned idle freshness sampler, standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
+
 - **Kind gate row K3.7: guarded database memberships have not drifted.**
   `smoke.js` asserts that the ADR-086 guard reports a series for every edge in
   `GUARDED_EDGES` (today `vault_rotator → notification`) and that

@@ -71,6 +71,9 @@ IDs are strings. Nullable average means no captured orders, not zero revenue.
 }
 ```
 
+`meta.sources[].lag_seconds` is a non-negative JSON number of seconds and
+may be fractional; consumers must not require an integer.
+
 ### Metric definitions
 
 | Field | Rule |

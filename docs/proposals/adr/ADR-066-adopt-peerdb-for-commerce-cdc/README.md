@@ -13,12 +13,12 @@
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | The transport and control-plane boundary from the three commerce PostgreSQL databases to ClickHouse |
-| **Affected components** | `product-db`; PeerDB; the `peerdb` Temporal namespace; the `peerdb-staging` RustFS bucket; the PeerDB catalog on `platform-db`; ClickHouse commerce raw tables |
+| **Affected components** | `product-db`; PeerDB; the `peerdb` Temporal namespace; the `analytics-service-cdc` RustFS bucket; the PeerDB catalog on `platform-db`; ClickHouse commerce raw tables |
 | **Related RFC** | [RFC-0030](../../rfc/RFC-0030/) |
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0030 rollout and acceptance gates |
+| **Implementation tracking** | [#1313](https://github.com/duynhlab/homelab/issues/1313) — native Task sub-issues and tradeoff log |
 | **Adoption** | Not started |
 
 ## Context
@@ -66,11 +66,19 @@ independent mirrors in rollout order `order`, `checkout`, then `payment`; each
 mirror owns one source database connection, publication, logical slot, and
 destination mapping.
 
-PeerDB will connect with TLS to `product-db-rw.product.svc:5432`. Logical
-decoding will never traverse PgDog or a read-only Service. PeerDB may reuse the
+PeerDB will connect through a platform-owned, replication-compatible CDC
+pooler profile to the source primary, with verify-full semantics on both hops.
+Snapshot SQL and WAL streaming must pass the RFC-0029 compatibility gate; no
+replica routing or automatic direct fallback is allowed. The concrete profile
+is not qualified yet. PeerDB may reuse the
 existing Temporal, RustFS, and `platform-db` capabilities only through a
-dedicated `peerdb` namespace, `peerdb-staging` bucket and identity, and catalog
+dedicated `peerdb` namespace, `analytics-service-cdc` bucket and identity, and catalog
 database and role. PeerDB control APIs and UI stay cluster-internal.
+
+Resource names follow [RFC-0030](../../rfc/RFC-0030/README.md#resource-naming):
+the destination peer is `analytics_service`, the ClickHouse database is
+`analytics`, and the ingest identity is `analytics_ingest`. The bucket identity
+is separate from the API reader and from the platform backup/cold-tier identities.
 
 ### Decision rules
 
@@ -78,7 +86,7 @@ database and role. PeerDB control APIs and UI stay cluster-internal.
 |------|-------------------|
 | **Transport ownership** | PeerDB owns snapshot, WAL consumption, checkpoints, staging, retries, and ClickHouse delivery; platform code must not implement a second CDC loop |
 | **Mirror isolation** | `order`, `checkout`, and `payment` use separate mirrors, publications, slots, credentials, and source health |
-| **Source path** | Mirrors connect directly to the CNPG read-write Service with TLS, never PgDog or a replica Service |
+| **Source path** | Snapshot SQL and WAL use a qualified CDC pooler profile to the primary; verify-full on both hops; a failed gate blocks rollout |
 | **Dependency isolation** | PeerDB receives dedicated Temporal namespace, RustFS identity/bucket, and catalog database/role |
 | **Failure behavior** | Finite retained-WAL limits protect PostgreSQL; invalidated or unsafe slots require an explicit resync decision rather than an improvised retry |
 | **Rollback** | Pause mirrors and preserve evidence and slots first; never run batch and PeerDB as parallel production transports |
@@ -87,13 +95,16 @@ database and role. PeerDB control APIs and UI stay cluster-internal.
 
 ```mermaid
 flowchart LR
-    O[("order DB")] -->|"mirror + slot"| P["PeerDB<br/>self-hosted"]
-    C[("checkout DB")] -->|"mirror + slot"| P
-    M[("payment DB")] -->|"mirror + slot"| P
-    P -->|"staging"| R[("RustFS<br/>peerdb-staging")]
-    P -->|"raw versions + tombstones"| CH[("ClickHouse<br/>commerce raw")]
+    O[("order DB")] -.->|"planned primary-only"| CP["CDC pooler profile<br/>planned — not qualified"]
+    C[("checkout DB")] -.->|"planned primary-only"| CP
+    M[("payment DB")] -.->|"planned primary-only"| CP
+    CP -.->|"planned snapshot + WAL<br/>verify-full both hops"| P["PeerDB<br/>self-hosted — planned"]
+    P -->|"staging"| R[("RustFS — Analytics CDC files<br/>analytics-service-cdc")]
+    P -->|"raw versions + tombstones"| CH[("ClickHouse<br/>analytics raw tables")]
     P -.->|"isolated workflow/catalog"| D["Temporal + platform-db"]
 
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class CP planned;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class O,C,M,R,CH data;
@@ -146,15 +157,18 @@ to platform-owned code.
 - Commerce CDC is an analytical integration path, not an application event bus.
 - ClickHouse stores independently versioned raw rows and tombstones before serving normalization.
 
+The source-access decision follows the [RFC-0030 contract](../../rfc/RFC-0030/README.md#source-access-contract)
+and RFC-0029; the existing direct Compose baseline is not pooled-access evidence.
+
 ## Implementation obligations
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Pin and review a compatible PeerDB core and deployment artifact | Platform | RFC-0030 prototype | Digests and licence decision recorded; clean install passes |
-| Declare isolated catalog, workflow, staging, secrets, and network paths | Platform | RFC-0030 rollout | No PeerDB identity can access adjacent platform state |
-| Size slots, WAL senders, retained WAL, storage, and resource floor | Platform / Database | RFC-0030 source-safety gate | Measured thresholds and finite WAL cap are committed |
-| Prove three mirrors and recovery | Platform | RFC-0030 correctness gate | Snapshot and CDC tests pass through restart, outage, and resync |
-| Add alerts, dashboard, and runbook | Platform / Observability | RFC-0030 close-out | Lag, slot, staging, dependency, and resync paths are operable |
+| Pin and review a compatible PeerDB core and deployment artifact | Platform | [#1314](https://github.com/duynhlab/homelab/issues/1314) | Digests and licence decision recorded; clean install passes |
+| Declare isolated catalog, workflow, staging, secrets, and network paths | Platform | [#1315](https://github.com/duynhlab/homelab/issues/1315) | No PeerDB identity can access adjacent platform state |
+| Size slots, WAL senders, retained WAL, storage, and resource floor | Platform / Database | [#1316](https://github.com/duynhlab/homelab/issues/1316) | Measured thresholds and finite WAL cap are committed |
+| Prove three mirrors and recovery | Platform | [#1317](https://github.com/duynhlab/homelab/issues/1317) | Snapshot and CDC tests pass through restart, outage, and resync |
+| Add alerts, dashboard, and runbook | Platform / Observability | [#1318](https://github.com/duynhlab/homelab/issues/1318) | Lag, slot, staging, dependency, and resync paths are operable |
 
 ## Validation and compliance
 
@@ -192,3 +206,4 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
+| 2026-10-18 | Accepted / Not started | Owner aligned source access with RFC-0029: qualified CDC pooler profile, verified TLS on both hops, no silent direct fallback; runtime qualification pending |

@@ -145,6 +145,8 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **RFC-0030 telemetry qualification:** document the planned idle freshness sampler, standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
+
 - **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`
   and `PgDogPoolBanned` on PgDog's own metrics (`pgdog_cl_waiting`,
   `pgdog_total_checkout_timeouts`, `pgdog_banned`), with runbooks; the catalog's
@@ -526,6 +528,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Document the draft RFC-0030 analytics API: exact money strings, USD-only v1,
+  event-date ledger totals, cohort semantics and fail-closed freshness. Backend
+  code and UI preview remain undeployed pending Linux qualification.
+
 - **The TLS topology is two diagrams** (#1339): `security/tls-pki-edge` (who
   issues each certificate, and the request, identity and east-west hops) and
   `security/tls-data-tier` (every database, pooler and store hop, with the
@@ -586,6 +592,10 @@ Skeleton (copy what you need):
   secrets diagrams.
 
 #### Proposals
+
+- **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
+  allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
+  Keep the accepted architecture separate from pending cluster qualification.
 
 - **RFC-0029 is Implemented.** Every service on `platform-db` and `product-db`
   runs on the owner / migrator / runtime split with the platform applying roles
@@ -760,6 +770,24 @@ Skeleton (copy what you need):
   credential to fail. The retained Job is force-replaced only after CNPG
   observes the new Secret revision; repository state alone does not claim that
   live revocation has happened.
+
+#### Local-stack
+
+- Match RFC-0030 snapshot Avro objects using the renamed `analytics_service_*`
+  mirrors so both PII gates check column allowlists across all ten tables.
+
+#### Docs
+
+- Link RFC-0030's four accepted ADRs to dedicated tracking issues and native
+  obligation tasks; retain the Linux handoff as an index and historical evidence.
+
+- Align RFC-0030 and ADR-066 source access with RFC-0029: CDC uses a qualified
+  primary-only pooler profile with verified TLS on both hops. Keep direct
+  Compose evidence explicitly separate and block rollout until lifecycle gates pass.
+
+- Align RFC-0030 resource names with analytics-service across the CDC prototype,
+  SQL access contract, RFC and ADRs. Require fresh disposable qualification
+  state; historical evidence remains tied to its original commits.
 
 #### Services
 

@@ -265,6 +265,10 @@ local execution and verification procedure.
 
 ## Release gate
 
+RFC-0030 has a separate, opt-in [commerce CDC qualification stack](../docs/proposals/rfc/RFC-0030/phase0.md).
+Its fixed disposable Compose project and `make e2e-analytics GATE=compose` gate
+do not replace the release audit below or qualify CNPG deployment.
+
 Run the [full E2E audit](docs/e2e-audit.md) after the stack is ready. The gate is
 mandatory for any change touching a service repository, `pkg`, the frontend,
 gateway/edge configuration (`gateway/eg/` here or

@@ -18,7 +18,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0030 dark-launch and consumer rollout |
+| **Implementation tracking** | [#1331](https://github.com/duynhlab/homelab/issues/1331) — native Task sub-issues and tradeoff log |
 | **Adoption** | Not started |
 
 ## Context
@@ -49,6 +49,30 @@ a component that does not own them.
 - Generic SQL, report builders, exports, or arbitrary dimensions.
 - PeerDB control APIs and ClickHouse raw-table access.
 - The Admin page's visual implementation details.
+
+## Telemetry decision (implementation planned)
+
+The service owns a 30-second background freshness sampler with a 2-second
+query budget, immediate startup sampling and no overlapping queries. Observable
+gauges read an atomic in-memory snapshot; they never query ClickHouse during
+collection. A snapshot older than 65 seconds or an invalid/failed batch produces
+`unknown`, with lag omitted. All four states are emitted as 0/1 per source.
+Response freshness remains independently checked on every request.
+
+The analytics namespace is registered in `pkg/semconv` before first release.
+`analytics.source.lag` becomes a seconds gauge, `analytics.source.state` a
+unit-1 one-hot gauge, and `analytics.freshness.last_success.time` a seconds Unix
+timestamp. Request-driven observation counters are removed. The existing
+ClickHouse adapter owns standard `db.client.operation.duration` and one client
+span per query, using shared DB buckets and bounded query summaries.
+
+`analytics.overview` carries a bounded unavailable reason. Shared HTTP middleware
+remains the sole owner of access logs and HTTP metrics; its 503 record links to
+the operation span by trace ID. Cancellation is distinguished from timeout;
+raw driver errors, SQL and parameters are never attached. See the
+[telemetry contract, candidates and Linux gates](../../../observability/analytics/)
+for exact boundaries, cardinality budget, alert recovery and sampler lifecycle.
+T1 (transport flag separation / ClickHouse TLS) remains a separate follow-up.
 
 ## Decision drivers
 
@@ -84,6 +108,13 @@ The protected analytics route and portal navigation remain absent until the
 service passes dark-launch correctness, authorization, freshness, and failure
 gates.
 
+The [draft contract](../../../api/analytics.md) selects USD-only v1, decimal
+integer JSON strings for money, ledger event-date totals, and checkout-created
+cohorts with current observed stages. Backend code and the isolated UI preview
+are under review. Adoption remains **Not started** for deployment: Linux data,
+security and runtime gates are tracked in
+[#1266](https://github.com/duynhlab/homelab/issues/1266).
+
 ### Decision rules
 
 | Rule | Required behavior |
@@ -95,13 +126,18 @@ gates.
 | **Failure behavior** | Stale and unknown data are explicit; the service never fabricates freshness or converts an unavailable pipeline into zero |
 | **Compatibility** | Commands remain direct under ADR-048; exact payload becomes authoritative in `docs/api/analytics.md` only after implementation |
 
+The read-only database identity is `analytics_reader`, with SELECT on reviewed
+`analytics.*_live` views only. Resource names follow the
+[RFC-0030 naming contract](../../rfc/RFC-0030/README.md#resource-naming); the
+`/analytics/v1/protected/commerce/overview` API route is unchanged.
+
 ### Decision view
 
 ```mermaid
 flowchart LR
     A["Admin Portal<br/>staff token"] -->|"bounded protected GET"| E["Envoy Gateway"]
     E --> S["analytics-service<br/>read only"]
-    S -->|"serving queries"| CH[("ClickHouse<br/>commerce serving")]
+    S -->|"serving queries"| CH[("ClickHouse<br/>analytics serving views")]
     A -->|"commands remain direct"| OWN["Owning services"]
     S -.->|"must not proxy writes"| OWN
 
@@ -163,11 +199,11 @@ the least controllable tier.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Implement the bounded service contract and validation | `analytics-service` | RFC-0030 dark launch | Contract, unit, integration, and negative authorization tests pass |
-| Provision read-only serving access and network path | Platform / ClickHouse | RFC-0030 analytical-storage gate | Identity cannot read raw objects or perform writes |
-| Add deployment, protected route, and observability | Platform / Observability | RFC-0030 dark launch | Resources, probes, policies, RED metrics, alerts, and runbook pass validation |
-| Add the Admin analytics page after dark-launch gates | `admin-service` | RFC-0030 consumer rollout | Loading, empty, stale, unavailable, keyboard, and responsive states pass |
-| Publish the as-built contract and topology | Platform docs | RFC-0030 close-out | `docs/api/analytics.md`, rollup, Admin index, ownership map, and call graph match deployment |
+| Implement the bounded service contract and validation | `analytics-service` | [#1332](https://github.com/duynhlab/homelab/issues/1332) | Contract, unit, integration, and negative authorization tests pass |
+| Provision read-only serving access and network path | Platform / ClickHouse | [#1333](https://github.com/duynhlab/homelab/issues/1333) | Identity cannot read raw objects or perform writes |
+| Add deployment, protected route, and observability | Platform / Observability | [#1334](https://github.com/duynhlab/homelab/issues/1334) | Resources, probes, policies, RED metrics, alerts, and runbook pass validation |
+| Add the Admin analytics page after dark-launch gates | `admin-service` | [#1335](https://github.com/duynhlab/homelab/issues/1335) | Loading, empty, stale, unavailable, keyboard, and responsive states pass |
+| Publish the as-built contract and topology | Platform docs | [#1336](https://github.com/duynhlab/homelab/issues/1336) | `docs/api/analytics.md`, rollup, Admin index, ownership map, and call graph match deployment |
 
 ## Validation and compliance
 

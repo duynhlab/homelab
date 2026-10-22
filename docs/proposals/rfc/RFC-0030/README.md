@@ -4,10 +4,13 @@
 |--------|-------|----------|---------|--------------|
 | Accepted | platform-wide | [./research.md](./research.md) — PeerDB + `pg_cron` direction audited 2026-09-08 | 2026-09-07 | 2026-09-09 |
 
-> **Accepted target architecture; not implemented.** PeerDB, the commerce
-> schema, the analytics workloads, and the Admin route are planned and not
-> deployed. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
+> **Accepted target architecture; Phase 0 qualification in progress.**
+> PeerDB and commerce CDC have an opt-in Compose prototype. Cluster rollout,
+> the analytics API, and the Admin route remain planned and not deployed. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
 > bounded-eventual read model.
+
+Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
+[Linux handoff issue](https://github.com/duynhlab/homelab/issues/1266).
 
 ## Prerequisites
 
@@ -30,7 +33,7 @@
 
 Self-host PeerDB to continuously replicate an explicit PostgreSQL base-table
 and column allowlist from the `order`, `checkout`, and `payment` databases
-into an isolated ClickHouse `commerce` database. Three database-local mirrors
+into an isolated ClickHouse `analytics` database. Three database-local mirrors
 feed versioned raw tables; serving views deduplicate with `argMax` and remove
 tombstones. A thin read-only `analytics-service` exposes one staff endpoint,
 and the Admin Portal consumes it from a lazy `/analytics` page.
@@ -48,7 +51,7 @@ historical questions about settled capture, refunds, checkout conversion, and
 top products. Browser fan-out cannot establish one honest cross-domain
 watermark, and repeated 90-day scans would couple review traffic to OLTP.
 
-The platform already runs PostgreSQL 18 on CloudNativePG, ClickHouse 26.7,
+The platform already runs PostgreSQL 18 on CloudNativePG, ClickHouse 26.9,
 Temporal, and RustFS. PeerDB is a narrower fit than building and operating a
 custom extractor because it owns the PostgreSQL snapshot/WAL/checkpoint path.
 It does not replace the semantic API, authorization, reconciliation, or
@@ -99,11 +102,12 @@ owned lifecycle.
 1. Declare one CNPG `Publication` resource with explicit table/column objects
    and reclaim policy `retain` for each source database. Grant a dedicated
    PeerDB login `LOGIN`, `REPLICATION`, and `SELECT` only on the selected
-   tables. Connect over TLS to `product-db-rw`, never PgDog or a read-only
-   Service.
+   tables. Connect through a replication-compatible CDC pooler profile to
+   the source primary, with verify-full semantics on both hops, as required
+   by RFC-0029. Never use a replica or silently fall back to direct access.
 2. Run three PeerDB mirrors—one per database, publication, and slot. Reuse
    existing Temporal through a dedicated `peerdb` namespace, RustFS through a
-   dedicated `peerdb-staging` bucket/identity, and `platform-db` through a
+   dedicated `analytics-service-cdc` bucket/identity, and `platform-db` through a
    dedicated PeerDB catalog database/role.
 3. Package `postgresql-18-cron` in a digest-pinned custom CNPG system image,
    deploy that compatible image to `product-db` and `product-db-replica`, then
@@ -151,6 +155,40 @@ risk, broad-read credentials on selected tables, full initial snapshots, an
 owned custom PostgreSQL image/preload lifecycle, and several upstream behaviors
 that the acceptance prototype must verify.
 
+
+## Resource naming
+
+Resources use the `analytics-service` workload name; commerce remains the
+business domain and API route. These names describe the planned cluster
+contract and the opt-in Compose implementation, not deployed cluster resources.
+
+| Resource | Name |
+|---|---|
+| RustFS bucket and CDC identity | `analytics-service-cdc` |
+| Compose RustFS service and volume | `analytics-service-cdc-storage` |
+| Compose bucket bootstrap | `analytics-service-cdc-bootstrap` |
+| PeerDB destination peer | `analytics_service` |
+| PeerDB mirrors | `analytics_service_order`, `analytics_service_checkout`, `analytics_service_payment` |
+| ClickHouse database | `analytics` |
+| ClickHouse ingest / API reader | `analytics_ingest` / `analytics_reader` |
+| Non-login serving-view owner | `analytics_view_owner` |
+
+PeerDB v0.37.5 requires lowercase letters, digits and underscores for
+[mirror names](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/ui/app/mirrors/create/schema.ts)
+and [peer names](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/ui/app/peers/create/%5BpeerType%5D/schema.ts).
+The underscore spelling is the protocol-compatible form of the workload name.
+The source publications stay `analytics_order`, `analytics_checkout` and
+`analytics_payment`. New mirrors generate slots named
+`peerflow_slot_analytics_service_<source>`; this does not rename existing slots.
+The `peerdb` Temporal namespace and catalog identity remain unchanged.
+
+RustFS holds intermediate CDC files written by PeerDB and read by ClickHouse.
+The API reader has no bucket credentials. “Staging” remains the upstream term
+for this mechanism, not an environment designation or a backup guarantee.
+See the [qualification runbook](./phase0.md#resource-naming-and-existing-projects)
+for the fresh-project requirement and historical-evidence boundary.
+
+
 ## Architecture
 
 This diagram answers one question: **what is the planned trust and data path?**
@@ -175,19 +213,21 @@ flowchart LR
     APICTL["flow API / control"]
     CAT[("catalog on platform-db")]
     TEMP["Temporal namespace peerdb"]
-    STAGE[("RustFS peerdb-staging")]
+    STAGE[("RustFS — Analytics CDC files<br/>analytics-service-cdc")]
   end
 
   subgraph CH["ClickHouse — deployed engine"]
-    RAW[("commerce raw<br/>planned")]
-    SERVE[("commerce serving<br/>planned")]
+    RAW[("analytics raw tables<br/>planned")]
+    SERVE[("analytics serving views<br/>planned")]
   end
 
   ANA["analytics-service<br/>planned — read only"]
   PAGE["Admin /analytics<br/>planned"]
 
   CRON -.->|"planned 30-second UPSERT"| ORD & CHECK & PAY
-  ORD & CHECK & PAY -.->|"planned direct TLS CDC"| FLOW
+  CDCPOOL["CDC pooler profile<br/>planned — not qualified"]
+  ORD & CHECK & PAY -.->|"planned verified TLS / primary only"| CDCPOOL
+  CDCPOOL -.->|"planned snapshot + WAL / verified TLS"| FLOW
   SNAP --- FLOW
   FLOW --- APICTL & CAT & TEMP
   FLOW -.->|"planned staged load"| STAGE
@@ -202,6 +242,7 @@ flowchart LR
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+  class CDCPOOL planned;
   class STAFF external;
   class EDGE edge;
   class PG,CH data;
@@ -283,6 +324,56 @@ explicitly accepted security drawback, bounded by exact-table grants, HBA,
 NetworkPolicy, Secret isolation, audit, and no `BYPASSRLS`. It must never gain
 `SELECT ON ALL TABLES IN SCHEMA`.
 
+### Source access contract
+
+**Accepted direction:** PeerDB → platform-owned CDC pooler profile → source
+primary. This follows [RFC-0029](../RFC-0029/) and
+[ADR-089](https://github.com/duynhlab/homelab/blob/main/docs/proposals/adr/ADR-089-postgresql-access-contract/README.md).
+The application receives the logical endpoint, database, credentials and CA;
+platform owns backend discovery, routing, authentication and pooler settings.
+Both metadata/snapshot SQL and the replication connection use this access
+contract. Migration and native CNPG replication exceptions do not grant PeerDB
+a direct-access exception.
+
+**Not yet qualified:** product, version, endpoint and concrete settings for the
+CDC profile. Preserve both PgDog and PgBouncer in the platform. PgBouncer is a
+qualification candidate with upstream replication-connection support; PgDog
+must separately prove external-client replication forwarding. Neither product's
+ordinary runtime profile is automatically approved for CDC. Start qualification
+with session affinity for snapshot SQL and a dedicated backend for each
+replication connection; do not multiplex an active WAL stream. A session-mode
+setting alone does not prove replication-protocol compatibility.
+
+The profile must be primary-only, preserve snapshot/transaction state and startup
+parameters, isolate CDC connection capacity from runtime traffic, and keep
+streaming connections alive under declared timeout/drain settings. Failover
+requires connector reconnect and verified slot/offset recovery; it does not
+transparently move an established stream or an exported snapshot to another
+backend. A failed gate blocks rollout; there is no automatic direct fallback.
+
+Require verify-full semantics on client → pooler and pooler → PostgreSQL.
+For pinned PeerDB v0.37.5, supply the pooler's DNS hostname and trusted `rootCa`,
+set `disableTls=false` and `skipCertVerification=false`, and verify that the
+certificate SAN matches the hostname (`tlsHost`, if used, must name the intended
+server). Do not substitute an IP without an explicit verified TLS hostname:
+this build's IP path can verify the chain without verifying the hostname.
+The literal `sslmode=require` in its generated URI is not proof of the final
+TLS behavior: its custom TLS configuration must also be inspected and tested.
+
+Source roles, exact database HBA rules, workload attribution and credential
+rotation follow RFC-0029. Preserve PeerDB's own `peerdb` application-name prefix
+until a tested connector mapping is recorded; do not claim it already emits
+`analytics-service`. CDC starts with manual 90-day rotation and monthly review;
+automatic rotation requires the reconnect/recovery gate.
+
+[Issue #1305](https://github.com/duynhlab/homelab/issues/1305) owns profile
+qualification and [#1266](https://github.com/duynhlab/homelab/issues/1266) owns the
+RFC-0030 integration handoff. The direct, plaintext disposable Compose prototype
+is a historical baseline, not an implementation or approval of this target.
+Switch the prototype only together with a concrete pooler/TLS profile and its
+gates; changing a hostname alone is insufficient. Source review and versioned
+references are in [research](./research.md#pooled-source-access-review).
+
 ## Data model and metric semantics
 
 - Payment ledger transactions and their `merchant_revenue` leg own capture,
@@ -291,11 +382,20 @@ NetworkPolicy, Secret isolation, audit, and no `BYPASSRLS`. It must never gain
 - Orders own completion state; order items preserve point-in-time product
   name, quantity, price, and subtotal.
 - Money remains integer minor units and is never summed across currencies.
+  The draft v1 contract supports USD only and serializes all money as canonical
+  decimal integer JSON strings; counts fail above JavaScript's safe integer bound.
+- Capture, reversal and refund use ledger transaction event dates. A September
+  capture refunded in October contributes to October refunds, so net may be
+  negative. Funnel membership instead uses checkout-created dates with current
+  observed stage state, which can progress after the interval ends.
+- Item price/subtotal already use BIGINT minor units after order migration
+  `000006`; no extra multiplication by 100 is permitted.
 - `from` is inclusive, `to` exclusive, and every boundary is UTC.
 - Raw tables retain `_peerdb_version`, `_peerdb_is_deleted`, and a sync
   timestamp. Serving views take the latest version, then filter deleted rows.
 - Source `order_id` values (`integer`, `text`, and `bigint`) normalize to
-  `String` only in ClickHouse serving objects.
+  `String` in the reader's ClickHouse SQL projections, preserving NULL.
+  Current live views retain the source types; no source schema is changed.
 - API history is capped at 90 days. Physical raw retention and full-snapshot
   capacity are set only after measurement; PeerDB cannot pretend its initial
   snapshot was filtered to 90 days.
@@ -331,8 +431,9 @@ It returns the existing overview dimensions plus:
 `sources` contains exactly `order`, `checkout`, and `payment`; state is
 `healthy`, `stale`, or `unavailable`. The service rejects unbounded
 intervals, arbitrary SQL/columns, non-staff issuers, and callers without
-`backoffice_admin`. Exact payload ownership moves to `docs/api/` only after
-implementation.
+`backoffice_admin`. The [draft canonical contract](../../../api/analytics.md)
+now owns exact payloads and the selected money/window semantics. Go code and the
+isolated UI preview are under review; neither is deployed or Linux-qualified.
 
 The Admin Portal adds a lazy `/_authenticated/analytics` route and leaves Home
 unchanged. It uses the existing TanStack/shadcn/Tailwind patterns, one query,
@@ -348,13 +449,15 @@ visible UTC/freshness labels, and accessible table equivalents for charts.
   heartbeat tables. Background-worker execution removes the external heartbeat
   password, HBA rule, network path, and workload. CNPG `DatabaseRole` manages
   role attributes; DDL owns the table grants and cron schedules.
-- Use a digest-pinned custom image derived from the deployed PostgreSQL 18.1
+- Use a digest-pinned custom image derived from the deployed PostgreSQL 18.6
   system image. The artifact must exist before adding `pg_cron` to
   `shared_preload_libraries`; a missing library prevents PostgreSQL startup.
 - Install `pg_cron` only in `postgres`, use UTC and background workers, cap its
   concurrent jobs, and retain seven days of `cron.job_run_details`.
-- Connect PeerDB directly to `product-db-rw.product.svc:5432` using TLS.
-  Logical decoding cannot use PgDog or `product-db-ro`.
+- Route PeerDB snapshot, metadata SQL and logical replication through the
+  platform-owned CDC pooler profile to the source primary. Require verified
+  CA and hostname on both hops; deny plaintext and direct fallback.
+  Pooler/version qualification is pending; see [source access](#source-access-contract).
 - Separate PeerDB control, catalog, staging, ClickHouse ingest, ClickHouse read,
   and the heartbeat execution role. OpenBAO/ESO delivers credentials that still
   require Secrets; background-worker heartbeats require none.
@@ -407,12 +510,13 @@ Roll out in dependency order, with each phase blocked on its evidence:
    switchover, promotion, and worker headroom.
 3. **Source safety:** size `max_replication_slots`, `max_wal_senders`,
    `max_slot_wal_keep_size`, connections, and WAL storage. Create roles, exact
-   HBA/TLS/NetworkPolicy, heartbeat tables, CNPG column-list `Publication`
+   qualified CDC pooler routing and two-hop TLS, HBA/NetworkPolicy, heartbeat
+   tables, CNPG column-list `Publication`
    resources with reclaim `retain`, named 30-second cron jobs, a daily
    seven-day run-history cleanup job, and mirror exclusions. Require
    `status.applied=true` at the observed generation before creating a mirror.
 4. **Isolated dependencies:** create the `peerdb` Temporal namespace,
-   `peerdb-staging` RustFS bucket/identity, and dedicated PeerDB catalog
+   `analytics-service-cdc` RustFS bucket/identity, and dedicated PeerDB catalog
    database/role in `platform-db`.
 5. **Analytical storage:** create least-privilege ClickHouse identities and
    replicated raw/serving objects through a dedicated schema wave.
@@ -507,12 +611,43 @@ qualification or rollout evidence exists.
 | Package and operate `pg_cron` in a custom CNPG system image for target-observed heartbeat scheduling | [ADR-068](../../adr/ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Accepted / Not started |
 | Add a thin read-only `analytics-service` as the ADR-048 aggregation escape hatch | [ADR-069](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) | Accepted / Not started |
 
-Expected contract updates after implementation are `docs/api/analytics.md`, the
+The draft `docs/api/analytics.md` contract exists; rollout must still update the
 service rollup in `docs/api/README.md`, the Admin consumer index
 `docs/api/admin.md`, the cross-service topology in `docs/api/api.md`, and the
 relevant feature ownership in `docs/api/microservices.md`.
 
+## Implementation tracking
+
+Start with the [Linux handoff index #1266](https://github.com/duynhlab/homelab/issues/1266).
+Each accepted ADR has its own tracking issue; native Task sub-issues own gates
+and blocked-by relationships. Historical Mac evidence stays in #1266 and does
+not qualify later commits or a pooled-source deployment.
+
+| Decision | Tracking |
+|---|---|
+| ADR-066 | [#1313](https://github.com/duynhlab/homelab/issues/1313) |
+| ADR-067 | [#1319](https://github.com/duynhlab/homelab/issues/1319) |
+| ADR-068 | [#1325](https://github.com/duynhlab/homelab/issues/1325) |
+| ADR-069 | [#1331](https://github.com/duynhlab/homelab/issues/1331) |
+
+[CDC access #1305](https://github.com/duynhlab/homelab/issues/1305) remains owned
+by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
+
 ## Implementation history
+
+- 2026-10-18 — Owner aligned the source-access target with RFC-0029: snapshot
+  SQL and replication use a qualified pooler profile with verified TLS on both
+  hops. The direct Compose baseline remains unqualified for this path; issue
+  #1305 owns the compatibility and recovery gates.
+
+- 2026-10-14 — Draft Go reader and isolated UI align on USD-only v1, exact money
+  strings, event-date ledger totals and checkout-created cohorts. The
+  [canonical contract](../../../api/analytics.md) records these choices;
+  Linux qualification and deployment remain pending.
+
+- 2026-10-13 — Added the opt-in Compose CDC qualification prototype and
+  [Linux handoff gates](./phase0.md). Cluster adoption and API/UI implementation
+  remain pending; Compose evidence does not close the CNPG gates.
 
 - 2026-09-09 — Owner accepted RFC-0030 and ADR-066 through ADR-069. Adoption
   remains `Not started`; the former acceptance blockers are mandatory Phase 0
@@ -542,3 +677,11 @@ relevant feature ownership in `docs/api/microservices.md`.
 - [`pg_cron` scheduler and operations](https://github.com/citusdata/pg_cron)
 - [CNPG shared preload configuration](https://cloudnative-pg.io/docs/1.30/postgresql_conf/#shared-preload-libraries)
 - [ClickHouse platform guide](../../../observability/clickhouse/README.md)
+
+## Analytics telemetry qualification
+
+The [ADR-069 telemetry decision](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/)
+and [operations guide](../../../observability/analytics/) define the planned
+idle sampler, standard DB instrumentation, bounded diagnostics and C22/G8/G10
+checks. Source review is recorded in the [telemetry audit](../../../observability/analytics/audit.md).
+Implementation evidence does not complete Adoption or the Linux runtime gates.

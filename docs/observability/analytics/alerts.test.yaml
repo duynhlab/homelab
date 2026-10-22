@@ -1,0 +1,112 @@
+rule_files:
+- alerts.yaml
+evaluation_interval: 30s
+tests:
+- name: stale fires and recovers
+  interval: 30s
+  input_series:
+  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+    values: 1+0x10
+  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="stale"}
+    values: 1+0x3 0+0x6
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: AnalyticsSourceStale
+    exp_alerts:
+    - exp_labels:
+        service_name: analytics-service
+        k8s_pod_name: analytics-1
+        analytics_source_name: order
+        analytics_source_state: stale
+        severity: warning
+      exp_annotations:
+        summary: Analytics source heartbeat is stale
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
+  - eval_time: 3m
+    alertname: AnalyticsSourceStale
+    exp_alerts: []
+- name: unavailable fires and recovers
+  interval: 30s
+  input_series:
+  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+    values: 1+0x10
+  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unavailable"}
+    values: 1+0x3 0+0x6
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: AnalyticsSourceUnavailable
+    exp_alerts:
+    - exp_labels:
+        service_name: analytics-service
+        k8s_pod_name: analytics-1
+        analytics_source_name: order
+        analytics_source_state: unavailable
+        severity: critical
+      exp_annotations:
+        summary: Analytics source heartbeat is older than 300 seconds
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
+  - eval_time: 3m
+    alertname: AnalyticsSourceUnavailable
+    exp_alerts: []
+- name: unknown fires and recovers
+  interval: 30s
+  input_series:
+  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+    values: 1+0x10
+  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="unknown"}
+    values: 1+0x3 0+0x6
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: AnalyticsFreshnessUnknown
+    exp_alerts:
+    - exp_labels:
+        service_name: analytics-service
+        k8s_pod_name: analytics-1
+        analytics_source_name: order
+        analytics_source_state: unknown
+        severity: warning
+      exp_annotations:
+        summary: Analytics cannot certify source freshness
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
+  - eval_time: 3m
+    alertname: AnalyticsFreshnessUnknown
+    exp_alerts: []
+- name: missing sampler and recovery
+  interval: 30s
+  input_series:
+  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+    values: 1+0x10
+  - series: analytics_source_state{service_name="analytics-service",k8s_pod_name="analytics-1",analytics_source_name="order",analytics_source_state="healthy"}
+    values: _ _ _ _ 1+0x6
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: AnalyticsSamplerMissing
+    exp_alerts:
+    - exp_labels:
+        service_name: analytics-service
+        k8s_pod_name: analytics-1
+        severity: warning
+      exp_annotations:
+        summary: Analytics runtime exists without sampler telemetry
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
+  - eval_time: 3m
+    alertname: AnalyticsSamplerMissing
+    exp_alerts: []
+- name: missing service and recovery
+  interval: 30s
+  input_series:
+  - series: go_goroutine_count{service_name="analytics-service",k8s_pod_name="analytics-1"}
+    values: 1 _ _ _ _ _ _ _ 1+0x2
+  alert_rule_test:
+  - eval_time: 3m
+    alertname: AnalyticsServiceMissing
+    exp_alerts:
+    - exp_labels:
+        service_name: analytics-service
+        severity: critical
+      exp_annotations:
+        summary: Analytics service or its telemetry export is missing
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/analytics/README.md#investigation-and-recovery
+  - eval_time: 4m
+    alertname: AnalyticsServiceMissing
+    exp_alerts: []

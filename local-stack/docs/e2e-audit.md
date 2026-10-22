@@ -2273,12 +2273,12 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 #      `analytics.overview`, which parents a `SELECT analytics.*` CLIENT span
 #      -- whose trace id ClickHouse's own query_log also carries, so the
 #      correlation holds on the server side too.
-for m in analytics_source_lag_seconds analytics_source_state analytics_freshness_last_success_time_seconds; do
+for m in analytics_source_lag_seconds analytics_source_state_ratio analytics_freshness_last_success_time_seconds; do
   curl -s "http://localhost:8428/api/v1/query?query=count($m{service_name=\"analytics\"})" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; n=int(r[0]['value'][1]) if r else 0; \
       print('C23 $m series:', 'OK %d' % n if n > 0 else 'FAIL 0')"
 done
-curl -s 'http://localhost:8428/api/v1/query?query=sum(analytics_source_state{service_name="analytics"})%20by%20(analytics_source_name)' \
+curl -s 'http://localhost:8428/api/v1/query?query=sum(analytics_source_state_ratio{service_name="analytics"})%20by%20(analytics_source_name)' \
   | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
     print('C23 one-hot per source:', 'OK' if r and all(v['value'][1]=='1' for v in r) and len(r)==3 else 'FAIL %r' % [(v['metric'].get('analytics_source_name'), v['value'][1]) for v in r])"
 curl -s 'http://localhost:8428/api/v1/query?query=count(db_client_operation_duration_seconds_count{service_name="analytics",db_system_name="clickhouse"})' \
@@ -2388,7 +2388,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 | C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all six jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005), `temporal` (server :8000) and `keycloak` (management :9000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **18 alerting** rules (8 ClickHouse engine + 2 collector + 3 inventory + 4 keycloak + Watchdog) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
-| C23 | Analytics signals (RFC-0030 / ADR-069) | `analytics_source_lag_seconds`, `analytics_source_state` (exactly one `1` per source) and `analytics_freshness_last_success_time_seconds` have series for `service_name="analytics"` with no API traffic; `db_client_operation_duration_seconds` for `db_system_name="clickhouse"` is present; one trace holds the HTTP server span → `analytics.overview` → a `SELECT analytics.*` client span, and ClickHouse `system.opentelemetry_span_log` carries that trace id for the reader's query |
+| C23 | Analytics signals (RFC-0030 / ADR-069) | `analytics_source_lag_seconds`, `analytics_source_state_ratio` (exactly one `1` per source) and `analytics_freshness_last_success_time_seconds` have series for `service_name="analytics"` with no API traffic; `db_client_operation_duration_seconds` for `db_system_name="clickhouse"` is present; one trace holds the HTTP server span → `analytics.overview` → a `SELECT analytics.*` client span, and ClickHouse `system.opentelemetry_span_log` carries that trace id for the reader's query |
 | C22 | Names conform to the registry | `make e2e-conformance` (Weaver `registry live-check` on the gate's OTLP, `--fail-on violation`) exits 0: every attribute, metric and event the fleet emitted is declared in `duynhlab/pkg` `semconv/registry`, with the declared unit and instrument, and no deprecated upstream key — `improvement`/`information` advice is allowed |
 
 Any failed row blocks the release tag. **C14** empty while C12 and C13 are

@@ -58,8 +58,11 @@ echo "baseline: $(state)"
 [ "$(state)" = "200 stale=False" ] || fail "baseline is not healthy"
 
 stop_heartbeat; echo "heartbeats stopped at $(date -u +%T)"
-# The last heartbeat's timestamp is the origin of every age below.
-T0=$(probe | head -n -1 | python3 -c 'import json,sys,datetime; d=json.load(sys.stdin); t=d["meta"]["data_through"].replace("Z","+00:00"); print(int(datetime.datetime.fromisoformat(t).timestamp()))')
+# The last heartbeat's timestamp is the origin of every age below. Read it
+# until two consecutive answers agree: a writer that takes its grace period
+# to die can land one more heartbeat after "stop".
+through() { probe | head -n -1 | python3 -c 'import json,sys,datetime; d=json.load(sys.stdin); t=d["meta"]["data_through"].replace("Z","+00:00"); print(int(datetime.datetime.fromisoformat(t).timestamp()))'; }
+T0=$(through); for i in 1 2 3 4 5 6; do sleep 10; t=$(through); [ "$t" = "$T0" ] && break; T0=$t; done
 echo "last heartbeat (data_through) at $(date -u -d @"$T0" +%T)"
 stale_at=""; unavailable_at=""
 while :; do

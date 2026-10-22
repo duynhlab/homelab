@@ -8,6 +8,9 @@ set -eu
 host="${CLICKHOUSE_HOST:-clickhouse}"
 interval="${HEARTBEAT_INTERVAL:-30}"
 version=1
+# Stop at once on SIGTERM: a loop that sits out its grace period writes one
+# more heartbeat after "stop", which skews every freshness measurement.
+trap 'exit 0' TERM INT
 while :; do
   version=$((version + 1))
   for db in order checkout payment; do
@@ -15,5 +18,6 @@ while :; do
       "INSERT INTO analytics.${db}_analytics_cdc_heartbeat (id, emitted_at, _peerdb_is_deleted, _peerdb_version) VALUES (1, now64(6), 0, ${version})" \
       || echo "heartbeat ${db} failed (version ${version})" >&2
   done
-  sleep "$interval"
+  sleep "$interval" &
+  wait $!
 done

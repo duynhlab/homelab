@@ -17,6 +17,16 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # No backup label: analytics owns no database (RFC-0030 / ADR-069); it
+    # reads ClickHouse serving views in monitoring.
+    platform.duynhlab.dev/tier: app
+  name: analytics
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
     platform.duynhlab/backup: "cnpg"
     platform.duynhlab.dev/tier: app
   name: cart

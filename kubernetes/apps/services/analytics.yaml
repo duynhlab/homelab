@@ -1,0 +1,21 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-analytics
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhlab.dev/domain: analytics
+spec:
+  type: Static
+  defaultValues:
+    name: analytics
+    # Dark launch (RFC-0030 phase 8): the main-branch image, no edge route and
+    # no Admin navigation until the G8 gates pass; the first release tag then
+    # replaces the sha pin.
+    image_tag: "sha-0000000" # {"$imagepolicy": "flux-system:analytics:tag"}
+    namespace: analytics
+    replicaCount: 1
+    # Serves only /protected/ (staff realm); there is no customer-realm
+    # surface, so no `authmw` input.
+    staffauthmw: true

@@ -1,0 +1,112 @@
+# Applied by scripts/analytics/serving-fixture.sh, never by Flux: the
+# fixture-backed serving layer for the analytics dark launch (RFC-0030 G8).
+# __ORDERS__ is substituted by the script.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: analytics-fixture-seed
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: analytics-fixture
+    app.kubernetes.io/component: fixture
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: analytics-fixture
+        app.kubernetes.io/component: fixture
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 101
+        runAsGroup: 101
+      containers:
+        - name: seed
+          image: clickhouse/clickhouse-server:26.9
+          command: ["clickhouse-client"]
+          args:
+            - --host=clickhouse-clickhouse.monitoring.svc.cluster.local
+            - --password=$(CLICKHOUSE_PASSWORD)
+            - --multiquery
+            - --param_orders=__ORDERS__
+            - --queries-file=/fixture/serving.sql
+          env:
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: password
+          volumeMounts:
+            - name: fixture
+              mountPath: /fixture
+              readOnly: true
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              memory: "256Mi"
+      volumes:
+        - name: fixture
+          configMap:
+            name: analytics-fixture
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-heartbeat
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: analytics-heartbeat
+    app.kubernetes.io/component: fixture
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: analytics-heartbeat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: analytics-heartbeat
+        app.kubernetes.io/component: fixture
+    spec:
+      securityContext:
+        runAsUser: 101
+        runAsGroup: 101
+      containers:
+        - name: heartbeat
+          image: clickhouse/clickhouse-server:26.9
+          command: ["sh", "/fixture/heartbeat.sh"]
+          env:
+            - name: CLICKHOUSE_HOST
+              value: clickhouse-clickhouse.monitoring.svc.cluster.local
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: password
+          volumeMounts:
+            - name: fixture
+              mountPath: /fixture
+              readOnly: true
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              memory: "64Mi"
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f heartbeat.sh"]
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f heartbeat.sh"]
+            periodSeconds: 10
+      volumes:
+        - name: fixture
+          configMap:
+            name: analytics-fixture

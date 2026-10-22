@@ -40,7 +40,7 @@ spec:
       matchExpressions:
         - key: kubernetes.io/metadata.name
           operator: In
-          values: [inventory, user, product, cart, order, review, notification, shipping, payment, checkout]
+          values: [inventory, user, product, cart, order, review, notification, shipping, payment, checkout, analytics]
   validations:
     - message: "Containers must declare resources.requests.{cpu,memory} and resources.limits.memory."
       expression: >-

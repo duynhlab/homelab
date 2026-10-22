@@ -1,0 +1,181 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: rs-analytics
+  namespace: default
+spec:
+  inputsFrom:
+    - kind: ResourceSetInputProvider
+      selector:
+        matchLabels:
+          platform.duynhlab.dev/domain: analytics
+  # The read-model domain (RFC-0030 / ADR-069): no PostgreSQL, no migrate init
+  # container, no gRPC. The service reads ClickHouse serving views as the
+  # restricted `analytics_reader` whose password ESO delivers into this
+  # namespace (cluster-external-secrets/clickhouse-analytics-reader.yaml).
+  # Everything else (identity, telemetry, probes, SLO) follows the five
+  # application domains so the operator's view of this pod is the same.
+  resourcesTemplate: |
+    apiVersion: helm.toolkit.fluxcd.io/v2
+    kind: HelmRelease
+    metadata:
+      name: << inputs.name >>
+      namespace: << inputs.namespace >>
+    spec:
+      interval: 10m
+      timeout: 10m
+      chartRef:
+        kind: OCIRepository
+        name: duynh-chart-oci
+        namespace: flux-system
+      releaseName: << inputs.name >>
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+      values:
+        nameOverride: << inputs.name >>
+        containerName: << inputs.name >>
+        replicaCount: << inputs.replicaCount | int >>
+        image:
+          repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service
+          tag: "<< inputs.image_tag >>"
+          pullPolicy: IfNotPresent
+        containerPort: 8080
+        service:
+          type: ClusterIP
+          port: 8080
+          appProtocol: http
+        # RFC-0014 P4: this pod ships its own logs over OTLP; the label tells
+        # the Vector DaemonSet to skip its stdout (double-ingest guard).
+        podLabels:
+          app.kubernetes.io/component: api
+          platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
+        env:
+          - name: SERVICE_NAME
+            value: << inputs.name >>
+          - name: HTTP_ADDR
+            value: ":8080"
+          - name: ENV
+            value: "production"
+          - name: OTEL_COLLECTOR_ENDPOINT
+            value: << index inputs "otel_endpoint" | default "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318" >>
+          - name: OTEL_SAMPLE_RATE
+            value: "0.1"
+          - name: OTEL_SERVICE_NAME
+            value: << inputs.name >>
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          # ADR-074: service.version is the pinned image tag; the pod identity
+          # is what splits the freshness gauges per replica (k8s.pod.name is on
+          # vmagent's promote allowlist, service.instance.id is not).
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=<< inputs.image_tag >>,k8s.container.name=<< inputs.name >>"
+          - name: SERVICE_VERSION
+            value: "<< inputs.image_tag >>"
+          - name: K8S_NAMESPACE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: DEPLOYMENT_ENVIRONMENT
+            value: "production"
+          - name: OTEL_LOGS_ENABLED
+            value: << index inputs "otel_logs_enabled" | default "true" | quote >>
+          - name: OTEL_METRICS_ENABLED
+            value: << index inputs "otel_metrics_enabled" | default "true" | quote >>
+          - name: PYROSCOPE_ENDPOINT
+            value: << index inputs "pyroscope_endpoint" | default "http://pyroscope.monitoring.svc.cluster.local:4040" >>
+          - name: LOG_LEVEL
+            value: << index inputs "log_level" | default "info" >>
+          - name: TRACING_ENABLED
+            value: << index inputs "tracing_enabled" | default "true" | quote >>
+          - name: PROFILING_ENABLED
+            value: << index inputs "profiling_enabled" | default "true" | quote >>
+          # The serving store. The CHI has no TLS listener (its header records
+          # the password plus the network fence as the control, ADR-069
+          # Adoption); the service refuses any user but analytics_reader.
+          - name: CLICKHOUSE_ADDR
+            value: << index inputs "clickhouse_addr" | default "clickhouse-clickhouse.monitoring.svc.cluster.local:9000" >>
+          - name: CLICKHOUSE_TLS
+            value: << index inputs "clickhouse_tls" | default "false" | quote >>
+          - name: CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: << index inputs "clickhouse_secret" | default "clickhouse-analytics-reader" >>
+                key: username
+          - name: CLICKHOUSE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: << index inputs "clickhouse_secret" | default "clickhouse-analytics-reader" >>
+                key: password
+          # The /protected/ surface verifies the workforce realm. The ISSUER is
+          # an identity claim (public host); the JWKS URL is the in-cluster
+          # fetch path (left empty the service would hairpin to the public
+          # host, which resolves to 127.0.0.1 in-cluster and fails closed).
+          - name: OIDC_STAFF_ISSUER
+            value: "https://id.duynh.me/realms/duynhlab-staff"
+          - name: OIDC_STAFF_JWKS_URL
+            value: "http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            # Query results are bounded server-side (512 MiB on ClickHouse, 1000
+            # rows); the Go side holds one overview at a time.
+            memory: "128Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+    <<- if not (index inputs "slo_disabled") >>
+    ---
+    # Request SLOs from the slo chart: the service emits
+    # http_server_request_duration_seconds through pkg/httpmw like the fleet.
+    apiVersion: helm.toolkit.fluxcd.io/v2
+    kind: HelmRelease
+    metadata:
+      name: << inputs.name >>-slo
+      namespace: << inputs.namespace >>
+    spec:
+      interval: 10m
+      chartRef:
+        kind: OCIRepository
+        name: slo-chart-oci
+        namespace: flux-system
+      releaseName: << inputs.name >>-slo
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+      values:
+        service: << inputs.name >>
+        namespace: monitoring
+        labels:
+          team: platform
+          env: monitoring
+    <<- end >>

@@ -65,3 +65,7 @@ spec:
       kind: ResourceSet
       name: rs-backoffice
       namespace: default
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: rs-analytics
+      namespace: default

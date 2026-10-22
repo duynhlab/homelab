@@ -105,8 +105,9 @@ it shares the same Kubernetes environment and object-storage failure domain.
   and Keycloak connect directly because their session and prepared-statement
   semantics are outside the pilot.
 - Every product-db service uses PgDog as its `<svc>_runtime` login. PgDog
-  sends reads and writes to `product-db-rw`; no database lists a replica
-  (ADR-089).
+  sends reads and writes to `product-db-rw`. The `product` database also lists
+  `product-db-ro` for connections that opt in (`-c pgdog.role=replica`); only
+  product-service's related-products reads do (ADR-089, #1304).
 - Every product-db service and both workers reach PgDog over client TLS and
   verify it (`sslmode=verify-full` against `homelab-ca`); PgDog refuses
   plaintext ([poolers](./poolers.md#tls)).
@@ -115,9 +116,11 @@ it shares the same Kubernetes environment and object-storage failure domain.
   clusters serve a `homelab-ca` server certificate, so one CA covers the
   poolers and the primary ([security](./security-and-access.md)).
 
-No application path reads from a replica today. A replica read is not a
+One application path reads from a replica: product-service's related products,
+through PgDog's opt-in profile with a 2 s lag ban and primary fallback
+([poolers](./poolers.md#current-connection-ownership)). A replica read is not a
 consistency guarantee: a read right after a primary commit may observe
-replication lag. That is why a replica profile will be an explicit opt-in.
+replication lag. That is why every other read stays on the primary.
 
 ## Database inventory
 

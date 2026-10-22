@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: user
-    image_tag: "2.5.3" # {"$imagepolicy": "flux-system:user:tag"}
+    image_tag: "2.5.5" # {"$imagepolicy": "flux-system:user:tag"}
     namespace: user
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

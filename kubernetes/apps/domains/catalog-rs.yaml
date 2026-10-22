@@ -226,6 +226,20 @@ spec:
             value: << inputs.pool_max | quote >>
           - name: DB_POOL_MODE
             value: "transaction"
+          <<- if (index inputs "db_read_replica") >>
+          # Opt-in stale-read pool through PgDog (#1304); the service decides
+          # which reads may use it.
+          - name: DB_READ_REPLICA
+            value: "true"
+          <<- end >>
+          <<- if (index inputs "db_pool_max_conn_lifetime") >>
+          # Lifetime + health check stay below the pooler's preStop, so clients
+          # leave a PgDog pod before it is told to shut down (#1350).
+          - name: DB_POOL_MAX_CONN_LIFETIME
+            value: << index inputs "db_pool_max_conn_lifetime" | quote >>
+          - name: DB_POOL_HEALTH_CHECK_PERIOD
+            value: << index inputs "db_pool_health_check_period" | default "10s" | quote >>
+          <<- end >>
           <<- if (index inputs "cache_enabled") >>
           - name: CACHE_ENABLED
             value: "true"

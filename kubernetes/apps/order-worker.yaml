@@ -58,7 +58,7 @@ spec:
         - name: worker
           # Worker and API pins may differ to freeze workflow code. The API owns schema
           # migrations; widen version skew only after replay and migration checks.
-          image: ghcr.io/duynhlab/order-service/order-service:2.10.4
+          image: ghcr.io/duynhlab/order-service/order-service:2.10.6
           imagePullPolicy: IfNotPresent
           args: ["worker"]
           ports:
@@ -154,6 +154,11 @@ spec:
               value: /etc/db/ca/ca.crt
             - name: DB_POOL_MAX_CONNECTIONS
               value: "10"
+            # Below PgDog's 70s preStop: the pool leaves a pod before SIGINT (#1350).
+            - name: DB_POOL_MAX_CONN_LIFETIME
+              value: "45s"
+            - name: DB_POOL_HEALTH_CHECK_PERIOD
+              value: "10s"
             - name: DB_POOL_MODE
               value: transaction
             # Temporal — the address order-service reads, and the queue it polls.

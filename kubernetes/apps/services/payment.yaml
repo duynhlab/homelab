@@ -13,7 +13,7 @@ spec:
     # The API and order worker must support unknown payment outcomes before rollout.
     # The migration init container must use this image before the app starts.
     # Compatibility gates: docs/proposals/rfc/RFC-0021/cutover-rollback.md.
-    image_tag: "2.8.2" # {"$imagepolicy": "flux-system:payment:tag"}
+    image_tag: "2.8.4" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -35,6 +35,8 @@ spec:
     # the CA in db_ca_secret; migrate verifies the primary with the same CA.
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
+    # Below PgDog's 70s preStop: clients leave a pod before SIGINT (#1350).
+    db_pool_max_conn_lifetime: "45s"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
     # RFC-0029: the service runs as payment_runtime through PgDog; the migrate
     # init container logs in as payment_migrator, which becomes payment_owner.

@@ -6,7 +6,7 @@ pool mode determines which session behaviors remain safe.
 | Cluster | Pooler | Replicas | Endpoint | Mode | Routing |
 |---|---|---:|---|---|---|
 | `platform-db` | CNPG PgBouncer `Pooler` | 2 | `platform-db-pooler-rw.platform.svc:5432` | transaction | Primary only |
-| `product-db` | PgDog chart v0.92 (PgDog v0.1.61) | 3 | `pgdog-product.product.svc:6432` | transaction | Primary only (`-rw`) |
+| `product-db` | PgDog chart v0.92 (PgDog v0.1.61) | 3 | `pgdog-product.product.svc:6432` | transaction | Primary (`-rw`); opt-in replica reads for `product` (`-ro`) |
 
 ## Why pooling exists
 
@@ -36,7 +36,7 @@ flowchart LR
     subgraph Kind["Kind cluster · homelab"]
         ProductClients["product / cart / order / checkout<br/>inventory / payment + 2 workers"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgDog["PgDog :6432"]
         PgDog -->|"reads and writes<br/>TLS, verify_full"| ProductRW["product-db-rw :5432"]
-        PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432<br/>(planned profile)"]
+        PgDog -.->|"opt-in: product related<br/>reads (pgdog.role=replica)"| ProductR["product-db-ro :5432"]
 
         PlatformClients["user / notification<br/>shipping / review"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgBouncer["PgBouncer :5432"]
         PgBouncer -->|"TLS, verify-full"| PlatformRW["platform-db-rw :5432"]
@@ -46,17 +46,28 @@ flowchart LR
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class ProductClients,PlatformClients,Direct service;
-    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-    class PgDog,PgBouncer,ProductRW,PlatformRW platform;
-    class ProductR planned;
+    class PgDog,PgBouncer,ProductRW,PlatformRW,ProductR platform;
 ```
 
-The diagram answers which clients use each deployed connection path. Both
-poolers send every query to the primary. PgDog used to send `SELECT`s outside a
-transaction to `product-db-r`. ADR-089 makes the primary the default, because a
-replica read right after a commit can miss it, so no PgDog database lists a
-replica any more. A flow that tolerates stale reads will opt in through a
-separate replica profile with a stated lag tolerance (**planned**, RFC-0029).
+The diagram answers which clients use each deployed connection path. ADR-089
+makes the primary the default, because a replica read right after a commit can
+miss it. PgDog runs `read_write_split = "prefer_primary"`: every query goes to
+the primary unless the connection opts in with the startup option
+`-c pgdog.role=replica` (the dotted line). Only the `product` database lists a
+replica (`product-db-ro`), and only product-service's related-products pool
+opts in (`DB_READ_REPLICA=true`, #1304); listing and detail reads stay on the
+primary because they fill the product cache, where a stale read racing an
+invalidation would stay until the TTL.
+
+The lag tolerance is 2 s: PgDog measures replica lag every 5 s
+(`lsn_check_interval`) and bans a replica past `ban_replica_lag = 2000`, and a
+banned replica's reads fall back to the primary. Verified on Kind
+(2026-10-22): 40 detail requests ran the related-products query 40 times on a
+replica and 0 on the primary; pausing WAL replay on both replicas banned them
+within 5 s, the endpoint kept answering 200, the queries ran on the primary,
+and the ban cleared after replay resumed. `pgdog_total_query_count` carries a
+`role` label but does not split by role; count on the instances
+(`pg_stat_statements`) to see where reads land.
 
 PgDog declares the six product-cluster databases and no users. With
 `passthrough_auth = "enabled_allow_change"` (ADR-025) it asks each client for
@@ -158,11 +169,11 @@ outside the PgBouncer pilot.
   ([emergency rotation](./runbooks/rotate-cnpg-service-password.md#emergency-rotation-credential-exposed)).
 - Pooler restarts can cut in-flight transactions. PDBs and replica counts reduce
   availability risk but do not preserve a transaction owned by a terminating
-  pod. PgDog drains first (a 10 s `preStop`, then up to 60 s for clients to
-  finish), but an idle pooled client connection to the stopping pod still gets
-  `57P01` on its next statement, so a roll costs a few fail-closed 503s until
-  `pkg/dbx` retries (duynhlab/pkg#124). The CNPG PgBouncer Pooler has no drain
-  configured.
+  pod. PgDog rolls without dropping requests: clients recycle every pooled
+  connection within about 60 s (`DB_POOL_MAX_CONN_LIFETIME` 45 s, health check
+  10 s), inside PgDog's 70 s `preStop`, so no idle client is left when it gets
+  `SIGINT` ([rolling restarts](./runbooks/pooler-operations.md#rolling-restarts-drain)).
+  The CNPG PgBouncer Pooler has no drain configured.
 
 ## Operations
 

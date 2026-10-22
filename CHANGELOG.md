@@ -145,6 +145,11 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`
+  and `PgDogPoolBanned` on PgDog's own metrics (`pgdog_cl_waiting`,
+  `pgdog_total_checkout_timeouts`, `pgdog_banned`), with runbooks; the catalog's
+  "PgDog pooler saturation alerts" row moves from Planned to Active.
+
 - **Pool connection churn on the Microservices (OTel) board.** The as-code
   dashboards move to `0.8.0`, which adds two panels to the database row:
   *Pool dead connections replaced* (`pgx_pool_acquire_evictions_total`) and
@@ -225,6 +230,15 @@ Skeleton (copy what you need):
   ownership conflict.
 
 #### Databases
+
+- **Opt-in stale reads through PgDog** (#1304). PgDog runs
+  `read_write_split = "prefer_primary"` with `ban_replica_lag = 2000`; the
+  `product` database lists `product-db-ro`, and product-service reads related
+  products from it (`DB_READ_REPLICA=true`, startup option
+  `-c pgdog.role=replica`). Everything else stays on the primary. A banned
+  replica falls back to the primary. The PgDog reload sidecar now also
+  reloads `pgdog.toml` and `users.toml`, so a config change reaches running
+  pods without a roll.
 
 - **A PgDog certificate renewal reloads in place instead of rolling** (#1350).
   The HelmRelease no longer copies `tls.crt` into a pod annotation; a
@@ -701,6 +715,15 @@ Skeleton (copy what you need):
   `service.version` said 2.5.0 while the image is 2.8.0.
 
 #### Databases
+
+- **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
+  recycle pooled connections within about 60 s (`DB_POOL_MAX_CONN_LIFETIME=45s`,
+  `DB_POOL_HEALTH_CHECK_PERIOD=10s`) and PgDog's `preStop` is 70 s (grace 140 s),
+  so no idle client is left on a pod when it gets SIGINT, as PgDog's upgrade
+  guide prescribes. Services pin the dbx v0.40.1 releases, which also fix a
+  connection leak: dbx v0.39.0–v0.40.0 could block forever in the acquire
+  check behind pgconn's background reader. Measured on Kind at 2 orders/s:
+  0 server 5xx during a roll against 0 at baseline (5–24 before).
 
 - **PgDog runs without a CPU limit** (was 200m), as the rest of the platform;
   `cpu: null` drops the chart's 1000m default. During a roll the new pods were

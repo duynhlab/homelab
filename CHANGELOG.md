@@ -145,6 +145,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Pool connection churn on the Microservices (OTel) board.** The as-code
+  dashboards move to `0.8.0`, which adds two panels to the database row:
+  *Pool dead connections replaced* (`pgx_pool_acquire_evictions_total`) and
+  *Pool connect failures* (`pgx_pool_connect_failures_total` by `error_type`,
+  the signal behind `PgxPoolConnectFailures`). The local-stack copy of the
+  board gets the same two panels (#1338).
+
 - **`PgxPoolConnectFailures` alert** (#1338). dbx v0.39.0 counts every
   connection a service fails to open in `pgx_pool_connect_failures_total`,
   labelled with the SQLSTATE (`28P01`, `57P01`, `53300`) or `connect`; pgxpool

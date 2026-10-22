@@ -13,7 +13,7 @@ spec:
     # Dark launch (RFC-0030 phase 8): the main-branch image, no edge route and
     # no Admin navigation until the G8 gates pass; the first release tag then
     # replaces the sha pin.
-    image_tag: "sha-67ae994" # {"$imagepolicy": "flux-system:analytics:tag"}
+    image_tag: "sha-8e4667f" # {"$imagepolicy": "flux-system:analytics:tag"}
     namespace: analytics
     replicaCount: 1
     # Serves only /protected/ (staff realm); there is no customer-realm

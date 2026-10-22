@@ -122,10 +122,12 @@ spec:
         readOnly: true
 
     # Drain on rollout: preStop keeps the pod serving while the Service drops
-    # it, then SIGINT lets clients finish (shutdown_timeout 60s). Grace covers
-    # both, since the chart's default (shutdown + 5s) ignores the preStop.
-    preStopSleepSeconds: 10
-    terminationGracePeriodSeconds: 75
+    # it. Clients recycle connections within ~60s (lifetime 45s x 1.1 +
+    # health check 10s, set on each client), so by SIGINT none is left here
+    # (#1350); SIGINT then lets in-flight work finish (shutdown_timeout 60s).
+    # Grace covers both, since the chart's default ignores the preStop.
+    preStopSleepSeconds: 70
+    terminationGracePeriodSeconds: 140
 
     lsnCheckDelay: 0
     lsnCheckInterval: 5000

@@ -35,6 +35,8 @@ spec:
     # the CA in db_ca_secret; migrate verifies the primary with the same CA.
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
+    # Below PgDog's 70s preStop: clients leave a pod before SIGINT (#1350).
+    db_pool_max_conn_lifetime: "45s"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
     # RFC-0029: the service runs as payment_runtime through PgDog; the migrate
     # init container logs in as payment_migrator, which becomes payment_owner.

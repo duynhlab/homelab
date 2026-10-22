@@ -18,6 +18,8 @@ spec:
     replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
+    # Below PgDog's 70s preStop: clients leave a pod before SIGINT (#1350).
+    db_pool_max_conn_lifetime: "45s"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
     # RFC-0029: the service runs as cart_runtime through PgDog; the migrate
     # init container logs in as cart_migrator, which becomes cart_owner.

@@ -32,7 +32,7 @@ case "$GATE" in
     ;;
   kind)
     ANALYTICS_URL="${ANALYTICS_URL:?set ANALYTICS_URL (port-forward or edge)}"
-    token() { KC_URL=https://id.duynh.me KC_REALM=duynhlab-staff KC_CLIENT_ID=admin-portal KC_REDIRECT=https://admin.duynh.me/ USERNAME=duyne PASSWORD='p@ss1234' bash local-stack/scripts/keycloak-token.sh; }
+    token() { KC_URL=https://id.duynh.me KC_REALM=duynhlab-staff KC_CLIENT_ID=admin-portal KC_REDIRECT=https://backoffice.duynh.me/ USERNAME=duyne PASSWORD='p@ss1234' bash local-stack/scripts/keycloak-token.sh; }
     stop_heartbeat()  { kubectl -n monitoring scale deploy/analytics-heartbeat --replicas=0 >/dev/null; }
     start_heartbeat() { kubectl -n monitoring scale deploy/analytics-heartbeat --replicas=1 >/dev/null; }
     ;;

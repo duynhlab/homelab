@@ -145,6 +145,11 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`
+  and `PgDogPoolBanned` on PgDog's own metrics (`pgdog_cl_waiting`,
+  `pgdog_total_checkout_timeouts`, `pgdog_banned`), with runbooks; the catalog's
+  "PgDog pooler saturation alerts" row moves from Planned to Active.
+
 - **Pool connection churn on the Microservices (OTel) board.** The as-code
   dashboards move to `0.8.0`, which adds two panels to the database row:
   *Pool dead connections replaced* (`pgx_pool_acquire_evictions_total`) and
@@ -701,6 +706,15 @@ Skeleton (copy what you need):
   `service.version` said 2.5.0 while the image is 2.8.0.
 
 #### Databases
+
+- **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
+  recycle pooled connections within about 60 s (`DB_POOL_MAX_CONN_LIFETIME=45s`,
+  `DB_POOL_HEALTH_CHECK_PERIOD=10s`) and PgDog's `preStop` is 70 s (grace 140 s),
+  so no idle client is left on a pod when it gets SIGINT, as PgDog's upgrade
+  guide prescribes. Services pin the dbx v0.40.1 releases, which also fix a
+  connection leak: dbx v0.39.0–v0.40.0 could block forever in the acquire
+  check behind pgconn's background reader. Measured on Kind at 2 orders/s:
+  0 server 5xx during a roll against 0 at baseline (5–24 before).
 
 - **PgDog runs without a CPU limit** (was 200m), as the rest of the platform;
   `cpu: null` drops the chart's 1000m default. During a roll the new pods were

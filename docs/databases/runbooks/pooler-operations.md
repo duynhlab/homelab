@@ -80,26 +80,35 @@ new serial, no container restarted, and no request failed with `57P01`.
 
 ## Rolling restarts drain
 
-Each PgDog pod gets a 10-second `preStop` sleep, so the Service stops routing to
-it before PgDog is signalled, and then `SIGINT` (the image's stop signal) makes
-PgDog stop accepting connections and wait up to `shutdown_timeout` (60 s) for
-clients to finish. `terminationGracePeriodSeconds` is 75 so the sleep and the
-drain both fit. With 3 replicas and PDB `minAvailable: 2` a restart is
-rolling, one pod at a time.
+PgDog has no option to move idle clients off a pod: on `SIGINT` (the image's
+stop signal) it sends every idle client `FATAL: PgDog is shutting down
+(SQLSTATE 57P01)` and waits up to `shutdown_timeout` (60 s) for clients still
+in a transaction. So the clients leave first, as PgDog's upgrade guide
+prescribes:
 
-The drain does not reach the idle connections a client's pgx pool holds to the
-pod being stopped: PgDog sends them `FATAL: PgDog is shutting down (SQLSTATE
-57P01)` and closes them. Since `pkg/dbx` v0.39.0 the pool checks each
-connection before handing it out and replaces one the pooler has already
-closed, so no request draws such a connection; `pgx_pool_acquire_evictions_total`
-counts the replacements. Measured on Kind (2026-10-22, 2 orders/s for 180 s
-through the edge): 0 `57P01` during a roll (5 before), 39 connections replaced.
+- Each PgDog pod gets a 70-second `preStop` sleep. The Service stops routing
+  new connections to it as soon as deletion starts.
+- Every client behind PgDog (product, inventory, cart, order, checkout, payment
+  and both workers) sets `DB_POOL_MAX_CONN_LIFETIME=45s` and
+  `DB_POOL_HEALTH_CHECK_PERIOD=10s`. An idle pgx connection then lives at most
+  45 s × 1.1 + 10 s ≈ 60 s, so by `SIGINT` the pool has replaced every
+  connection to the stopping pod with one to another pod.
+- `terminationGracePeriodSeconds` is 140: the 70 s sleep, the 60 s drain and a
+  margin. With 3 replicas and PDB `minAvailable: 2` a restart is rolling, one
+  pod at a time; a full roll finishes in about two and a half minutes.
+- As a backstop, `pkg/dbx` checks each pooled connection before handing it out
+  and replaces one the pooler already closed
+  (`pgx_pool_acquire_evictions_total` counts them).
 
-A roll still fails about 21 requests (24 server 5xx against 3 at baseline,
-nearly all checkout 503). They are `context deadline exceeded` on checkout
-queries, in one burst as each old pod receives SIGINT at the end of its
-`preStop`. Expect them on every roll until #1350 is fixed; a certificate
-renewal no longer rolls PgDog (above).
+Measured on Kind (2026-10-22, 2 orders/s for 180 s through the edge, dbx
+v0.40.1): **0 server 5xx during a roll against 0 at baseline**, 0 evictions, 0
+`57P01`. Before this change a roll cost 5–24 failed requests. Two client-side
+defects made it worse and are fixed in dbx v0.40.0/v0.40.1: a two-minute
+default connect timeout, and an acquire-check peek that could block forever
+behind pgconn's background reader and leak the connection. One residual: a
+freshly started pod can refuse a first passthrough login (upstream
+pgdog#1798); it surfaced once as `pgx_pool_connect_failures_total{error_type="58000"}`
+on a worker, with no request failure.
 
 ## Add a database backend (new service)
 

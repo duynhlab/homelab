@@ -7,7 +7,7 @@
 | **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/pooler/pgdog-alerts.yaml` |
 | **Metrics** | `pgdog_banned`, `pgdog_errors` |
 | **Status** | active |
-| **Validation** | `static-valid` (2026-10-22, #1350) |
+| **Validation** | `live-signal` (Kind 2026-10-22: series present with the labels the expr uses; rule healthy, inactive through a PgDog roll) |
 | **Dashboard** | Databases → PGDog |
 | **Local-stack** | not present locally (no PgDog in local-stack) |
 

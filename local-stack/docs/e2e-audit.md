@@ -191,6 +191,7 @@ already mint their own for this reason.
 > | A1, A2, A3, A7, A11 | `make e2e-smoke GATE=compose` |
 > | A4, A5 | `make e2e-session` — separate because A4 kills the realm session on purpose |
 > | A17, A18, A19, A21 | `make e2e-staff` |
+> | A25 | `make e2e-analytics-api GATE=compose`, then `GATE=compose scripts/analytics-freshness-drill.sh` and `GATE=compose scripts/analytics-failure-drill.sh` |
 > | A20 | `make e2e-operator` |
 > | C6, C16, C17, C18, C19, C20, C21 | `make e2e-smoke GATE=compose`, `make e2e-observability` |
 >
@@ -1227,6 +1228,34 @@ done   # <svc>-migrate-1 → <svc>-migrate, <svc>-seed-1 → <svc>-seed, <svc>-a
 > the seeded realm user `bob` instead of a freshly registered one, which is why
 > A13 now clears bob's leftover session before arming.
 
+# A25. THE ANALYTICS PROTECTED SURFACE (RFC-0030 / ADR-069). One endpoint,
+#      three proofs. (1) The guard chain: tokenless 401, customer-realm 401 at
+#      the edge, and -- the part only this row has -- a VALID staff login that
+#      holds no backoffice_admin role (`duyne-viewer`) is 403 FORBIDDEN, so the
+#      role gate is proven on its own rather than inferred from the issuer
+#      fence. (2) The contract: `duyne` gets 200 with Cache-Control: no-store,
+#      every *_minor field a decimal integer STRING, one trend row per UTC day,
+#      three sources all `healthy`, `stale:false`; every malformed filter
+#      (missing currency, VND, >90 days, reversed, unknown parameter, bad date)
+#      is 400 VALIDATION_ERROR. (3) Freshness and failure on the clock the
+#      contract names: with the `analytics-heartbeat` container stopped the
+#      answer turns `stale:true` after 120 s and 503 ANALYTICS_UNAVAILABLE after
+#      300 s, and is healthy again within 60 s of the restart; with ClickHouse
+#      PAUSED (connections hang) the overview is 503 inside its 5 s budget and
+#      recovers within 30 s of the unpause.
+#
+#      The serving layer here is FIXTURE-BACKED: CDC is not deployed in
+#      local-stack, `analytics-fixture` builds the raw tables in PeerDB's shape
+#      and the views the service reads (local-stack/analytics/fixture/). The
+#      row therefore proves the API, its guards and its failure behaviour, not
+#      the pipeline; the pipeline's own gates are G1-G7 on #1266.
+make e2e-analytics-api GATE=compose          # the guard chain and the contract
+GATE=compose scripts/analytics-freshness-drill.sh   # ~5.5 min: stale >120 s, 503 >300 s, recovery
+GATE=compose scripts/analytics-failure-drill.sh     # ClickHouse paused: 503 in <=5 s, recovery <=30 s
+# want: every A25 check `rate==1.0`; the drills print PASS with the measured
+# transition ages. A stale transition under 120 s or an unavailable one under
+# 300 s is a contract failure, not a timing nit.
+
 ## Phase B — real browser (agent-browser, ~8 min)
 
 Two SPAs, run in that order: the storefront (`:3001`, B1-B4) and the Backoffice
@@ -1472,7 +1501,7 @@ agent-browser $P batch "fill @e2 duyne" "fill @e4 'p@ss1234'" "click @e3" \
   "wait 3000" "get url" "snapshot -i"
 # want: back on http://localhost:3009/ with the shell rendered — the primary nav
 # carries Dashboard, Catalog, Inventory, Orders, Payments, Shipments, Customers,
-# and a "Sign out" icon button. Landing on /forbidden instead means the token is
+# Analytics, and a "Sign out" icon button. Landing on /forbidden instead means the token is
 # valid but carries no `backoffice_admin` role, which is a different failure from
 # a rejected sign-in: read the row it lands on before calling this red.
 
@@ -1527,6 +1556,33 @@ agent-browser $N batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
 # "Invalid username or password." message, and NEVER back on :3009 with a shell.
 # A rendered portal after these credentials is a FAILED row and means the two
 # realms share a user store.
+
+# B11. THE ANALYTICS PAGE RENDERS THE SERVER'S VERDICT (RFC-0030 / ADR-069).
+#      Still signed in as duyne in the `portal` session. Open /analytics and
+#      assert: the heading "Analytics"; the "Data freshness" region reads "Data
+#      is fresh" with three source lags (order, checkout, payment) in seconds;
+#      KPI cards show formatted money (a `$` figure, never a dash or spinner);
+#      the trend chart and the funnel render; the "30 days" preset rewrites the
+#      URL (`from=` changes) and the figures reload through `:8080`.
+agent-browser $P batch "open http://localhost:3009/analytics" "wait 3000" "get url" "snapshot -i"
+agent-browser $P network requests --type fetch | grep ':8080/analytics/v1/protected/commerce/overview'
+#      Then the two degraded states the page must show rather than hide. Stop
+#      the heartbeats and reload after ~2.5 minutes: the banner reads "Delayed
+#      data" and the figures stay. After ~5.5 minutes: the page shows the
+#      unavailable state with a Retry control and NO figures. Start the
+#      heartbeats; Retry within a minute shows "Data is fresh" again. (Reuse the
+#      A25 drill timings; this is the browser half of the same contract.)
+docker compose stop analytics-heartbeat
+# ... wait, reload, snapshot; then:
+docker compose start analytics-heartbeat
+#      Finally the role gate in the browser: in a CLEAN profile (`portal-neg`,
+#      no staff SSO cookie) sign in as `duyne-viewer` / `p@ss1234` -- a valid
+#      staff account WITHOUT backoffice_admin. The shell's UX gate parks it on
+#      /forbidden; a rendered Analytics page for this account is a FAILED row.
+agent-browser $N batch "open http://localhost:3009/analytics" "wait 2500" "snapshot -i"
+# ... click "Sign in with Keycloak", fill duyne-viewer / p@ss1234, submit, then:
+agent-browser $N batch "get url" "snapshot -i"
+# want url http://localhost:3009/forbidden
 
 # B8. Cleanup — both portal sessions.
 agent-browser $P close
@@ -1746,9 +1802,9 @@ curl -s "$CH" -u default:otel --data-binary "
 import sys
 server = {l.split('\t')[0]: int(l.split('\t')[2]) for l in sys.stdin.read().splitlines() if l}
 required = ['user','product','inventory','cart','order','review','shipping',
-            'notification','payment','checkout','$EDGE']
+            'notification','payment','checkout','analytics','$EDGE']
 bad = [s for s in required if server.get(s, 0) == 0]
-print('C4 server spans:', 'OK all 10 services + edge (min %d)' % min(server[s] for s in required)
+print('C4 server spans:', 'OK all 11 services + edge (min %d)' % min(server[s] for s in required)
       if not bad else 'FAIL no Server span: ' + ','.join(bad))"
 # want every service driven by Phase A present with server_spans > 0, plus $EDGE.
 
@@ -1765,7 +1821,7 @@ done
 #     VictoriaTraces serves this API shape so Grafana's `jaeger` datasource type
 #     can query it.
 #
-#     The required set is the TEN application services local-stack runs plus the
+#     The required set is the ELEVEN application services local-stack runs plus the
 #     EDGE, which is a first-class traced participant now that it is the trace
 #     root. `auth` is deliberately absent: auth-service is removed from
 #     local-stack (its cluster surface retires in RFC-0024 P5), so nothing calls
@@ -1776,9 +1832,9 @@ curl -s "$VT/services" | python3 -c "
 import json,sys
 actual = set(json.load(sys.stdin)['data'])
 required = {'user','product','inventory','cart','order','review','shipping',
-            'notification','payment','checkout','$EDGE'}
+            'notification','payment','checkout','analytics','$EDGE'}
 missing = sorted(required - actual)
-print('C6 traced services:', 'OK all 10 services + edge' if not missing else 'FAIL missing=' + ','.join(missing))
+print('C6 traced services:', 'OK all 11 services + edge' if not missing else 'FAIL missing=' + ','.join(missing))
 print('C6 also present (expected, not required):', sorted(actual - required))
 if 'auth' in actual: print('C6 NOTE: auth is traced — auth-service should be gone from local-stack')
 raise SystemExit(1 if missing else 0)"
@@ -1924,8 +1980,8 @@ curl -s http://localhost:9428/select/logsql/stream_field_values \
 import json,sys
 got = {v['value'] for v in json.load(sys.stdin)['values']}
 missing = sorted({'user','product','inventory','cart','order','review','shipping',
-                  'notification','payment','checkout'} - got)
-print('C12 OTLP log streams:', 'OK all 10 services' if not missing else 'FAIL missing=' + ','.join(missing))"
+                  'notification','payment','checkout','analytics'} - got)
+print('C12 OTLP log streams:', 'OK all 11 services' if not missing else 'FAIL missing=' + ','.join(missing))"
 # want every service Phase A drove.
 
 # C13. EDGE ACCESS LOGS, in ClickHouse. The second-most important row in this
@@ -2030,8 +2086,8 @@ curl -s -X POST 'http://localhost:4040/querier.v1.QuerierService/LabelValues' \
   -H 'Content-Type: application/json' \
   -d "{\"name\":\"service_name\",\"matchers\":[\"{}\"],\"start\":$(((`date +%s`-3600)*1000)),\"end\":$((`date +%s`*1000))}" \
   | python3 -c "import json,sys; got=set(json.load(sys.stdin)['names']); \
-  required={'user','product','inventory','cart','order','review','shipping','notification','payment','checkout'}; \
-  missing=sorted(required-got); print('C16 profiled services:', 'OK all 10' if not missing else 'FAIL missing='+','.join(missing)); \
+  required={'user','product','inventory','cart','order','review','shipping','notification','payment','checkout','analytics'}; \
+  missing=sorted(required-got); print('C16 profiled services:', 'OK all 11' if not missing else 'FAIL missing='+','.join(missing)); \
   print('C16 also present:', sorted(got-required)); \
   raise SystemExit(1 if missing else 0)"
 # `pyroscope` itself appears in that list (it profiles its own process) — expected.
@@ -2208,6 +2264,41 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 #      print([a['labels']['alertname'] for a in json.load(sys.stdin)['data']['alerts']])" \
 #   && docker compose start clickhouse
 
+# C23. ANALYTICS SIGNALS (RFC-0030 / ADR-069) -- numbered after C22 only
+#      because C22 must run LAST; run this one before it. Three things the
+#      service must emit even when nobody opens the portal: the idle freshness
+#      gauges (one lag series per source, one-hot state, last-success time)
+#      split by the replica identity; the standard DB client duration for its
+#      ClickHouse reads; and a trace in which the HTTP server span parents
+#      `analytics.overview`, which parents a `SELECT analytics.*` CLIENT span
+#      -- whose trace id ClickHouse's own query_log also carries, so the
+#      correlation holds on the server side too.
+for m in analytics_source_lag_seconds analytics_source_state analytics_freshness_last_success_time_seconds; do
+  curl -s "http://localhost:8428/api/v1/query?query=count($m{service_name=\"analytics\"})" \
+    | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; n=int(r[0]['value'][1]) if r else 0; \
+      print('C23 $m series:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+done
+curl -s 'http://localhost:8428/api/v1/query?query=sum(analytics_source_state{service_name="analytics"})%20by%20(analytics_source_name)' \
+  | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+    print('C23 one-hot per source:', 'OK' if r and all(v['value'][1]=='1' for v in r) and len(r)==3 else 'FAIL %r' % [(v['metric'].get('analytics_source_name'), v['value'][1]) for v in r])"
+curl -s 'http://localhost:8428/api/v1/query?query=count(db_client_operation_duration_seconds_count{service_name="analytics",db_system_name="clickhouse"})' \
+  | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; n=int(r[0]['value'][1]) if r else 0; \
+    print('C23 db.client.operation.duration (clickhouse):', 'OK %d series' % n if n > 0 else 'FAIL 0')"
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT TraceId, countIf(SpanKind='Server') AS server, countIf(SpanName='analytics.overview') AS overview,
+         countIf(SpanKind='Client' AND SpanName LIKE 'SELECT analytics.%') AS client
+  FROM otel.otel_traces WHERE ServiceName='analytics' AND Timestamp > now() - INTERVAL 45 MINUTE
+  GROUP BY TraceId HAVING server > 0 AND overview > 0 AND client > 0 LIMIT 1 FORMAT TSV" \
+  | python3 -c "import sys; l=sys.stdin.read().split(); print('C23 server→overview→client ancestry:', 'OK trace '+l[0] if l else 'FAIL no complete trace'); open('/tmp/c23-trace','w').write(l[0] if l else '')"
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT count() FROM system.query_log
+  WHERE user='analytics_reader' AND type='QueryFinish' AND event_time > now() - INTERVAL 45 MINUTE
+    AND opentelemetry_trace_id = reinterpretAsUUID(unhex('$(cat /tmp/c23-trace)')) FORMAT TSV" \
+  | python3 -c "import sys; n=int(sys.stdin.read() or 0); print('C23 ClickHouse query_log carries the trace id:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+# want: three gauge families with series, exactly one state = 1 per source, a
+# DB duration histogram for clickhouse, one trace with all three spans, and
+# the same trace id on the server-side query_log row (clickhouse-go WithSpan).
+
 # C22. EVERY NAME THE FLEET EMITTED IS IN THE REGISTRY (ADR-076). Weaver has been
 #      listening to a copy of the gate's OTLP since Preconditions step 2 (the
 #      compose.weaver.yaml overlay). Stopping it returns the report and sets the
@@ -2262,23 +2353,25 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
 | A22 | The attention cards' six reads (RFC-0023) | the five count queries the portal dashboard issues each answer **200** with a **numeric `total_items`** (zero is a legitimate count; a missing or non-numeric field is not), the recent-orders panel honours `page_size=5`, and a status order-service does not know is **400** — which is what proves the `manual_review` and `cancelling` cards are genuinely filtered rather than both reporting the total order count |
 | A23 | The split services' three database roles (RFC-0029) | for each of the ten services (review, user, shipping, notification, product, inventory, cart, order, checkout, payment): as `<svc>_runtime`, reads its table, and `CREATE`, `DROP`, `SET ROLE <svc>_owner` and reading `schema_migrations` are each **refused**; as `<svc>_migrator` with no `SET ROLE` anywhere: `current_user` is `<svc>_owner` at login **and after `RESET ROLE`**, and `CREATE` succeeds; **0** relations in `public` owned by anyone but `<svc>_owner` |
+| A25 | Analytics protected surface (RFC-0030 / ADR-069) | tokenless 401 **at the edge**; customer-realm token 401 wrong-issuer; staff `duyne-viewer` (no `backoffice_admin`) **403 `FORBIDDEN`**; `duyne` 200 with `Cache-Control: no-store`, every `*_minor` a decimal integer **string**, one trend row per UTC day, three `healthy` sources and `stale:false`; six malformed filters each 400 `VALIDATION_ERROR`; heartbeats stopped → `stale:true` after >120 s and 503 `ANALYTICS_UNAVAILABLE` after >300 s, healthy ≤60 s after restart; ClickHouse paused → 503 within 5 s, 200 within 30 s of unpause. Serving layer is **fixture-backed** (CDC not deployed) |
 | A24 | Every client names itself (ADR-089) | `pg_stat_activity` shows each of the 10 services under its own name as `<svc>_runtime`, plus `order-worker` as `order_runtime` and `checkout-worker` as `checkout_runtime`, with **no** application session left unnamed; every `*-migrate`, `*-seed` and `*-authz` container ran with `PGAPPNAME` `<svc>-migrate`, `<svc>-seed` and `db-authz` |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
 | B4 | Browser cleanup (storefront) | the `audit` session is closed, so a later run starts from a clean profile |
-| B5 | Portal sign-in through the **staff** realm | an unauthenticated `:3009` load lands on `/login` with one "Sign in with Keycloak" button and no password field; the button changes the ORIGIN to `localhost:8081` **and the realm in the path is `duynhlab-staff`** — `realms/duynhlab` here means the container was built with the storefront's realm arg; after `duyne` signs in the shell renders with the seven primary nav items and a Sign out control (a landing on `/forbidden` is a role failure, not a sign-in failure); **no JWT-shaped value in either web storage** |
+| B5 | Portal sign-in through the **staff** realm | an unauthenticated `:3009` load lands on `/login` with one "Sign in with Keycloak" button and no password field; the button changes the ORIGIN to `localhost:8081` **and the realm in the path is `duynhlab-staff`** — `realms/duynhlab` here means the container was built with the storefront's realm arg; after `duyne` signs in the shell renders with the eight primary nav items and a Sign out control (a landing on `/forbidden` is a role failure, not a sign-in failure); **no JWT-shaped value in either web storage** |
 | B6 | Portal dashboard reads real numbers | all five cards present — Low / out of stock, Manual review, Cancelling, Unresolved attempts, Recon discrepancies (latest run) — each showing a numeral rather than a dash or a spinner, and every `:8080` call behind them 200. Zero is a legitimate value; a blank or missing card is not. Requires Phase A to have run first |
 | B7 | The realm split is a fence in the browser | in a **clean** profile (`portal-neg`, so no staff SSO cookie), the customer account `alice` / `password123` typed on the portal's realm page stays on `localhost:8081` with "Invalid username or password."; a rendered portal shell after those credentials is a FAILED row and means the two realms share a user store |
 | B8 | Browser cleanup (portal) | both the `portal` and `portal-neg` sessions are closed |
 | B9 | Portal bootstrap reaches an untracked SKU (ADR-053) | the page-level **Receive first stock** dialog accepts a free-entry SKU id with no balance row; the advisory line reads "No balance row yet — this receipt creates it." before submit; after Receive the balances table shows the new row and the ledger carries the `RECEIVE` with duyne's staff subject |
+| B11 | Analytics page shows the server's verdict (RFC-0030 / ADR-069) | `/analytics` renders the heading, the **Data freshness** region with three source lags, formatted money in the KPI cards (no dash or spinner), the trend and funnel; the "30 days" preset rewrites the URL and refetches through `:8080`; with the heartbeats stopped the banner reads **Delayed data** after ~2.5 min and the page is the **unavailable** state with Retry (no figures) after ~5.5 min, fresh again within a minute of the restart; `duyne-viewer` lands on `/forbidden` |
 | B10 | Publish warns, never gates (ADR-053) | publishing a fresh (untracked-by-construction) draft shows the amber "No inventory balance row exists for SKU …" notice inside the confirm dialog while the **Publish button stays enabled**, and the publish succeeds |
 | C1 | Collector | 0 export failures / error lines |
 | C2 | Edge span is the trace root | the discovery query returns exactly one non-application service name (`platform.envoy-gateway-system`, derived by Envoy Gateway from `<gateway>.<namespace>` — discovered, not assumed) and the ROOT span of the tagged request is the edge's `ingress` Server span; the `deployment.environment.name=local` customTag corroborates it |
 | C3 | Trace continuity edge→service | one `TraceId` holds the edge **and** the service, with exactly one root and the service's Server span carrying a non-empty `ParentSpanId` |
-| C4 | Per-service span coverage | every service Phase A drove appears in `otel.otel_traces` with `server_spans > 0`, plus the edge |
+| C4 | Per-service span coverage | every service Phase A drove (the 10 domain services plus `analytics`) appears in `otel.otel_traces` with `server_spans > 0`, plus the edge |
 | C5 | ClickHouse (RFC-0019) | `otel.otel_traces` and `otel.otel_logs` non-empty after the driven flow (SQL over `:8123`) |
-| C6 | Trace service coverage | the **10** application service names local-stack runs **plus the edge** are present in **VictoriaTraces' Jaeger-compatible query API** (`:10428/select/jaeger/api/services`) — there is no Jaeger container. `mockpay` also appears and is legitimate but not required; `auth` must be **absent** |
+| C6 | Trace service coverage | the **11** application service names local-stack runs **plus the edge** are present in **VictoriaTraces' Jaeger-compatible query API** (`:10428/select/jaeger/api/services`) — there is no Jaeger container. `mockpay` also appears and is legitimate but not required; `auth` must be **absent** |
 | C7 | spanmetrics / RED leg | `spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"}` > 0 and `spanmetrics_duration_milliseconds_bucket` present — proves the connector plus the remote-write path |
 | C8 | App semconv metrics leg | `http_server_request_duration_seconds_count`, `rpc_server_call_duration_seconds_count{service_name="inventory"}` (the only metrics evidence for gRPC-only inventory), and `go_goroutine_count` all have series |
 | C9 | Business counters | confirmed = saga = authorized for flows driven since the last process restart (after ~45s). A14/A15 reset the saga counter; then the durable evidence settles it — every `OrderFulfillmentWorkflow` `Completed`, every confirmed order `completed`. `auth_*` counters are **not** asserted |
@@ -2288,12 +2381,13 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C13 | Edge access logs (ClickHouse only, ADR-060 + ADR-061) | `otel.otel_logs` rows for `platform.envoy-gateway` carrying `upstream_cluster` + `route_name` (the discriminator against the control plane's own logs) are non-empty, VictoriaLogs holds **0** of them (the collector's `filter/drop_edge_logs`, as on the cluster), and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — with `GET 200` to the `api-product` cluster, not Envoy's built-in fallback names |
 | C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C14 empty while C12 and C13 are healthy = the Vector leg is down |
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
-| C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
+| C16 | Profiling | Pyroscope's `service_name` label values cover the 11 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
 | C17 | Grafana datasources | `/api/datasources` returns exactly the five expected uid/type pairs (VictoriaLogs included) and each `/api/datasources/uid/<uid>/health` answers `OK` |
 | C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 18 provisioned uids (incl. the three vendored Envoy Gateway dashboards plus the hand-authored Edge Overview board under Gateway/, the collector-health board, the Keycloak Identity board, and the two RFC-0021-era parity copies) and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 | C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all six jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005), `temporal` (server :8000) and `keycloak` (management :9000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **18 alerting** rules (8 ClickHouse engine + 2 collector + 3 inventory + 4 keycloak + Watchdog) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
+| C23 | Analytics signals (RFC-0030 / ADR-069) | `analytics_source_lag_seconds`, `analytics_source_state` (exactly one `1` per source) and `analytics_freshness_last_success_time_seconds` have series for `service_name="analytics"` with no API traffic; `db_client_operation_duration_seconds` for `db_system_name="clickhouse"` is present; one trace holds the HTTP server span → `analytics.overview` → a `SELECT analytics.*` client span, and ClickHouse `system.query_log` carries that trace id for the reader's query |
 | C22 | Names conform to the registry | `make e2e-conformance` (Weaver `registry live-check` on the gate's OTLP, `--fail-on violation`) exits 0: every attribute, metric and event the fleet emitted is declared in `duynhlab/pkg` `semconv/registry`, with the declared unit and instrument, and no deprecated upstream key — `improvement`/`information` advice is allowed |
 
 Any failed row blocks the release tag. **C14** empty while C12 and C13 are
@@ -2334,10 +2428,10 @@ evidence table too, not just service and `pkg` changes.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A14 + A16–A23 API contract | PASS / FAIL | |
+| A | A1–A14 + A16–A25 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
-| B | B1–B10 real browser | PASS / FAIL | |
-| C | C1–C21 telemetry + engine-health loop | PASS / FAIL | |
+| B | B1–B11 real browser | PASS / FAIL | |
+| C | C1–C21 + C23 telemetry + engine-health loop | PASS / FAIL | |
 | C | C22 registry conformance (Weaver) | PASS / FAIL | |
 
 Decision: ELIGIBLE FOR TAG / BLOCKED

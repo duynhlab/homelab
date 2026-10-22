@@ -111,11 +111,10 @@ PgDog sets `tls_client_required`, so a client that drops TLS is refused.
 `make db-tls` (`scripts/db-tls-check.sh`) re-runs the positive case, the
 host-name and CA negatives and the plaintext refusal for each pooled hop.
 
-**A renewal rolls PgDog.** cert-manager renews the Secret on schedule. The
-Secret's `reconcile.fluxcd.io/watch` label makes helm-controller reconcile, and
-the HelmRelease carries `tls.crt` as a pod annotation, so the new certificate
-rolls the Deployment and every pod drains first
-([pooler operations](./runbooks/pooler-operations.md)).
+**A renewal does not roll PgDog.** cert-manager renews the Secret on schedule,
+kubelet updates the mounted file, and the `tls-reload` sidecar sends PgDog
+`SIGHUP`, which re-reads the certificate in place; open sessions keep theirs
+([pooler operations](./runbooks/pooler-operations.md#rotate-the-client-tls-certificate)).
 
 ### PgBouncer (platform-db)
 

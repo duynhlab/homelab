@@ -1,8 +1,7 @@
 # PgDog Connection Pooler for product-db (product, cart, order, payment,
 # checkout, inventory)
-# Primary only: no database lists a replica, so PgDog cannot split reads.
-# ADR-089 makes the primary the default; a replica read must be an explicit
-# opt-in profile (planned, docs/databases/poolers.md).
+# Primary by default (ADR-089). Only the product database lists a replica, and
+# only clients that opt in (-c pgdog.role=replica) are routed to it (#1304).
 # Prepared statements: extended mode (no prefer_simple_protocol needed)
 #
 # Passthrough auth (ADR-025): PgDog holds no password list. It asks each client
@@ -32,9 +31,11 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  # A renewed certificate is reloaded in place, not rolled (#1350): kubelet
-  # updates the mounted Secret, and the tls-reload sidecar sends PgDog SIGHUP,
-  # which re-reads the TLS files; open sessions keep their handshake.
+  # A renewed certificate or a changed config is reloaded in place, not rolled
+  # (#1350, #1304): kubelet updates the mounted Secrets, and the tls-reload
+  # sidecar sends PgDog SIGHUP, which re-reads pgdog.toml, users.toml and the
+  # TLS files; open sessions keep their handshake. The chart has no config
+  # checksum annotation, so without this a config change never took effect.
   postRenderers:
     - kustomize:
         patches:
@@ -59,18 +60,24 @@ spec:
                           - sh
                           - -c
                           - |
-                            f=/etc/pgdog-tls/tls.crt
-                            last=$(sha256sum "$f")
+                            sum() { cat /etc/pgdog-tls/tls.crt /etc/pgdog/pgdog.toml /etc/secrets/pgdog/users.toml 2>/dev/null | sha256sum; }
+                            last=$(sum)
                             while true; do
                               sleep 30
-                              cur=$(sha256sum "$f")
+                              cur=$(sum)
                               if [ "$cur" != "$last" ] && p=$(pidof pgdog); then
-                                kill -HUP $p && echo "tls.crt changed: sent SIGHUP to pgdog $p" && last=$cur
+                                kill -HUP $p && echo "certificate or config changed: sent SIGHUP to pgdog $p" && last=$cur
                               fi
                             done
                         volumeMounts:
                           - name: pgdog-tls
                             mountPath: /etc/pgdog-tls
+                            readOnly: true
+                          - name: config
+                            mountPath: /etc/pgdog
+                            readOnly: true
+                          - name: users
+                            mountPath: /etc/secrets/pgdog
                             readOnly: true
                         livenessProbe:
                           exec:
@@ -131,6 +138,12 @@ spec:
 
     lsnCheckDelay: 0
     lsnCheckInterval: 5000
+    # Opt-in stale reads (ADR-089, #1304): prefer_primary keeps every query on
+    # the primary unless the client asks for a replica (startup option
+    # -c pgdog.role=replica). A replica lagging over 2 s is banned and those
+    # reads fall back to the primary.
+    readWriteSplit: prefer_primary
+    banReplicaLag: 2000
 
     databases:
       # product DB
@@ -139,6 +152,15 @@ spec:
         port: 5432
         database: product
         poolSize: 30
+        poolMode: transaction
+      # The only replica entry: product-service's related-products pool
+      # (DB_READ_REPLICA) opts in; every other client stays on the primary.
+      - name: product
+        host: product-db-ro.product.svc.cluster.local
+        port: 5432
+        database: product
+        role: replica
+        poolSize: 10
         poolMode: transaction
       # cart DB
       - name: cart

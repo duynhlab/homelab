@@ -1,10 +1,10 @@
 # Analytics telemetry and operations
 
 Analytics must reveal stale commerce data even when nobody opens the portal.
-Its sampler measures target-observed source freshness — the CDC heartbeat
-path once the mirrors land (**planned**, RFC-0030 phases 1–7); today the
-serving fixture's heartbeat writer (`analytics-heartbeat`) stands in for it. It
-does not replace the per-request freshness checks that authorize an API
+Its sampler measures target-observed source freshness — on Kind the real CDC
+heartbeat path (pg_cron in product-db → PeerDB → ClickHouse,
+[docs/databases/cdc](../../databases/cdc/README.md)); in local-stack the
+fixture's `analytics-heartbeat` container stands in for it. It does not replace the per-request freshness checks that authorize an API
 response.
 
 **Status: the signals are deployed; the alert rules and dashboard in this
@@ -134,10 +134,11 @@ use scrape `up` as the health signal for an OTLP push application.
 2. On unknown, inspect the heartbeat batch through the existing approved reader
    path: one valid timestamp per source, no future timestamp, no duplicate.
    Do not widen service grants or log returned rows to investigate.
-3. On stale/unavailable, check the heartbeat writer first. Today that is the
-   fixture's `analytics-heartbeat` (compose service; Kind Deployment in
-   `monitoring`); once CDC lands (**planned**) follow source heartbeat job →
-   replication slot and mirror → object transport → target heartbeat view.
+3. On stale/unavailable, check the heartbeat writer first: on Kind the pg_cron
+   jobs on product-db (`cron.job`, `cron.job_run_details`), then follow
+   replication slot and mirror → object transport → target heartbeat view
+   ([CDC operations](../../databases/cdc/README.md#operations)); in local-stack
+   the fixture's `analytics-heartbeat` container.
    Check all three sources;
    a healthy source cannot certify a different source's data.
 4. Correlate a failing overview access record to its business and client spans.

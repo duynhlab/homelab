@@ -6,7 +6,7 @@ bounded-eventual and never handles commands.
 
 | Attribute | Value |
 |---|---|
-| Availability | **Live on a fixture-backed serving layer** — deployed in local-stack and on Kind (namespace `analytics`, route `api-analytics-protected`), consumed by the Backoffice **Analytics** page; the `analytics.*` tables are seeded by a fixture in PeerDB's shape until the CDC mirrors (RFC-0030 phases 1–7, **planned**, not deployed) land |
+| Availability | **Live** — deployed in local-stack and on Kind (namespace `analytics`, route `api-analytics-protected`), consumed by the Backoffice **Analytics** page. On Kind the `analytics.*` tables are fed by real CDC from product-db ([PeerDB, docs/databases/cdc](../databases/cdc/README.md)); local-stack keeps a fixture in PeerDB's table shape |
 | Repository | [analytics-service](https://github.com/duynhlab/analytics-service) — release `v0.1.0` (image `0.1.0`, pinned on Kind); local-stack builds the sibling checkout |
 | Consumer | [Backoffice portal](./admin.md) `/analytics` (eighth navigation item) |
 | Storage access | Native ClickHouse, restricted `analytics_reader`, reviewed `analytics.*_live` views only |
@@ -15,7 +15,7 @@ bounded-eventual and never handles commands.
 
 There is no gRPC API, migration runner, source-database access or write endpoint
 for this service. The Envoy route and the Admin navigation exist; the data behind
-the views is fixture-seeded until the mirrors phase, and every gate row that
+the views is real CDC on Kind and a fixture in local-stack, and every gate row that
 reads it says so.
 
 ## Request and authorization

@@ -776,7 +776,7 @@ cannot be derived from a single file — they get their own row (K2.3).
   `otel.*`, `pg_stat_ch.*`, `system.query_log`, INSERT, CREATE, DROP, another
   user's grants.
   ```bash
-  scripts/analytics/serving-fixture.sh up        # the serving layer is FIXTURE-BACKED until the mirrors phase
+  # the serving layer is real CDC: cdc-local's peerdb-bootstrap + analytics-views Jobs Complete
   scripts/analytics-reader-sweep.sh
   ```
   **FAIL:** any `FAIL` line. A raw table that reads means the grant list
@@ -1077,8 +1077,10 @@ breaks a command copied from the Compose audit:
   GATE=kind ANALYTICS_URL=http://127.0.0.1:18080 scripts/analytics-freshness-drill.sh
   GATE=kind ANALYTICS_URL=http://127.0.0.1:18080 scripts/analytics-failure-drill.sh
   ```
-  Performance (G8.5) on the 1M-fact fixture (`serving-fixture.sh up 500000`):
-  50 overview calls each on 7-, 30- and 90-day windows, then
+  Performance (G8.5): Kind carries real CDC data now, so the one-million-fact
+  measurement runs on a disposable ClickHouse with the same views
+  (analytics-service#4 harness); on Kind, 50 overview calls each on 7-, 30- and
+  90-day windows, then
   ```sql
   SELECT quantile(0.95)(query_duration_ms), max(memory_usage)
   FROM system.query_log WHERE user = 'analytics_reader' AND type = 'QueryFinish' AND event_time > now() - INTERVAL 15 MINUTE

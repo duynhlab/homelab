@@ -9,8 +9,8 @@
 #
 # compose: the heartbeats are the `analytics-heartbeat` container; the API is
 # reached through the edge with a staff token minted by scripts/keycloak-token.sh.
-# kind: the heartbeats are the fixture Deployment `analytics-heartbeat` in
-# `monitoring` (scripts/analytics/serving-fixture.sh); the API is reached
+# kind: the heartbeats are product-db's pg_cron jobs, carried by PeerDB's
+# mirrors (docs/databases/cdc/); the drill pauses them. The API is reached
 # through ANALYTICS_URL (a port-forward, or the edge once the route exists).
 #
 # The clock is the heartbeat's own: the last heartbeat may have landed up to
@@ -33,8 +33,13 @@ case "$GATE" in
   kind)
     ANALYTICS_URL="${ANALYTICS_URL:?set ANALYTICS_URL (port-forward or edge)}"
     token() { KC_URL=https://id.duynh.me KC_REALM=duynhlab-staff KC_CLIENT_ID=admin-portal KC_REDIRECT=https://backoffice.duynh.me/ USERNAME=duyne PASSWORD='p@ss1234' bash local-stack/scripts/keycloak-token.sh; }
-    stop_heartbeat()  { kubectl -n monitoring scale deploy/analytics-heartbeat --replicas=0 >/dev/null; }
-    start_heartbeat() { kubectl -n monitoring scale deploy/analytics-heartbeat --replicas=1 >/dev/null; }
+    # Real CDC: pause and resume the three pg_cron heartbeat jobs on the
+    # primary; the cleanup job is untouched.
+    cron_active() { kubectl -n product exec "$(kubectl -n product get cluster product-db -o jsonpath='{.status.currentPrimary}')" \
+      -c postgres -- psql -XAtq -d postgres -c \
+      "UPDATE cron.job SET active = $1 WHERE username = 'analytics_heartbeat' AND schedule = '30 seconds'" >/dev/null; }
+    stop_heartbeat()  { cron_active false; }
+    start_heartbeat() { cron_active true; }
     ;;
   *) echo "GATE must be compose or kind" >&2; exit 2 ;;
 esac

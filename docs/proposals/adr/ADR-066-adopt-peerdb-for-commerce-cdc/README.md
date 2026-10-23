@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1313](https://github.com/duynhlab/homelab/issues/1313) — native Task sub-issues and tradeoff log |
-| **Adoption** | Not started |
+| **Adoption** | Partial — PeerDB v0.37.5 mirrors order, checkout and payment into ClickHouse on Kind; phase-7 drills, alerts and dashboard pending |
 
 ## Context
 
@@ -207,3 +207,4 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
 | 2026-10-18 | Accepted / Not started | Owner aligned source access with RFC-0029: qualified CDC pooler profile, verified TLS on both hops, no silent direct fallback; runtime qualification pending |
+| 2026-10-23 | Accepted / Partial | Owner accepted ELv2 and the upstream chart; PeerDB 0.9.17 (core v0.37.5) on Kind with catalog on platform-db, Temporal namespace `peerdb`, RustFS staging (shared key, recorded gap). Three mirrors admitted; replicated target via `replicated: true` + `database_replicated_allow_replicated_engine_arguments = 2`; four checkouts reached the read API as $142.48 captured within 45 s |

@@ -7,7 +7,7 @@ database.
 | Item | Current state |
 |---|---|
 | **Operator / PostgreSQL** | CloudNativePG 1.30.1 / PostgreSQL 18.6 |
-| **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie` |
+| **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`; `product-db` and its replica run `postgresql-cron` 1.0.0 (the same base plus pg_cron 1.6.8) through an `ImageCatalog` |
 | **Artifact delivery** | Extensions packaged in the system operand image, plus one image-volume extension (`pg_stat_ch`) |
 | **Startup loading** | `Cluster.spec.postgresql.shared_preload_libraries` |
 | **Database activation** | `Database.spec.extensions` |
@@ -76,6 +76,12 @@ entry resolves through the `dynamic_library_path` CNPG appends for it. The
 `product-db-replica` cluster mounts the same image without preloading it, so
 the extension objects that arrive through WAL stay resolvable after a
 promotion.
+
+`pg_cron` (product-db only) is the other exception: it ships in the operand
+itself (`postgresql-cron`, duynhlab/images), is preloaded on `product-db`,
+lives in the `postgres` database, and runs the CDC heartbeat jobs as
+`analytics_heartbeat` — see [Commerce CDC](./cdc/README.md#platform-behavior).
+The replica carries the same operand without the preload.
 
 ## Current database inventory
 

@@ -9,7 +9,8 @@ or find the right recovery procedure without mixing those three concerns.
 | **PostgreSQL** | 18.6 |
 | **Operational clusters** | `platform-db`, `product-db` |
 | **DR cluster** | `product-db-replica` — one instance, co-located recovery copy |
-| **Poolers** | CNPG PgBouncer for `platform-db`; PgDog for `product-db` |
+| **Poolers** | CNPG PgBouncer for `platform-db`; PgDog for `product-db`; a session-mode CNPG PgBouncer for CDC (`product-db-pooler-cdc`) |
+| **CDC** | PeerDB mirrors `order`, `checkout`, `payment` into ClickHouse — [Commerce CDC](./cdc/README.md) |
 | **Backup** | Barman Cloud plugin to RustFS-compatible object storage |
 | **Historical operator** | Zalando Postgres Operator — reference only, not deployed |
 
@@ -54,6 +55,7 @@ audit. Historical lab/drill records retain the versions they actually measured.
 | 5 | What changes when connections are pooled? | [Poolers](./poolers.md) |
 | 6 | What must survive to recover data? | [Backup policy](./backup-policy.md), [DR](./disaster-recovery.md), then [targets and evidence](./reliability-targets.md) |
 | 7 | How do we diagnose and change the platform? | [Troubleshooting](./observability-and-troubleshooting.md), then [maintenance](./runbooks/maintenance-and-upgrades.md) |
+| 8 | How does data leave for analytics? | [Commerce CDC (PeerDB)](./cdc/README.md) |
 
 Additional platform topics:
 

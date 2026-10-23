@@ -1,0 +1,155 @@
+# Runs bootstrap.sh (ConfigMap product-db-cdc-bootstrap): the heartbeat tables
+# and the analytics_heartbeat cron jobs (RFC-0030 / ADR-068).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: product-db-cdc-bootstrap
+  namespace: product
+  annotations:
+    # The pod template carries the ConfigMap hash; Flux recreates the Job.
+    kustomize.toolkit.fluxcd.io/force: enabled
+  labels:
+    app.kubernetes.io/name: product-db-cdc-bootstrap
+    app.kubernetes.io/component: cdc
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: product-db-cdc-bootstrap
+        app.kubernetes.io/component: cdc
+    spec:
+      serviceAccountName: product-db-authz
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 26
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+          command: ["bash", "/cdc/bootstrap.sh"]
+          env:
+            - name: SOURCES
+              value: "order checkout payment"
+            - name: PGSSLROOTCERT
+              value: /etc/db/ca/ca.crt
+            - name: PGAPPNAME
+              value: cdc-bootstrap
+            - name: DB_AUTHZ_USER
+              valueFrom:
+                secretKeyRef: {name: product-db-db-authz-secret, key: username}
+            - name: DB_AUTHZ_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: product-db-db-authz-secret, key: password}
+            - name: HEARTBEAT_USER
+              valueFrom:
+                secretKeyRef: {name: product-db-analytics-heartbeat-secret, key: username}
+            - name: HEARTBEAT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: product-db-analytics-heartbeat-secret, key: password}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - {name: cdc, mountPath: /cdc, readOnly: true}
+            - {name: db-ca, mountPath: /etc/db/ca, readOnly: true}
+      volumes:
+        - name: cdc
+          configMap:
+            name: product-db-cdc-bootstrap
+        - name: db-ca
+          secret:
+            secretName: product-db-ca-trust
+            items:
+              - {key: ca.crt, path: ca.crt}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: product-db-cdc-bootstrap
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-cdc-bootstrap
+    app.kubernetes.io/component: cdc
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: product-db-cdc-bootstrap
+            app.kubernetes.io/component: cdc
+        spec:
+            serviceAccountName: product-db-authz
+            automountServiceAccountToken: false
+            restartPolicy: OnFailure
+            enableServiceLinks: false
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 26
+              seccompProfile:
+                type: RuntimeDefault
+            containers:
+              - name: bootstrap
+                image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+                command: ["bash", "/cdc/bootstrap.sh"]
+                env:
+                  - name: SOURCES
+                    value: "order checkout payment"
+                  - name: PGSSLROOTCERT
+                    value: /etc/db/ca/ca.crt
+                  - name: PGAPPNAME
+                    value: cdc-bootstrap
+                  - name: DB_AUTHZ_USER
+                    valueFrom:
+                      secretKeyRef: {name: product-db-db-authz-secret, key: username}
+                  - name: DB_AUTHZ_PASSWORD
+                    valueFrom:
+                      secretKeyRef: {name: product-db-db-authz-secret, key: password}
+                  - name: HEARTBEAT_USER
+                    valueFrom:
+                      secretKeyRef: {name: product-db-analytics-heartbeat-secret, key: username}
+                  - name: HEARTBEAT_PASSWORD
+                    valueFrom:
+                      secretKeyRef: {name: product-db-analytics-heartbeat-secret, key: password}
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 32Mi
+                  limits:
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop: [ALL]
+                volumeMounts:
+                  - {name: cdc, mountPath: /cdc, readOnly: true}
+                  - {name: db-ca, mountPath: /etc/db/ca, readOnly: true}
+            volumes:
+              - name: cdc
+                configMap:
+                  name: product-db-cdc-bootstrap
+              - name: db-ca
+                secret:
+                  secretName: product-db-ca-trust
+                  items:
+                    - {key: ca.crt, path: ca.crt}

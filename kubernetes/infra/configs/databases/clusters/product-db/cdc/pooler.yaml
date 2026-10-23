@@ -1,0 +1,84 @@
+# The only path from PeerDB to product-db (RFC-0030, owner decision on #1305):
+# a CNPG PgBouncer Pooler in session mode, so a logical-replication
+# connection keeps its server connection for its whole life. PgDog (the app
+# pooler) is transaction-mode and cannot carry replication. TLS both hops:
+# clients verify this pooler's homelab-ca certificate, the pooler verifies
+# the primary (verify-full). NetworkPolicy peerdb-to-cdc-pooler admits only
+# the peerdb namespace; product-db's HBA admits only the peerdb_<db> roles.
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: product-db-pooler-cdc
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    clientTLSSecret:
+      name: product-db-pooler-cdc-tls
+    parameters:
+      max_client_conn: "50"
+      default_pool_size: "10"
+      client_tls_sslmode: require
+      server_tls_sslmode: verify-full
+      # PeerDB sets these at startup; PgBouncer would refuse the connection.
+      ignore_startup_parameters: statement_timeout,idle_in_transaction_session_timeout,bytea_output,wal_sender_timeout
+  monitoring:
+    enablePodMonitor: true
+  template:
+    spec:
+      containers:
+        - name: pgbouncer
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-pooler-cdc-tls
+  namespace: product
+spec:
+  secretName: product-db-pooler-cdc-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+  commonName: product-db-pooler-cdc.product.svc
+  dnsNames:
+    - product-db-pooler-cdc.product.svc
+    - product-db-pooler-cdc.product.svc.cluster.local
+---
+# PeerDB reaches product-db only through the CDC pooler. Ingress-only, like
+# every policy here; product-db's own pods admit nothing from peerdb.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: peerdb-to-cdc-pooler
+  namespace: product
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/poolerName: product-db-pooler-cdc
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: peerdb
+      ports:
+        - protocol: TCP
+          port: 5432

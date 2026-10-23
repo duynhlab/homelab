@@ -1,0 +1,86 @@
+# Publications PeerDB reads (RFC-0030 / ADR-067): exact tables, exact columns
+# — the allowlist in local-stack/analytics/allowlist.json plus each database's
+# heartbeat table (ADR-068). Retained when the CR goes away: dropping a
+# publication under a live slot breaks the mirror.
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: product-db-analytics-order
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  dbname: order
+  name: analytics_order
+  publicationReclaimPolicy: retain
+  target:
+    objects:
+      - table:
+          schema: public
+          name: orders
+          columns: [id, status, version, created_at, updated_at, completed_at]
+      - table:
+          schema: public
+          name: order_items
+          columns: [id, order_id, product_id, product_name, quantity, price, subtotal, created_at]
+      - table:
+          schema: public
+          name: analytics_cdc_heartbeat
+          columns: [id, emitted_at]
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: product-db-analytics-checkout
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  dbname: checkout
+  name: analytics_checkout
+  publicationReclaimPolicy: retain
+  target:
+    objects:
+      - table:
+          schema: public
+          name: checkout_sessions
+          columns: [id, status, order_id, currency, created_at, updated_at]
+      - table:
+          schema: public
+          name: analytics_cdc_heartbeat
+          columns: [id, emitted_at]
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: product-db-analytics-payment
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  dbname: payment
+  name: analytics_payment
+  publicationReclaimPolicy: retain
+  target:
+    objects:
+      - table:
+          schema: public
+          name: payments
+          columns: [id, order_id, currency, created_at, updated_at]
+      - table:
+          schema: public
+          name: ledger_transactions
+          columns: [id, payment_id, kind, created_at]
+      - table:
+          schema: public
+          name: ledger_entries
+          columns: [id, transaction_id, account_id, direction, amount_minor]
+      - table:
+          schema: public
+          name: ledger_accounts
+          columns: [id, name, type]
+      - table:
+          schema: public
+          name: analytics_cdc_heartbeat
+          columns: [id, emitted_at]

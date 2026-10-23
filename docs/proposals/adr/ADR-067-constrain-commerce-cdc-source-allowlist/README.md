@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1319](https://github.com/duynhlab/homelab/issues/1319) — native Task sub-issues and tradeoff log |
-| **Adoption** | Not started |
+| **Adoption** | Partial — publications, source roles and grants live on product-db (Kind); mirrors pending (RFC-0030 phase 6) |
 
 ## Context
 
@@ -179,3 +179,4 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
+| 2026-10-23 | Accepted / Partial | Column-listed CNPG Publications, `peerdb_<db>` DatabaseRoles (LOGIN REPLICATION) and exact-table SELECT in pgroles on product-db; the session-mode PgBouncer CDC pooler carries `replication=database` with verify-full (IDENTIFY_SYSTEM and a temporary pgoutput slot pass; wrong host, wrong CA, plaintext and direct-to-primary refused) — G3.1–G3.4 PASS on Kind |

@@ -249,8 +249,11 @@ recreates them as synced copies within seconds:
 ```bash
 kubectl -n product exec <old-primary> -c postgres -- psql -Atc \
   "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots
-   WHERE slot_type = 'logical' AND NOT synced"
+   WHERE slot_type = 'logical' AND NOT synced AND pg_is_in_recovery()"
 ```
+
+The `pg_is_in_recovery()` guard makes it a no-op on the primary, where every
+slot reads `synced = false` and dropping one would break its mirror.
 
 **Restoring product-db** works on the `postgresql-cron` operand like any other
 recovery. `scripts/analytics/pgcron-restore-check.sh` restores a throwaway

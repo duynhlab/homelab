@@ -34,7 +34,7 @@ because it is much less than Keycloak can do:
 
 - Issue and refresh access tokens for two browser clients over Authorization
   Code + PKCE.
-- Publish a JWKS per realm, which the edge and ten services fetch to verify
+- Publish a JWKS per realm, which the edge and eleven services fetch to verify
   signatures.
 - Hold realm roles (`customer`, `backoffice_admin`) and the demo users.
 - **Staff SSO for infra tools** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/)):
@@ -197,13 +197,14 @@ plus one `allow-internal-callers` policy with three rules:
 |------|---------|-----|
 | ns `monitoring` | 9000 | VMAgent scrape |
 | ns `envoy-gateway` | 8080 | The `id.duynh.me` route + the edge's `remoteJWKS` fetches |
-| 10 service namespaces | 8080 | In-service `pkg/authmw` JWKS fetches |
+| 11 service namespaces | 8080 | In-service `pkg/authmw` / `staffauthmw` JWKS fetches |
 
-The ten namespaces are `cart`, `checkout`, `inventory`, `notification`, `order`,
-`payment`, `product`, `review`, `shipping`, `user` — the exact set of
-`authmw` consumers. This rule closed a real outage on 2026-08-22 in which every
+The eleven namespaces are `analytics`, `cart`, `checkout`, `inventory`,
+`notification`, `order`, `payment`, `product`, `review`, `shipping`, `user` —
+the exact set of in-service verifiers (`analytics` verifies only the staff
+realm). This rule closed a real outage on 2026-08-22 in which every
 private and protected route returned `401`: the policy had been written for seven
-namespaces when ten services needed it. **Adding an eleventh `authmw` consumer
+namespaces when ten services needed it. **Adding another in-service verifier
 means editing this policy**, or that service fails closed.
 
 `frontend` and `backoffice` are deliberately absent — the browser holds the

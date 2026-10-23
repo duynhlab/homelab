@@ -761,6 +761,16 @@ Skeleton (copy what you need):
   (29 lines each way in 30 minutes on Kind); the label is added.
   `service.version` said 2.5.0 while the image is 2.8.0.
 
+#### Observability
+
+- **The analytics alert and dashboard candidates match the stored state
+  label.** `docs/observability/analytics/` matched and grouped on
+  `analytics_source_state_ratio="…"`, but only the metric name takes the
+  `_ratio` unit suffix: the OTel attribute `analytics.source.state` lands as
+  the label `analytics_source_state`, so every state matcher selected nothing.
+  The rules, their promtool tests and the dashboard legend now use the label
+  as stored; `promtool test rules` passes.
+
 #### Databases
 
 - **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
@@ -814,6 +824,19 @@ Skeleton (copy what you need):
   mirrors so both PII gates check column allowlists across all ten tables.
 
 #### Docs
+
+- **Analytics go-live docs describe what is deployed.** `analytics-service`,
+  its edge route and the Backoffice page are current in RFC-0030 (status,
+  architecture diagram, `FINAL` instead of `argMax`), ADR-069 (telemetry
+  implemented, Adoption `Partial` with the 90-day funnel's ~0.55 s recorded as
+  the owner-accepted deviation from the 500 ms bar), the ADR/RFC indexes,
+  `docs/api/` (contract TLS and read-path text, eleven services, 27 protected
+  operations, staff verifiers and JWKS namespaces), the edge inventory (36
+  reconciled HTTPRoutes, 34 policies, the `api-analytics-protected` row), the
+  ClickHouse and Keycloak guides, the Admin Portal page and the
+  platform-api, request-path and secrets Draw.io diagrams. CDC, PeerDB and the
+  `pg_cron` heartbeats stay **planned**; the serving data is the fixture. Kind
+  row K4.12's edge-404 check now applies only before the route lands.
 
 - Link RFC-0030's four accepted ADRs to dedicated tracking issues and native
   obligation tasks; retain the Linux handoff as an index and historical evidence.
@@ -943,6 +966,15 @@ Skeleton (copy what you need):
   in this range touch sharding, plugins and 2PC, none of which are used.
 
 #### Services
+
+- **analytics-service 0.1.0 and Backoffice 0.5.1.** analytics-service's
+  first release (replacing `sha-8e4667f`) carries the typed ledger joins and
+  the orders semi-join (analytics-service#5); with the `FINAL` serving views the
+  90-day overview runs in 0.23–0.55 s on one million facts, the funnel's
+  ~0.55 s accepted by the owner as a known limit (analytics-service#4).
+  Backoffice 0.5.1 is the same Analytics page on node 26.12 / nginx 1.31.7 and
+  the minor dependency group, signed again (admin-service#52). Gate: full
+  local-stack A/B/C + C22 on the merged SHAs, 2026-10-23.
 
 - **Fleet patch release for the telemetry shutdown budget** (#1359): user
   2.5.6, product 1.16.7, inventory 0.9.6, cart 2.4.6, order 2.10.7, review

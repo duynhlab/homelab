@@ -212,12 +212,18 @@ NOINHERIT and restricted runtime privileges when fixing that wiring.
 | Credential lifecycle | New password accepted and old password refused on fresh connections; stream recovers at verified offset; wrong CA/hostname and plaintext denied on both hops; CA overlap/reload | Pending; Compose uses disposable identities |
 | Data exclusion | Trace payload inspection and wider representative PII fixtures | Pending; Compose inspects allowlisted raw/staging data and PeerDB logs |
 | Native capacity | Full snapshot, WAL/staging bounds, one million facts; 7/30/90-day checksums | Pending |
-| Query performance | p95 ≤500 ms, peak memory ≤512 MiB, no pod restart | Pending |
+| Query performance | p95 ≤500 ms, peak memory ≤512 MiB, no pod restart | Measured on the fixture-backed serving layer: 90-day funnel ~0.55 s median, accepted by the owner as a known limit 2026-10-23 (analytics-service#4); pending on CDC-fed data |
 | License | Explicit pre-rollout disposition for actual use/distribution | Pending |
 
 Do not enable the gateway/Admin route or mark Phase 0 qualified until every
 mandatory gate has evidence. Analytics API behavior and browser acceptance
 belong to later phases; this prototype does not implement their endpoints.
+
+> **Superseded for the consumer half (owner, 2026-10-23).** The route and the
+> Admin page shipped on a fixture-backed serving layer before these gates
+> closed (RFC-0030 phases 8–10). The rule still binds the **CDC cutover**:
+> do not replace the fixture with PeerDB mirrors, or mark Phase 0 qualified,
+> until every mandatory gate above has evidence.
 
 ## References
 

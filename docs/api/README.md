@@ -5,7 +5,7 @@ service or the Backoffice application service at a time.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Status** | Living documentation checked against 11 API service repositories and the Backoffice application repository | — |
+| **Status** | Living documentation checked against 12 API service repositories and the Backoffice application repository | — |
 | **Canonical shared guide** | [api.md](./api.md) | — |
 | **Service map** | [microservices.md](./microservices.md) | — |
 | **Workflow guide** | [temporal.md](./temporal.md) | — |
@@ -18,13 +18,13 @@ flowchart TD
     Hub["API documentation hub"] --> Shared["api.md<br/>shared HTTP + gRPC rules"]
     Hub --> Rollup["Service contracts rollup<br/>deployment + CI"]
     Hub --> Catalog["microservices.md<br/>feature ownership + gaps"]
-    Hub --> Contracts["11 API contract files"]
+    Hub --> Contracts["12 API contract files"]
     Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
     Hub --> Saga["temporal.md<br/>3 workflows + saga theory"]
     Hub --> Pkg["pkg.md<br/>shared Go modules + layering"]
     Hub --> Consumer["admin.md<br/>Backoffice app service<br/>+ consumer index"]
     Shared --> Journeys["api.md § End-to-end user journeys"]
-    Contracts --> Basic["Auth · User · Product · Inventory · Cart<br/>Order · Review · Notification · Shipping"]
+    Contracts --> Basic["Auth · User · Product · Inventory · Cart<br/>Order · Review · Notification · Shipping<br/>Analytics"]
     Contracts --> Deep["Checkout · Payment<br/>state-machine deep dives"]
     Consumer -.->|"links, never restates"| Contracts
     Shared --> Contracts
@@ -182,7 +182,7 @@ not its availability. Record them under the service's **Known gaps** section.
 | mockpay provider | ✓ | ✓ | Implemented | — |
 | frontend SPA | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
 | [Backoffice app service](./admin.md) | ✓ | ✓ | Implemented — React SPA served by Nginx; consumes seven owning services and serves no business API | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
-| [analytics API](./analytics.md) | ✓ | ✓ | Implemented — staff-only read model on a fixture-backed serving layer; `v0.1.0` waits on the read-path finding (analytics-service#4) | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
+| [analytics API](./analytics.md) | ✓ | ✓ | Implemented — staff-only read model on a fixture-backed serving layer; first tag `v0.1.0` no longer waits on the read path (funnel known limit accepted, analytics-service#4) | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
 | gRPC mTLS east-west | — | — | Planned | — |
 
 | Service | One-line responsibility | Contract |
@@ -207,7 +207,7 @@ not its availability. Record them under the service's **Known gaps** section.
 |----------|--------|----------------|
 | [api.md](./api.md) | HTTP and gRPC architecture, call graph, user journeys, HTTP/2 load balancing, security, observability | Implemented |
 | [identity.md](./identity.md) | Two realms, edge vs in-service verification, `sub` as `user_id`, the `OIDC_*` env contract, browser flow | Implemented |
-| [admin.md](./admin.md) | Backoffice application-service contract plus the 26 `/protected/` operations it consumes; no BFF or business API | Implemented |
+| [admin.md](./admin.md) | Backoffice application-service contract plus the 27 `/protected/` operations it consumes; no BFF or business API | Implemented |
 | [microservices.md](./microservices.md) | Feature/data ownership, composition boundaries, and current known-gap rollup | Living reference |
 | [temporal.md](./temporal.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
 | [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | Implemented — P1-P5 shipped; the legacy order path was removed in RFC-0021 P5 |

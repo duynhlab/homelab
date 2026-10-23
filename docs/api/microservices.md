@@ -31,7 +31,7 @@ wins and the mismatch is drift to fix.
 
 The current runtime inventory is the hub rollup, verified by
 [`local-stack/compose.yaml`](../../local-stack/compose.yaml) and the
-[`kubernetes/apps/`](../../kubernetes/apps/) manifests. It includes ten Go
+[`kubernetes/apps/`](../../kubernetes/apps/) manifests. It includes eleven Go
 microservices, the Storefront and Backoffice application services, two Temporal
 workers, Keycloak, and the MockPay provider stub. The former auth-service is
 archived; [auth.md](./auth.md) is historical contract material, not a live
@@ -52,6 +52,7 @@ owner.
 | Shipping quotes, shipments, tracking numbers, and shipment state | shipping | Checkout consumes quotes; order consumes shipment state | [shipping.md](./shipping.md) |
 | Notification inbox records and send-attempt state | notification | Order requests messages but does not own delivery records | [notification.md](./notification.md) |
 | Payment/refund state, ledger, provider attempts, and reconciliation | payment | Order orchestrates money steps but cannot write payment state | [payments.md](./payments.md) |
+| Staff commerce overview: metric composition and per-request freshness over ClickHouse serving views | analytics | Read-only; owns no business data, and order, checkout and payment stay authoritative for every fact it reports | [analytics.md](./analytics.md) |
 | Shopper UI and browser-side presentation | Storefront application service | Owns no business data or business API | [frontend platform contract](../frontend/README.md) |
 | Operator UI and protected-API consumption map | Backoffice application service | Owns no business data, authorization decision, or BFF | [admin.md](./admin.md) |
 
@@ -89,6 +90,7 @@ availability vocabulary used by service At-a-glance tables.
 | Unpersisted destination and demo quote math | shipping | Migration debt and accepted limitations | [shipping known gaps](./shipping.md#known-gaps) |
 | Direct DB connection, reconciliation limits, and single-replica constraint | payment | Migration and scaling constraints | [payment known gaps](./payments.md#known-gaps) |
 | Bounded review feed and write-once reviews | review | Accepted design limits | [review known gaps](./review.md#known-gaps) |
+| Fixture-backed serving data (CDC planned), plaintext ClickHouse hop and the 90-day funnel over the 500 ms bar | analytics | Accepted known limit (funnel); CDC and TLS planned | [analytics verification and rollout](./analytics.md#verification-and-rollout) |
 | Backoffice availability and static-delivery hardening | Backoffice | Current platform gaps | [Backoffice known gaps](../frontend/admin-portal/README.md#known-gaps) |
 
 Resolved migrations and retired surfaces stay in their RFCs, ADRs, and archived

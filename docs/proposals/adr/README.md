@@ -474,7 +474,7 @@ and extend Adoption instead.
 | [ADR-066](ADR-066-adopt-peerdb-for-commerce-cdc/) | Adopt PeerDB for Commerce CDC | Accepted | Not started | [RFC-0030](../rfc/RFC-0030/) |
 | [ADR-067](ADR-067-constrain-commerce-cdc-source-allowlist/) | Constrain Commerce CDC to an Explicit Source Allowlist | Accepted | Not started | [RFC-0030](../rfc/RFC-0030/) |
 | [ADR-068](ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Schedule CDC Freshness Heartbeats with pg_cron | Accepted | Not started | [RFC-0030](../rfc/RFC-0030/) |
-| [ADR-069](ADR-069-serve-commerce-analytics-through-read-only-service/) | Serve Commerce Analytics through a Read-Only Service | Accepted | Not started | [RFC-0030](../rfc/RFC-0030/) |
+| [ADR-069](ADR-069-serve-commerce-analytics-through-read-only-service/) | Serve Commerce Analytics through a Read-Only Service | Accepted | Partial — service, route and Admin page live on a fixture-backed serving layer (2026-10-23); CDC planned; 90-day funnel over the 500 ms bar accepted as a known limit | [RFC-0030](../rfc/RFC-0030/) |
 | [ADR-070](ADR-070-logging-facade-and-event-catalog/) | Log through One Shared slog Facade with a Reviewed Event Catalog | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
 | [ADR-071](ADR-071-telemetry-event-data-contract/) | Fix One Canonical Event, Access and Privacy Data Contract | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
 | [ADR-072](ADR-072-telemetry-clean-cutover/) | Cut the Fleet Over in One Release with No Migration Mechanism | Accepted | Partial | [RFC-0031](../rfc/RFC-0031/) |

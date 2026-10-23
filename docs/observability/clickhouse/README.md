@@ -12,7 +12,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | **Engine** | `clickhouse/clickhouse-server:26.8` (LTS), ReplicatedMergeTree, **1 shard × 3 replicas** on a 3-node ClickHouse Keeper quorum |
 | **Operator** | Altinity `clickhouse-operator` `0.27.4` + a `ClickHouseInstallation` CR and a `ClickHouseKeeperInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
-| **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs. A second database, `pg_stat_ch` (`events_raw` + three rollups), holds PostgreSQL per-execution events written by the CNPG clusters' pg_stat_ch extension as an INSERT-only user — [query-telemetry.md](../metrics/postgresql/query-telemetry.md) |
+| **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs. A second database, `pg_stat_ch` (`events_raw` + three rollups), holds PostgreSQL per-execution events written by the CNPG clusters' pg_stat_ch extension as an INSERT-only user — [query-telemetry.md](../metrics/postgresql/query-telemetry.md). A third, `analytics` (raw tables + ten `*_live` serving views), is created and seeded by the RFC-0030 serving fixture outside Flux until the CDC mirrors land (**planned**); the CHI declares `analytics_reader`, SELECT on those ten views only, for analytics-service — [Commerce analytics](#commerce-analytics) |
 | **Retention** | `otel.*` and `pg_stat_ch.events_raw`: **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff; parts older than **7 days move to the RustFS cold tier** first ([details](#cold-tier-on-rustfs)). The engine's own `system.*` log tables run [7–30 days from three different owners](#the-engines-own-log-tables) |
 | **Storage** | hot: local PVC `standard` `10Gi` **per replica** (cluster) + small keeper PVCs; cold: RustFS bucket `clickhouse-otel/{replica}/` behind a 1Gi local cache (policy `hot_cold`); a named `clickhouse-data` volume and no tier (local-stack, which stays single-node) |
 | **Query** | Grafana `grafana-clickhouse-datasource` **4.22.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
@@ -40,7 +40,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 10. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
 11. [Glossary](#glossary)
 12. [Where each store belongs](#where-each-store-belongs)
-13. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
+13. [Commerce analytics](#commerce-analytics)
 14. [FAQ](#faq)
 15. [References](#references)
 
@@ -120,7 +120,7 @@ retired Tempo and Jaeger deployments and are historical, not current topology.
 
 ```mermaid
 flowchart LR
-  Apps["10 services + 2 workers<br/>+ edge"] -->|OTLP| Col["OTel Collector<br/>(contrib)"]
+  Apps["11 services + 2 workers<br/>+ edge"] -->|OTLP| Col["OTel Collector<br/>(contrib)"]
   Pods["Other pods' stdout<br/>(Postgres, ClickHouse, OpenBao audit, …)"] --> Vec["Vector<br/>DaemonSet"]
   Vec -->|jsonline| VL
   Vec -->|"OTLP :4319<br/>otlp/vector → logs/vector"| Col
@@ -129,11 +129,12 @@ flowchart LR
   Col -->|traces| VT[("VictoriaTraces")]
   Col -->|"logs + traces (RFC-0019)"| CH[("ClickHouse<br/>otel_logs / otel_traces")]
   CH --> Graf["Grafana<br/>clickhouse datasource"]
+  CH -->|"analytics.*_live views<br/>analytics_reader · :9000"| Ana["analytics-service<br/>staff overview"]
 
   classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
-  class Apps,Pods service;
+  class Apps,Pods,Ana service;
   class Col,Vec collector;
   class VM,VL,VT,CH data;
 ```
@@ -1148,15 +1149,22 @@ On this platform:
 
 ---
 
-## Commerce analytics (Phase A — not deployed)
+## Commerce analytics
 
-RFC-0019 also sketched an **optional** Phase A: batch-sync read-only commerce
-facts (orders, payments, checkout sessions) from Postgres into ClickHouse fact
-tables for GMV / funnel panels. **This is out of scope for the current
-implementation** (observability-only) and is **not deployed**. If revived it would
-be a nightly batch SQL export from `product-db` / `platform-db` via PgDog — never
-CDC, never new public analytics APIs, and Postgres stays authoritative. See
-[RFC-0019](../../proposals/rfc/RFC-0019/).
+RFC-0019's optional batch "Phase A" sketch is superseded by
+[RFC-0030](../../proposals/rfc/RFC-0030/README.md): commerce facts reach an
+isolated `analytics` database, and `analytics-service` serves one staff-only
+overview from it ([contract](../../api/analytics.md)). Postgres stays
+authoritative.
+
+Deployed today: the `analytics` database with PeerDB-shaped
+`ReplacingMergeTree(_peerdb_version)` raw tables and ten `*_live` views read
+with `FINAL`, and the `analytics_reader` user (native `:9000`, no TLS
+listener — password plus NetworkPolicy fence) that analytics-service uses. The
+data is a **fixture**: `scripts/analytics/serving-fixture.sh` on Kind and the
+`analytics-fixture` compose service seed it, and `analytics-heartbeat` refreshes
+the three source heartbeats every 30 s. The PeerDB CDC mirrors that replace the
+fixture are **planned** (RFC-0030 phases 1–7).
 
 ---
 

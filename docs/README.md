@@ -1,6 +1,6 @@
 # Documentation Index
 
-Documentation for the **duynhlab microservices platform** — 10 Go services + a React storefront + a back-office portal (Keycloak as the identity provider), with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
+Documentation for the **duynhlab microservices platform** — 11 Go services + a React storefront + a back-office portal (Keycloak as the identity provider), with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
 
 ---
 
@@ -25,6 +25,7 @@ docs/
 │   ├── checkout.md               # P1-P5 checkout subsystem; P6 planned
 │   ├── payments.md               # Payment contract, ledger, reconciliation
 │   ├── inventory.md              # Inventory gRPC contract — the sole stock authority
+│   ├── analytics.md              # Staff commerce overview from ClickHouse serving views (fixture-backed)
 │   ├── graceful-shutdown.md      # Cross-service shutdown contract (drain, timeouts)
 │   ├── caching.md                # Cache-Aside app contract: keys, TTLs, invalidation
 │   ├── pkg.md                     # Which shared Go modules exist and how they layer
@@ -102,6 +103,7 @@ docs/
 │   │   └── README.md             # Platform pipeline (VictoriaLogs + Vector)
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
+│   ├── analytics/                # analytics-service sampler signals, alert/dashboard candidates, audit
 │   ├── clickhouse/               # ClickHouse OTel logs+traces OLAP (deployed)
 │   │   ├── README.md             # Platform hub, architecture, and Grafana
 │   │   ├── internals/            # Engine learning path + chapter authoring contract
@@ -220,7 +222,7 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | Checkout | [checkout-service](https://github.com/duynhlab/checkout-service) | [checkout.md](./api/checkout.md) | `ghcr.io/duynhlab/checkout-service/checkout-service` | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) |
 | Payment | [payment-service](https://github.com/duynhlab/payment-service) | [payments.md](./api/payments.md) | `ghcr.io/duynhlab/payment-service/payment-service` | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) |
 | Frontend | [frontend](https://github.com/duynhlab/frontend) | [frontend/](./frontend/README.md) — platform view; no API contract of its own | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
-| Commerce analytics | [analytics-service](https://github.com/duynhlab/analytics-service) | [analytics.md](./api/analytics.md) — staff-only ClickHouse read model; fixture-backed serving layer until the CDC mirrors land | `ghcr.io/duynhlab/analytics-service/analytics-service` | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
+| Commerce analytics | [analytics-service](https://github.com/duynhlab/analytics-service) | [analytics.md](./api/analytics.md) — staff-only ClickHouse read model; fixture-backed serving layer until the CDC mirrors (**planned**) land | `ghcr.io/duynhlab/analytics-service/analytics-service` | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
 | Backoffice portal | [admin-service](https://github.com/duynhlab/admin-service) | [frontend/admin-portal/](./frontend/admin-portal/README.md) — operator SPA; the reads it calls are in each service's contract | `ghcr.io/duynhlab/admin-service/admin-service` | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
 
 Clone all repositories: [platform/setup.md](./platform/setup.md).
@@ -313,7 +315,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 
 ### API Reference
 
-1. **[API area hub](./api/README.md)** - Start here for the learning path and all 11 service contracts
+1. **[API area hub](./api/README.md)** - Start here for the learning path and all 12 service contracts
 
 2. **[Shared API and communication guide](./api/api.md)** - URL naming, audiences, auth, errors, pagination, HTTP-vs-gRPC, current call graph, HTTP/2 load balancing, security, and observability
 
@@ -321,7 +323,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 
 4. **[Identity and tokens](./api/identity.md)** - Realms, where a token is verified, and the `OIDC_*` env contract every service follows
 
-4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Inventory](./api/inventory.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
+4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Inventory](./api/inventory.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), [Payment](./api/payments.md), and [Analytics](./api/analytics.md)
 
 6. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
 
@@ -535,7 +537,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
 - **40 Data Panels + 6 Row Groups** - Complete monitoring dashboard
 - **4 Custom Metrics** - Application-level metrics (RED method)
-- **10 Microservices** - Deployed service inventory; contracts are canonical in `docs/api/`
+- **11 Microservices** - Deployed service inventory; contracts are canonical in `docs/api/`
 - **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - VictoriaTraces + ClickHouse (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)

@@ -15,7 +15,7 @@ external request passes through before it reaches a service.
 | Edge telemetry | OTLP **gRPC** traces, JSON access log on **two** sinks — stdout (`File`) and OTLP to the collector ([ADR-060](../proposals/adr/ADR-060-envoy-access-log-transport/)) — Prometheus stats endpoint |
 | Edge `service.name` in traces | Derived as `<gateway>.<namespace>` — locally `platform.envoy-gateway-system` |
 | Verified | Local edge end-to-end on 2026-08-12: root span, trace continuity, access log field set, edge JWT 401/200 |
-| Resources | 39 HTTPRoutes defined / **35 reconciled** (`routes/mcp.yaml` disabled) + 33 policy objects — [inventory](#resource-inventory) |
+| Resources | 40 HTTPRoutes defined / **36 reconciled** (`routes/mcp.yaml` disabled) + 34 policy objects — [inventory](#resource-inventory) |
 | Design records | [ADR-044](../proposals/adr/ADR-044-envoy-gateway-platform-edge/) (edge) · [ADR-045](../proposals/adr/ADR-045-local-first-edge-rate-limiting/) (rate limiting) · [ADR-046](../proposals/adr/ADR-046-e2e-gate-kind-fallback/) (the gate) — see [Design decisions](#design-decisions) |
 | Cluster status | **Reconciled on Kind** during the RFC-0024 bring-up — #791 fixed two runtime defects against the live edge (CRD delivery, data-plane node placement); the full end-to-end Kind gate pass (K-rows) is still pending |
 
@@ -137,14 +137,14 @@ back within one reconcile. Split-horizon DNS is the whole trick: in-cluster,
 
 ### Routes
 
-**39 HTTPRoutes are defined; 35 reconcile.** The four in `routes/mcp.yaml` are
+**40 HTTPRoutes are defined; 36 reconcile.** The four in `routes/mcp.yaml` are
 commented out of `kustomization.yaml` (disabled 2026-08-21 with `mcp-local`) —
 their backends are gone, so leaving them active would resolve a route and then
 503.
 
 | File | Routes | Hostnames | Edge JWT | Rate limit | CIDR fence |
 |------|:-----:|-----------|:--------:|:----------:|:----------:|
-| `routes/api.yaml` | 18 | `gateway.duynh.me` | 13 of 18 | `btp-api` | — |
+| `routes/api.yaml` | 19 | `gateway.duynh.me` | 14 of 19 | `btp-api` (not `analytics`) | — |
 | `routes/monitoring.yaml` | 8 | `grafana`, `victoriametrics`, `vmalert`, `karma`, `victoriatraces`, `pyroscope`, `logs`, `slo` | — | `btp-admin` | ✅ |
 | `routes/infra.yaml` | 4 | `ui`, `source`, `openbao`, `kyverno` | — | `btp-admin` | ✅ |
 | `routes/frontend.yaml` | 1 | `local.duynh.me` | — | — | — |
@@ -162,7 +162,7 @@ own file.
 
 ### The API surface
 
-The 18 API routes, and which realm guards each. This is the table to read before
+The 19 API routes, and which realm guards each. This is the table to read before
 changing a prefix — the prefix *is* the security boundary
 ([Routing is audience-scoped](#routing-is-audience-scoped)).
 
@@ -186,8 +186,9 @@ changing a prefix — the prefix *is* the security boundary
 | `api-order-protected` | order | `/order/v1/protected` | `duynhlab-staff` |
 | `api-payment-protected` | payment | `/payment/v1/protected` | `duynhlab-staff` |
 | `api-shipping-protected` | shipping | `/shipping/v1/protected` | `duynhlab-staff` |
+| `api-analytics-protected` | analytics | `/analytics/v1/protected` | `duynhlab-staff` — no `BackendTrafficPolicy` in this namespace |
 
-Every one of the 18 also carries a `ResponseHeaderModifier` security-headers
+Every one of the 19 also carries a `ResponseHeaderModifier` security-headers
 filter (`nosniff`, `strict-origin-when-cross-origin`, `X-Frame-Options: DENY`,
 HSTS). The one exception is `backoffice`, which sends `X-Frame-Options:
 SAMEORIGIN` plus `Content-Security-Policy: frame-ancestors 'self'`: keycloak-js
@@ -197,7 +198,7 @@ blank.
 
 ### Policies
 
-**33 policy objects.** Policy `targetRefs` are same-namespace only, which is why
+**34 policy objects.** Policy `targetRefs` are same-namespace only, which is why
 one logical policy appears once per namespace rather than once overall — the
 repeated names below are not duplicates.
 
@@ -205,12 +206,12 @@ repeated names below are not duplicates.
 |------|------|:-----:|-------------|---------|
 | `SecurityPolicy` | `cors-policy` | 1 | the **Gateway** | The CORS baseline every route inherits; exposes `X-RateLimit-*` so the SPA can read its quota |
 | `SecurityPolicy` | `jwt-edge` | 7 | customer `/private/` routes | `remoteJWKS` against realm `duynhlab` |
-| `SecurityPolicy` | `jwt-edge-staff` | 6 | staff `/protected/` routes | `remoteJWKS` against realm `duynhlab-staff` (ADR-050) |
+| `SecurityPolicy` | `jwt-edge-staff` | 7 | staff `/protected/` routes | `remoteJWKS` against realm `duynhlab-staff` (ADR-050) |
 | `SecurityPolicy` | `admin-cidr-internal` | 5 | admin UI routes in `monitoring`, `flux-system`, `rustfs`, `openbao`, `policy-reporter` | `defaultAction: Deny` + a private/in-cluster allow list |
-| `BackendTrafficPolicy` | `btp-api` | 9 | the API routes, per namespace | Local rate limit 25/s **per instance**, 10Mi body cap, retries, timeouts, active + passive health checks |
+| `BackendTrafficPolicy` | `btp-api` | 9 | the API routes, per namespace (none in `analytics`) | Local rate limit 25/s **per instance**, 10Mi body cap, retries, timeouts, active + passive health checks |
 | `BackendTrafficPolicy` | `btp-admin` | 5 | the same 5 admin namespaces | Local rate limit 600/min per instance |
 
-All 13 JWT policies and all 5 CIDR policies set `mergeType: StrategicMerge` —
+All 14 JWT policies and all 5 CIDR policies set `mergeType: StrategicMerge` —
 without it they would silently drop the inherited CORS baseline. No JWT policy
 declares `audiences`; that is deliberate and explained in
 [Design decisions](#design-decisions).
@@ -451,8 +452,8 @@ kubectl get httproute -A -o custom-columns='NS:.metadata.namespace,NAME:.metadat
 kubectl get securitypolicy,backendtrafficpolicy -A
 ```
 
-**Expected**: **35** HTTPRoutes (not 39 — `routes/mcp.yaml` is disabled), and
-**33** policy objects. A policy present but not `Accepted` is the quiet failure
+**Expected**: **36** HTTPRoutes (not 40 — `routes/mcp.yaml` is disabled), and
+**34** policy objects. A policy present but not `Accepted` is the quiet failure
 described in [Policy attachment](#policy-attachment-and-the-two-rules-that-surprise-people)
 — check its status conditions, because a losing policy contributes nothing
 without erroring.

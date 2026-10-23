@@ -6,8 +6,8 @@ bounded-eventual and never handles commands.
 
 | Attribute | Value |
 |---|---|
-| Availability | **Live on a fixture-backed serving layer** — deployed in local-stack and on Kind (namespace `analytics`, route `api-analytics-protected`), consumed by the Backoffice **Analytics** page; the `analytics.*` tables are seeded by a fixture in PeerDB's shape until the CDC mirrors (RFC-0030 phases 1–7) land |
-| Repository | [analytics-service](https://github.com/duynhlab/analytics-service) — image `sha-8e4667f`; `v0.1.0` waits on the read-path finding below |
+| Availability | **Live on a fixture-backed serving layer** — deployed in local-stack and on Kind (namespace `analytics`, route `api-analytics-protected`), consumed by the Backoffice **Analytics** page; the `analytics.*` tables are seeded by a fixture in PeerDB's shape until the CDC mirrors (RFC-0030 phases 1–7, **planned**, not deployed) land |
+| Repository | [analytics-service](https://github.com/duynhlab/analytics-service) — release `v0.1.0` (image `0.1.0`, pinned on Kind); local-stack builds the sibling checkout |
 | Consumer | [Backoffice portal](./admin.md) `/analytics` (eighth navigation item) |
 | Storage access | Native ClickHouse, restricted `analytics_reader`, reviewed `analytics.*_live` views only |
 | Design | [RFC-0030](../proposals/rfc/RFC-0030/), [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) |
@@ -133,8 +133,12 @@ a one-second context budget; it does not certify pipeline freshness. Queries
 have a two-second context/server execution budget, 512 MiB memory limit and two
 threads; the overview context budget is five seconds. Exceeded limits fail the
 whole response rather than returning partial/truncated aggregates. Pool size is
-four open / two idle connections. TLS verifies the ClickHouse endpoint unless
-the explicit local development opt-out is set.
+four open / two idle connections. The service connects over native `:9000`
+with `CLICKHOUSE_TLS=false` in both local-stack and Kind: the ClickHouse
+installation has no TLS listener, so the controls today are the
+`analytics_reader` password and the NetworkPolicy fence. TLS to ClickHouse is
+**planned** (ADR-069 obligation T1); with the flag set to `true` the client
+verifies the endpoint certificate.
 
 ## Verification and rollout
 
@@ -151,15 +155,21 @@ edge route (K4.13, 25 checks) and the Admin page (K4.14) pass the same rows, and
 [#1334](https://github.com/duynhlab/homelab/issues/1334) and
 [#1335](https://github.com/duynhlab/homelab/issues/1335).
 
-**Open — the read path does not scale (G8.5).** On one million ledger entries
-every overview call exceeds the 2 s query budget and answers `503
-ANALYTICS_UNAVAILABLE`: the `*_live` views recompute `GROUP BY id` + `argMax`
-over every row per call (no window predicate reaches the scan) and the ledger
-CTE joins on `toString()` keys. Even the 2,000-order seed costs ~330 ms of
-ClickHouse CPU per query on Kind. The fix is a design decision — `FINAL`-based
-views, typed join keys and a daily rollup — tracked in
-[analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4);
-until it lands the service runs from the `sha-` image and is not tagged.
+**Read path — accepted known limit (G8.5).** The first million-fact run found
+every overview call over the 2 s query budget: each `*_live` view recomputed
+`GROUP BY id` + `argMax` over its whole raw table per read, and the ledger
+joined on `toString()` keys. Two changes followed. The serving views now read
+`FINAL` over PeerDB's `ReplacingMergeTree(_peerdb_version)` tables
+([homelab#1366](https://github.com/duynhlab/homelab/pull/1366)), and the reader
+joins the ledger on native `Int64` keys and counts completed orders with a
+semi-join
+([analytics-service#5](https://github.com/duynhlab/analytics-service/pull/5);
+released in `v0.1.0`). On one
+million ledger facts, two threads, the 90-day medians are 0.23 s (daily),
+0.25 s (captured), 0.38 s (products) and 0.55 s (funnel). The funnel stays over
+the ≤500 ms bar; the owner accepted that as a known limit on 2026-10-23, and
+the daily-rollup option is deferred
+([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)).
 
 The UI validates string money, formats via exact integer arithmetic, and shows
 an exact table when values are too large for safe chart coordinates.

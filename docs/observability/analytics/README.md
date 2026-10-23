@@ -1,17 +1,21 @@
 # Analytics telemetry and operations
 
 Analytics must reveal stale commerce data even when nobody opens the portal.
-Its sampler measures target-observed CDC freshness; it does not replace the
-per-request freshness checks that authorize an API response.
+Its sampler measures target-observed source freshness — the CDC heartbeat
+path once the mirrors land (**planned**, RFC-0030 phases 1–7); today the
+serving fixture's heartbeat writer (`analytics-heartbeat`) stands in for it. It
+does not replace the per-request freshness checks that authorize an API
+response.
 
 **Status: the signals are deployed; the alert rules and dashboard in this
 directory are still candidates.** The sampler, its three gauges, the DB duration
 histogram and the ClickHouse client spans ship with `analytics-service`
-(`sha-8e4667f`) in local-stack (row C23) and on Kind (row K5.11, run
+(`v0.1.0`) in local-stack (row C23) and on Kind (row K5.11, run
 2026-10-23). `alerts.yaml` and `dashboard.json` are reviewable candidates,
 deliberately not wired into Flux: promote them with the metric names
-VictoriaMetrics stores (`analytics_source_state_ratio`, not `_state`) once the
-read-path finding (analytics-service#4) settles the service's release.
+VictoriaMetrics stores (metric `analytics_source_state_ratio`, state label
+`analytics_source_state`). The read-path finding (analytics-service#4) is
+settled as an owner-accepted known limit, so promotion no longer waits on it.
 
 | Fact | Contract |
 |---|---|
@@ -130,8 +134,11 @@ use scrape `up` as the health signal for an OTLP push application.
 2. On unknown, inspect the heartbeat batch through the existing approved reader
    path: one valid timestamp per source, no future timestamp, no duplicate.
    Do not widen service grants or log returned rows to investigate.
-3. On stale/unavailable, follow source heartbeat job → replication slot and
-   mirror → object transport → target heartbeat view. Check all three sources;
+3. On stale/unavailable, check the heartbeat writer first. Today that is the
+   fixture's `analytics-heartbeat` (compose service; Kind Deployment in
+   `monitoring`); once CDC lands (**planned**) follow source heartbeat job →
+   replication slot and mirror → object transport → target heartbeat view.
+   Check all three sources;
    a healthy source cannot certify a different source's data.
 4. Correlate a failing overview access record to its business and client spans.
    A `validation` reason needs serving-view/ledger investigation; `limits` needs

@@ -1060,9 +1060,15 @@ breaks a command copied from the Compose audit:
   envoy-gateway-only ingress rule), and only a port-forward reaches the
   Service. Through that port-forward the guard chain and the contract hold
   exactly as on compose, and the two drills meet their clocks.
+  **The edge-404 check applies only before the route lands (phase 8).** Once
+  `api-analytics-protected` exists (phase 9, on `main` since 2026-10-23) the
+  edge answers a tokenless call **401** — that is K4.13's assertion, and a 401
+  here on a rerun is not a FAIL. The probe-pod check stays valid after phase 9:
+  the route does not change the namespace's NetworkPolicy, whose only ingress
+  is from `envoy-gateway`.
   ```bash
   curl -sk -o /dev/null -w '%{http_code}\n' "https://gateway.duynh.me/analytics/v1/protected/commerce/overview?currency=USD&from=$(date -u -d '7 days ago' +%F)&to=$(date -u +%F)"
-  # want 404
+  # want 404 before phase 9 only; after the route lands, skip (K4.13 owns it)
   kubectl -n checkout run -it --rm --restart=Never --image=curlimages/curl:8.17.0 probe -- \
     curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://analytics.analytics.svc.cluster.local:8080/health
   # want a timeout (exit 28), not 200
@@ -1079,7 +1085,8 @@ breaks a command copied from the Compose audit:
   ```
   **Want:** p95 ≤ 500 ms, max memory ≤ 512 MiB, the ClickHouse pods' restart
   count unchanged, and the API totals equal to the same sums run as `default`.
-  **FAIL:** a 200 at the edge or from the probe pod (the launch is not dark),
+  **FAIL:** a 200 at the edge before phase 9 or from the probe pod at any
+  time,
   any A25-shaped assertion failing, a drill transition off its clock, or a
   performance bar missed.
 

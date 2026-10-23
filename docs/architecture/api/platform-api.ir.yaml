@@ -13,6 +13,9 @@
 # each label; frames were dropped, see below); note names checkout-worker; o_ship's
 # label moved off the horizontal run it collided with. Crossings: 8 is the floor of
 # ~100 random peer orderings (pinned 15, worker on its own tier 9).
+# Re-verified 2026-10-23: analytics added (services/analytics.yaml staffauthmw, no
+# *_grpc_addr; routes/api.yaml api-analytics-protected; analytics-rs.yaml reads
+# ClickHouse :9000 as analytics_reader). It calls no service, so it has no east-west edge.
 diagram:
   id: platform-api
   title: "duynhlab homelab — Platform API topology"
@@ -62,6 +65,7 @@ nodes:
 
   - {id: notification, label: "notification\ncomms domain", role: service, layer: sink, parent: f_services, icon: go}
   - {id: mockpay, label: "mockpay\ncheckout domain\npayment provider (in-cluster)", role: service, layer: sink, parent: f_services, icon: go}
+  - {id: analytics, label: "analytics\nanalytics domain\nHTTP: protected only · read only", role: service, layer: sink, parent: f_services, icon: go}
 
 edges:
   - {id: s_store, source: storefront, target: envoy, type: traffic, label: "HTTPS · /public /private"}
@@ -95,7 +99,7 @@ edges:
 notes:
   - id: note_edge
     title: "Reading the gateway arrow"
-    text: "The gateway reaches every service on HTTP :8080 through its route set on gateway.duynh.me: /public and /private for the storefront (customer realm JWT), /protected for the back-office on product, inventory, order, payment, shipping and user (staff realm JWT). Inventory exposes only /protected over HTTP. Every service also verifies tokens itself against Keycloak's JWKS (pkg/authmw), which is not drawn."
+    text: "The gateway reaches every service on HTTP :8080 through its route set on gateway.duynh.me: /public and /private for the storefront (customer realm JWT), /protected for the back-office on product, inventory, order, payment, shipping, user and analytics (staff realm JWT). Inventory and analytics expose only /protected over HTTP. Every service also verifies tokens itself against Keycloak's JWKS (pkg/authmw), which is not drawn."
   - id: note_scope
     title: "Elsewhere"
-    text: "checkout starts AbandonedCheckoutWorkflow and the order API starts OrderFulfillmentWorkflow and CancellationWorkflow on Temporal; the order worker's calls above are that workflow's activities (workflows/temporal-keda). checkout-worker runs the abandoned-checkout workflow against its database only and calls no service, so it is not drawn. mockpay posts its webhook to payment in-cluster; the gateway's webhook route is used by local-stack only. Databases and the Valkey cache are databases/topology."
+    text: "checkout starts AbandonedCheckoutWorkflow and the order API starts OrderFulfillmentWorkflow and CancellationWorkflow on Temporal; the order worker's calls above are that workflow's activities (workflows/temporal-keda). checkout-worker runs the abandoned-checkout workflow against its database only and calls no service, so it is not drawn. mockpay posts its webhook to payment in-cluster; the gateway's webhook route is used by local-stack only. Databases and the Valkey cache are databases/topology; analytics reads ClickHouse serving views as analytics_reader (native :9000), not drawn here."

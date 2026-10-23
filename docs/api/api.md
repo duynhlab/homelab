@@ -82,6 +82,10 @@ flowchart TB
             Notification["notification"]
         end
 
+        subgraph AnalyticsDomain["Analytics domain"]
+            Analytics["analytics<br/>read only"]
+        end
+
         Temporal["Temporal"]
     end
 
@@ -97,6 +101,7 @@ flowchart TB
     Edge -->|"HTTP :8080"| Payment
     Edge -->|"HTTP :8080"| Notification
     Edge -->|"protected HTTP :8080"| Inventory
+    Edge -->|"protected HTTP"| Analytics
 
     %% Async / workflow layer
     Checkout -->|"start abandonment workflow"| Temporal
@@ -115,6 +120,7 @@ flowchart TB
         PlatformDB[("platform-db")]
         ProductDB[("product-db")]
         Valkey[("Valkey")]
+        ClickHouse[("ClickHouse<br/>analytics serving views")]
     end
 
     User --> PlatformDB
@@ -132,6 +138,7 @@ flowchart TB
     Order --> ProductDB
     Payment --> ProductDB
     CheckoutWorker -.->|"expire sessions"| ProductDB
+    Analytics -->|"native :9000 · analytics_reader"| ClickHouse
 
     classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
@@ -140,10 +147,10 @@ flowchart TB
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class Storefront,Backoffice,Edge edge;
-    class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification,MockPay service;
+    class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification,Analytics,MockPay service;
     class CheckoutWorker,OrderWorker worker;
     class Keycloak,Temporal platform;
-    class PlatformDB,ProductDB,Valkey data;
+    class PlatformDB,ProductDB,Valkey,ClickHouse data;
     class Internet external;
 ```
 
@@ -184,7 +191,7 @@ Calls are drawn caller → callee and animated; stores and workflow starts are
 left to their own diagrams.
 
 <p align="center">
-  <a href="../architecture/api/platform-api.svg"><img src="../architecture/api/platform-api.svg" alt="Platform API topology: SPAs, gateway, Keycloak and the gRPC calls between the ten services, the order worker and mockpay" width="960"></a>
+  <a href="../architecture/api/platform-api.svg"><img src="../architecture/api/platform-api.svg" alt="Platform API topology: SPAs, gateway, Keycloak, the eleven services and the gRPC calls between them, the order worker and mockpay" width="960"></a>
 </p>
 
 <p align="center"><sub>Source <a href="../architecture/api/platform-api.drawio"><code>api/platform-api.drawio</code></a> · <a href="../architecture/api/img/platform-api.png">PNG</a></sub></p>

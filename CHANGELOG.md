@@ -107,6 +107,13 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **PeerDB runs on Kind** (RFC-0030 phases 1 and 4, ADR-066). Upstream chart
+  `peerdb` 0.9.17 (core v0.37.5, images digest-pinned) in the `peerdb`
+  namespace and a new `cdc-local` wave gated on the HelmRelease: catalog
+  `peerdb_catalog` on platform-db over verify-full, the platform Temporal in a
+  `peerdb` namespace with the `MirrorName` search attribute, staging bucket
+  `analytics-service-cdc` through the shared RustFS key (recorded gap, #1315).
+  No mirror is created yet.
 - **analytics-service runs on Kind, dark-launched then routed** (#1360,
   RFC-0030 phases 8–9 / ADR-069). The `analytics` namespace (app tier), its
   domain ResourceSet (no DB, no migrate, no gRPC; ClickHouse reader from an ESO
@@ -252,6 +259,16 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **pg_cron on product-db** (RFC-0030 phase 2, ADR-068). The operand is
+  `postgresql-cron` 1.0.0 (CNPG 18.6 + pg_cron 1.6.8, duynhlab/images) through
+  an `ImageCatalog`, because CNPG reads the PostgreSQL major from an image tag
+  and this tag is the image's own version. `pg_cron` is preloaded with
+  background workers (`max_worker_processes` 8 → 12, replica matched),
+  `cron.database_name=postgres`; `postInitSQL` creates the extension, the
+  `analytics_heartbeat` role and its single `EXECUTE` on
+  `cron.schedule_in_database` (owner decision on #1325 — a live cluster runs
+  those four statements once by hand). Slot safety for CDC:
+  `max_replication_slots` 10, `max_slot_wal_keep_size` 1GB.
 - **Opt-in stale reads through PgDog** (#1304). PgDog runs
   `read_write_split = "prefer_primary"` with `ban_replica_lag = 2000`; the
   `product` database lists `product-db-ro`, and product-service reads related

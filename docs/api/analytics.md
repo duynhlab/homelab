@@ -7,7 +7,7 @@ bounded-eventual and never handles commands.
 | Attribute | Value |
 |---|---|
 | Availability | **Live on a fixture-backed serving layer** — deployed in local-stack and on Kind (namespace `analytics`, route `api-analytics-protected`), consumed by the Backoffice **Analytics** page; the `analytics.*` tables are seeded by a fixture in PeerDB's shape until the CDC mirrors (RFC-0030 phases 1–7, **planned**, not deployed) land |
-| Repository | [analytics-service](https://github.com/duynhlab/analytics-service) — Kind pins image `sha-8e4667f` until the first release tag replaces it; local-stack builds the sibling checkout |
+| Repository | [analytics-service](https://github.com/duynhlab/analytics-service) — release `v0.1.0` (image `0.1.0`, pinned on Kind); local-stack builds the sibling checkout |
 | Consumer | [Backoffice portal](./admin.md) `/analytics` (eighth navigation item) |
 | Storage access | Native ClickHouse, restricted `analytics_reader`, reviewed `analytics.*_live` views only |
 | Design | [RFC-0030](../proposals/rfc/RFC-0030/), [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) |
@@ -164,7 +164,7 @@ joined on `toString()` keys. Two changes followed. The serving views now read
 joins the ledger on native `Int64` keys and counts completed orders with a
 semi-join
 ([analytics-service#5](https://github.com/duynhlab/analytics-service/pull/5);
-merged on the service's `main`, newer than the Kind pin `sha-8e4667f`). On one
+released in `v0.1.0`). On one
 million ledger facts, two threads, the 90-day medians are 0.23 s (daily),
 0.25 s (captured), 0.38 s (products) and 0.55 s (funnel). The funnel stays over
 the ≤500 ms bar; the owner accepted that as a known limit on 2026-10-23, and

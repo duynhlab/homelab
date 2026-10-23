@@ -10,9 +10,8 @@ spec:
   type: Static
   defaultValues:
     name: analytics
-    # A main-branch image until the first release tag replaces the sha pin;
-    # the edge route and Admin navigation are live (RFC-0030 phases 9-10).
-    image_tag: "sha-8e4667f" # {"$imagepolicy": "flux-system:analytics:tag"}
+    # The edge route and Admin navigation are live (RFC-0030 phases 9-10).
+    image_tag: "0.1.0" # {"$imagepolicy": "flux-system:analytics:tag"}
     namespace: analytics
     replicaCount: 1
     # Serves only /protected/ (staff realm); there is no customer-realm

@@ -111,7 +111,7 @@ K4.14, 2026-10-23).
 
 The [contract](../../../api/analytics.md) selects USD-only v1, decimal integer
 JSON strings for money, ledger event-date totals, and checkout-created cohorts
-with current observed stages. The service (`sha-8e4667f`), the
+with current observed stages. The service (`v0.1.0`), the
 `api-analytics-protected` route under `jwt-edge-staff`, and the Backoffice
 `/analytics` page are deployed in local-stack and on Kind on a **fixture-backed
 serving layer** (PeerDB's table shape, CDC not yet deployed); the Linux

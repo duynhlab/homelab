@@ -10,7 +10,7 @@ response.
 **Status: the signals are deployed; the alert rules and dashboard in this
 directory are still candidates.** The sampler, its three gauges, the DB duration
 histogram and the ClickHouse client spans ship with `analytics-service`
-(`sha-8e4667f`) in local-stack (row C23) and on Kind (row K5.11, run
+(`v0.1.0`) in local-stack (row C23) and on Kind (row K5.11, run
 2026-10-23). `alerts.yaml` and `dashboard.json` are reviewable candidates,
 deliberately not wired into Flux: promote them with the metric names
 VictoriaMetrics stores (metric `analytics_source_state_ratio`, state label

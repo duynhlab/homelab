@@ -967,6 +967,15 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **analytics-service 0.1.0 and Backoffice 0.5.1.** analytics-service's
+  first release (replacing `sha-8e4667f`) carries the typed ledger joins and
+  the orders semi-join (analytics-service#5); with the `FINAL` serving views the
+  90-day overview runs in 0.23–0.55 s on one million facts, the funnel's
+  ~0.55 s accepted by the owner as a known limit (analytics-service#4).
+  Backoffice 0.5.1 is the same Analytics page on node 26.12 / nginx 1.31.7 and
+  the minor dependency group, signed again (admin-service#52). Gate: full
+  local-stack A/B/C + C22 on the merged SHAs, 2026-10-23.
+
 - **Fleet patch release for the telemetry shutdown budget** (#1359): user
   2.5.6, product 1.16.7, inventory 0.9.6, cart 2.4.6, order 2.10.7, review
   2.6.5, shipping 1.10.5, notification 2.4.5, payment 2.8.5 (and mockpay),

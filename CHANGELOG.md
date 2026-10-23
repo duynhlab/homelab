@@ -888,6 +888,19 @@ Skeleton (copy what you need):
   discrepancy in the window is `missing_provider` and mockpay started at least
   5 minutes after payment; the alert itself is unchanged.
 
+### Performance
+
+#### Local-stack
+
+- **Analytics serving views read `FINAL`, not a per-call `argMax`.** The
+  fixture (compose and Kind) and the PeerDB prototype define each
+  `analytics.*_live` view as `SELECT … FROM <raw> FINAL WHERE
+  _peerdb_is_deleted = 0` over PeerDB's `ReplacingMergeTree(_peerdb_version)`:
+  same rows, NULLs included, without a full `GROUP BY` on every read. With the
+  reader's typed joins (analytics-service#5) the 90-day overview queries on one
+  million ledger facts drop from 0.77–1.61 s to 0.23–0.55 s on two threads
+  (analytics-service#4); the funnel is the one query still above 500 ms.
+
 ### Dependency
 
 #### Observability

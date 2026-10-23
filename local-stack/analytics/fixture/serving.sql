@@ -69,52 +69,43 @@ CREATE OR REPLACE TABLE analytics.order_analytics_cdc_heartbeat (
 CREATE OR REPLACE TABLE analytics.checkout_analytics_cdc_heartbeat AS analytics.order_analytics_cdc_heartbeat;
 CREATE OR REPLACE TABLE analytics.payment_analytics_cdc_heartbeat AS analytics.order_analytics_cdc_heartbeat;
 
--- Serving views: latest version per id, tombstones hidden. A tuple preserves
--- NULLs from the latest row; per-column argMax would skip NULL. The fixture's
+-- Serving views: latest version per id, tombstones hidden. FINAL returns the
+-- whole highest-_peerdb_version row (NULLs included) without the per-call
+-- GROUP BY an argMax wrapper costs (analytics-service#4). The fixture's
 -- definer is `default` (exists on every replica of the CHI and in compose);
 -- the mirrors phase introduces the non-login analytics_view_owner the ADR
 -- names, together with the real raw tables.
 
 CREATE OR REPLACE VIEW analytics.order_orders_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS status, latest.3 AS version, latest.4 AS created_at, latest.5 AS updated_at, latest.6 AS completed_at
-  FROM (SELECT id, argMax(tuple(id,status,version,created_at,updated_at,completed_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.order_orders GROUP BY id) WHERE latest.7 = 0;
+  SELECT id, status, version, created_at, updated_at, completed_at
+  FROM analytics.order_orders FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.order_order_items_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS order_id, latest.3 AS product_id, latest.4 AS product_name, latest.5 AS quantity, latest.6 AS price, latest.7 AS subtotal, latest.8 AS created_at
-  FROM (SELECT id, argMax(tuple(id,order_id,product_id,product_name,quantity,price,subtotal,created_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.order_order_items GROUP BY id) WHERE latest.9 = 0;
+  SELECT id, order_id, product_id, product_name, quantity, price, subtotal, created_at
+  FROM analytics.order_order_items FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.checkout_checkout_sessions_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS status, latest.3 AS order_id, latest.4 AS currency, latest.5 AS created_at, latest.6 AS updated_at
-  FROM (SELECT id, argMax(tuple(id,status,order_id,currency,created_at,updated_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.checkout_checkout_sessions GROUP BY id) WHERE latest.7 = 0;
+  SELECT id, status, order_id, currency, created_at, updated_at
+  FROM analytics.checkout_checkout_sessions FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.payment_payments_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS order_id, latest.3 AS currency, latest.4 AS created_at, latest.5 AS updated_at
-  FROM (SELECT id, argMax(tuple(id,order_id,currency,created_at,updated_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.payment_payments GROUP BY id) WHERE latest.6 = 0;
+  SELECT id, order_id, currency, created_at, updated_at
+  FROM analytics.payment_payments FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.payment_ledger_transactions_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS payment_id, latest.3 AS kind, latest.4 AS created_at
-  FROM (SELECT id, argMax(tuple(id,payment_id,kind,created_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.payment_ledger_transactions GROUP BY id) WHERE latest.5 = 0;
+  SELECT id, payment_id, kind, created_at
+  FROM analytics.payment_ledger_transactions FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.payment_ledger_entries_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS transaction_id, latest.3 AS account_id, latest.4 AS direction, latest.5 AS amount_minor
-  FROM (SELECT id, argMax(tuple(id,transaction_id,account_id,direction,amount_minor,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.payment_ledger_entries GROUP BY id) WHERE latest.6 = 0;
+  SELECT id, transaction_id, account_id, direction, amount_minor
+  FROM analytics.payment_ledger_entries FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.payment_ledger_accounts_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS name, latest.3 AS type
-  FROM (SELECT id, argMax(tuple(id,name,type,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.payment_ledger_accounts GROUP BY id) WHERE latest.4 = 0;
+  SELECT id, name, type
+  FROM analytics.payment_ledger_accounts FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.order_analytics_cdc_heartbeat_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS emitted_at
-  FROM (SELECT id, argMax(tuple(id,emitted_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.order_analytics_cdc_heartbeat GROUP BY id) WHERE latest.3 = 0;
+  SELECT id, emitted_at
+  FROM analytics.order_analytics_cdc_heartbeat FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.checkout_analytics_cdc_heartbeat_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS emitted_at
-  FROM (SELECT id, argMax(tuple(id,emitted_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.checkout_analytics_cdc_heartbeat GROUP BY id) WHERE latest.3 = 0;
+  SELECT id, emitted_at
+  FROM analytics.checkout_analytics_cdc_heartbeat FINAL WHERE _peerdb_is_deleted = 0;
 CREATE OR REPLACE VIEW analytics.payment_analytics_cdc_heartbeat_live DEFINER = default SQL SECURITY DEFINER AS
-  SELECT latest.1 AS id, latest.2 AS emitted_at
-  FROM (SELECT id, argMax(tuple(id,emitted_at,_peerdb_is_deleted), _peerdb_version) AS latest
-        FROM analytics.payment_analytics_cdc_heartbeat GROUP BY id) WHERE latest.3 = 0;
+  SELECT id, emitted_at
+  FROM analytics.payment_analytics_cdc_heartbeat FINAL WHERE _peerdb_is_deleted = 0;
 
 -- Representative seed: {orders} orders spread over the last 100 UTC days,
 -- one line each, every order captured, every twentieth refunded a day later,

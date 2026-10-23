@@ -1,7 +1,6 @@
 # analytics-service freshness and telemetry alerts (ADR-069). Names are the
 # ones VictoriaMetrics stores after OTLP unit suffixing; the sampler, its
 # thresholds and the recovery steps are in docs/observability/analytics/README.md.
-# Test: scripts/promtool-test.sh <this file> analytics-alerts.test.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:

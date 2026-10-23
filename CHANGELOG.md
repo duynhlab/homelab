@@ -186,8 +186,7 @@ Skeleton (copy what you need):
   WAL retained over 512 MiB and over 900 MiB, a slot missing) and the mirrors
   through PeerDB's metrics. PeerDB now exports OTLP metrics with the `peerdb_`
   prefix. The five analytics freshness rules move from a docs candidate to
-  `analytics-alerts.yaml`. `scripts/promtool-test.sh` runs the rule tests from
-  the Prometheus image.
+  `analytics-alerts.yaml`.
 
 - **RFC-0030 telemetry qualification:** document the planned idle freshness sampler, standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
 

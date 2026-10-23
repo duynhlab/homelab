@@ -148,15 +148,7 @@ use scrape `up` as the health signal for an OTLP push application.
    with expected state. Re-run the API freshness boundary cases. Retain failure
    and recovery evidence in #1266; do not mark G8/G10 complete from a unit test.
 
-Rule tests (Prometheus `promtool`, run from its image):
-
-```bash
-D=kubernetes/infra/configs/observability/metrics/prometheusrules/microservices
-scripts/promtool-test.sh $D/analytics-alerts.yaml $D/analytics-alerts.test.yaml
-```
-
-The tests cover all five firing and recovery paths. The one-minute dwell is a
-noise guard across two 30-second sampler cycles; the 120/300-second
+The one-minute dwell is a noise guard across two 30-second sampler cycles; the 120/300-second
 thresholds come from the API freshness contract. Validate delivery and tune the
 dwell from Linux failure/recovery evidence before enabling notifications.
 

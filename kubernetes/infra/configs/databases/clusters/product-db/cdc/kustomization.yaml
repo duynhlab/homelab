@@ -3,8 +3,8 @@ kind: Kustomization
 
 # CDC source on product-db (RFC-0030 phase 3): roles, heartbeat bootstrap and
 # the session-mode PgBouncer pooler PeerDB connects through. The publications
-# and grants name app tables, so they live in the cdc-local wave
-# (configs/cdc/source/), after the service migrations can create them.
+# name app tables, so they live in the cdc-local wave (configs/cdc/source/);
+# bootstrap.sh grants SELECT on whatever they publish.
 resources:
   - secrets.yaml
   - roles.yaml

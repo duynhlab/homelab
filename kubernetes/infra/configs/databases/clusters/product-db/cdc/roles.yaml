@@ -1,6 +1,6 @@
 # CDC roles (RFC-0030). REPLICATION is a superuser-only attribute, so CNPG —
-# not the db-authz catalog Job — owns these. Grants live in the CDC pgroles
-# policies (configs/cdc/source/grants.yaml); the HBA lines in ../instance.yaml.
+# not the db-authz catalog Job — owns these. Their grants follow the
+# publications (bootstrap.sh); the HBA lines in ../instance.yaml.
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole

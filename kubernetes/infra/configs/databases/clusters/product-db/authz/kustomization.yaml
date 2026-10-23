@@ -4,7 +4,7 @@ kind: Kustomization
 # Database authorization for product-db (ADR-088), the same shape as
 # platform-db/authz: the db_authz login, the role catalog Job + CronJob, and one
 # pgroles policy per converted service, which owns its in-database grants.
-# The CDC roles' grants are separate policies in configs/cdc/source/.
+# The CDC roles' grants are not here: product-db/cdc/bootstrap.sh owns them.
 # apply.sh and roles.sql are platform-db's files: one copy of the catalog logic
 # for both clusters (validation and Flux both build without load restrictions).
 resources:

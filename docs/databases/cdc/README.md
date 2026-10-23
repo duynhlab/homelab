@@ -134,14 +134,19 @@ publications and `views.sql` are generated from it: change them together.
 
 **Who may read what.** Each `peerdb_<db>` is a CNPG `DatabaseRole` (REPLICATION
 is a superuser-only attribute) with SELECT on its published tables only,
-declared in its own pgroles policy (`configs/cdc/source/grants.yaml`), which
-revokes anything undeclared for that role.
+granted by `product-db-cdc-bootstrap` (Job, then a CronJob every 10 min): in one
+transaction it revokes the role's table privileges and grants SELECT on exactly
+the tables in publication `analytics_<db>`, so the publication is the only list.
 
-**Why the publications and grants sit in the CDC wave.** Both name app tables,
-which the service migrations create in `apps-local`. In `databases-local`,
-whose `wait: true` waits on every object it applies, they deadlocked a cold
-bring-up: the wave waited on grants for tables that only exist once the wave is
-Ready. In `cdc-local` they fail and retry until the tables exist, and
+**Why not pgroles, and why the publications sit in the CDC wave.** The grants
+and the publications name app tables, which the service migrations create in
+`apps-local`. Inside the service pgroles policies, in `databases-local` (whose
+`wait: true` waits on every object it applies), they deadlocked a cold
+bring-up: the wave waited on grants for tables that exist only once it is
+Ready, and each failed plan also withheld the runtime default privileges.
+pgroles allows one policy per database, so a separate CDC policy is refused
+(`ConflictingPolicy`). The publications now live in `cdc-local` and converge
+once the tables exist; the bootstrap CronJob grants what they publish; and
 `peerdb-bootstrap` waits for every published table to be readable as
 `peerdb_<db>` before it creates a mirror (cold bring-up, 2026-10-23). product-db's
 HBA admits each role to its own database only; PeerDB reaches product-db only

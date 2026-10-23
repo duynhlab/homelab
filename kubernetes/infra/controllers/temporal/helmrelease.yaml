@@ -119,6 +119,9 @@ spec:
           namespace:
             - name: mop
               retention: 168h
+            # PeerDB's CDC workflows (RFC-0030 / ADR-066), isolated from mop.
+            - name: peerdb
+              retention: 168h
 
     # Schema/namespace jobs are plain resources under Flux (no Helm hooks).
     schema:

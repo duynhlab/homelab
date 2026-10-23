@@ -76,6 +76,8 @@ spec:
       # ADR-025: OpenBAO's rotation admin connects to the notification DB
       # (sslmode=require) to ALTER the four runtime passwords.
       - host notification        vault_rotator all scram-sha-256
+      # PeerDB's catalog (RFC-0030 / ADR-066): verify-full from the peerdb ns.
+      - hostssl peerdb_catalog   peerdb_catalog all scram-sha-256
       - host all                 all      all reject
 
     synchronous:

@@ -22,7 +22,14 @@ spec:
   certificates:
     serverTLSSecret: product-db-replica-server-tls
     serverCASecret: product-db-replica-server-tls
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  # Same operand as product-db (../product-db/image-catalog.yaml): pg_cron
+  # available, NOT preloaded — the cron schema arrives through WAL; preload is
+  # a promotion-time decision.
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: postgresql-cron
+    major: 18
 
   plugins:
     - name: barman-cloud.cloudnative-pg.io
@@ -76,7 +83,7 @@ spec:
       - host    all     all     all reject
     parameters:
       max_connections: "200"
-      max_worker_processes: "8"
+      max_worker_processes: "12"
       max_wal_senders: "10"
       wal_level: "logical"
       min_wal_size: "2GB"

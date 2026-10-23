@@ -1,0 +1,81 @@
+# peerdb_catalog — PeerDB's own state: peers, mirrors, schema history (RFC-0030 /
+# ADR-066). PeerDB's server runs its migrations into this database; the CDC
+# workers read it. It connects directly to platform-db-rw:5432 with
+# verify-full (pg_hba hostssl line in instance.yaml).
+#
+# OpenBAO path: secret/data/local/databases/platform-db/peerdb-catalog
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-peerdb-catalog-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-peerdb-catalog-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-peerdb-catalog-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-peerdb-catalog-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/platform-db/peerdb-catalog
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/platform-db/peerdb-catalog
+        property: password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-peerdb-catalog
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: peerdb_catalog
+  comment: "PeerDB catalog owner (RFC-0030 / ADR-066)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: platform-db-peerdb-catalog-secret
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: peerdb-catalog-database
+  namespace: platform
+spec:
+  name: peerdb_catalog
+  owner: peerdb_catalog
+  cluster:
+    name: platform-db
+  extensions:
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

@@ -56,7 +56,7 @@ spec:
             - |
               set -e
               ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
-              BUCKETS="pg-backups-cnpg pyroscope-profiles clickhouse-otel"
+              BUCKETS="pg-backups-cnpg pyroscope-profiles clickhouse-otel analytics-service-cdc"
               ATTEMPTS=60
               s3() { aws --endpoint-url "$ENDPOINT" s3api "$@"; }
 

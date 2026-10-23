@@ -1,0 +1,60 @@
+# PeerDB's catalog connection, in the shape the chart reads from
+# catalog.existingSecret: host, port, user, password, dbname, uri.
+# OpenBAO path: secret/data/local/databases/platform-db/peerdb-catalog (the
+# same value the platform-db DatabaseRole binds).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: peerdb-catalog
+  namespace: peerdb
+  labels:
+    app.kubernetes.io/name: peerdb-catalog
+    app.kubernetes.io/component: cdc
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: peerdb-catalog
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: Opaque
+      data:
+        host: platform-db-rw.platform.svc.cluster.local
+        port: "5432"
+        user: "{{ .username }}"
+        password: "{{ .password }}"
+        dbname: peerdb_catalog
+        uri: "postgres://{{ .username }}:{{ .password | urlquery }}@platform-db-rw.platform.svc.cluster.local:5432/peerdb_catalog?sslmode=verify-full&sslrootcert=/etc/peerdb-ca/ca.crt"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/platform-db/peerdb-catalog
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/platform-db/peerdb-catalog
+        property: password
+---
+# The CA PeerDB verifies platform-db (catalog) and the product-db CDC pooler
+# against. Issued by the live homelab-ca ClusterIssuer so ca.crt matches what
+# signs both servers; only ca.crt is used.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: peerdb-ca-trust
+  namespace: peerdb
+spec:
+  secretName: peerdb-ca-trust
+  commonName: peerdb-ca-trust.peerdb.svc
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

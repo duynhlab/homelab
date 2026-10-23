@@ -18,7 +18,12 @@ spec:
   certificates:
     serverTLSSecret: product-db-server-tls
     serverCASecret: product-db-server-tls
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  # PostgreSQL 18.6 + pg_cron for the CDC heartbeats (image-catalog.yaml).
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: postgresql-cron
+    major: 18
 
   plugins:
     - name: barman-cloud.cloudnative-pg.io
@@ -48,6 +53,8 @@ spec:
       - pg_stat_statements
       - auto_explain
       - pg_stat_ch
+      # Heartbeat scheduler (ADR-068); needs the postgresql-cron operand above.
+      - pg_cron
 
     # Connection isolation (RFC-0012 P4, ADR-015): each service role connects
     # only to its own database. CNPG inserts these BETWEEN its fixed rules
@@ -119,12 +126,25 @@ spec:
       wal_compression: "on"
       archive_timeout: "5min"
       max_wal_senders: "10"
+      # CDC (RFC-0030): three PeerDB slots plus headroom; a stalled mirror may
+      # retain at most 1GB of WAL before its slot is invalidated (G6/G7).
+      max_replication_slots: "10"
+      max_slot_wal_keep_size: "1GB"
       wal_keep_size: "1GB"
       min_wal_size: "2GB"
       max_wal_size: "8GB"
 
       # Parallelism settings
-      max_worker_processes: "8"
+      # 8 for queries plus pg_cron's background workers (max 4 at once).
+      max_worker_processes: "12"
+
+      # pg_cron (ADR-068): installed in `postgres`, schedules into the source
+      # databases with cron.schedule_in_database as analytics_heartbeat.
+      cron.database_name: "postgres"
+      cron.use_background_workers: "on"
+      cron.max_running_jobs: "4"
+      cron.timezone: "UTC"
+      cron.enable_superuser_jobs: "off"
       max_parallel_workers_per_gather: "4"
       max_parallel_workers: "8"
       max_parallel_maintenance_workers: "4"
@@ -244,6 +264,14 @@ spec:
         # role is a member of every role it creates. db_authz reaches it via SET
         # ROLE. An existing cluster runs this once by hand (runbook).
         - CREATE ROLE authz_admin NOLOGIN CREATEROLE INHERIT
+        # CDC heartbeats (RFC-0030 / ADR-068, owner decision 2026-10-23 on
+        # #1325): pg_cron lives in `postgres`; analytics_heartbeat may schedule
+        # jobs into the source databases and nothing else. An existing cluster
+        # runs these four statements once by hand (runbook).
+        - CREATE EXTENSION IF NOT EXISTS pg_cron
+        - CREATE ROLE analytics_heartbeat WITH LOGIN
+        - GRANT USAGE ON SCHEMA cron TO analytics_heartbeat
+        - GRANT EXECUTE ON FUNCTION cron.schedule_in_database(text, text, text, text, text, boolean) TO analytics_heartbeat
 
   # Roles live in per-service DatabaseRole CRs under services/ (RFC-0012,
   # ADR-013) — do not re-add an inline managed.roles entry except as the

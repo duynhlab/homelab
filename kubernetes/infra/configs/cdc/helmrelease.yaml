@@ -1,0 +1,142 @@
+# PeerDB core (RFC-0030 / ADR-066): flow-api, flow-worker, flow-snapshot-worker
+# and peerdb-server from the upstream `peerdb` chart. Owner decisions
+# 2026-10-23 (#1313): ELv2 accepted for internal self-hosting; upstream chart.
+#
+# Chart 0.9.17 ships app v0.37.5, the core qualified on Compose; images are
+# pinned by digest through each component's `version`. External dependencies:
+#   - catalog: peerdb_catalog on platform-db, verify-full (catalog.yaml)
+#   - Temporal: the platform server, namespace `peerdb`, no TLS (as for mop)
+#   - staging: RustFS bucket analytics-service-cdc (shared key, #1315 gap)
+# The two workers are Temporal workers with no health endpoint, so they carry
+# no probes; flow-api and peerdb-server ship their own.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: peerdb
+  namespace: peerdb
+spec:
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: peerdb
+      version: "0.9.17"
+      sourceRef:
+        kind: HelmRepository
+        name: peerdb
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    serviceAccount:
+      create: true
+      name: peerdb
+    catalog:
+      existingSecret: peerdb-catalog
+      deploy:
+        enabled: false
+    aws:
+      region: us-east-1
+    temporal:
+      deploy:
+        enabled: false
+      host: temporal-frontend.temporal.svc.cluster.local
+      port: 7233
+      namespace: peerdb
+      # Empty: the platform Temporal frontend has no TLS listener.
+      clientCert: ""
+      clientKey: ""
+      taskQueueId: homelab
+    pyroscope:
+      enabled: false
+    datadog:
+      enabled: false
+    peerdbUI:
+      enabled: false
+    authentication:
+      enabled: false
+    peerdb:
+      replicaCount: 1
+      version: stable-v0.37.5@sha256:24f4ac833b238453e0dcf801e84b936b2693a276fdb8e7456f847876d67c947d
+      image:
+        pullPolicy: IfNotPresent
+      extraEnv: &catalogTls
+        - name: PEERDB_CATALOG_SSL_MODE
+          value: verify-full
+        - name: PGSSLROOTCERT
+          value: /etc/peerdb-ca/ca.crt
+      resources:
+        requests: {cpu: 25m, memory: 64Mi}
+        limits: {memory: 256Mi}
+    flowApi:
+      replicaCount: 1
+      version: stable-v0.37.5@sha256:9fc41a955674c0ea7542e56278daaf10f37954a83b6ce4d7c0c8174757b6f86a
+      image:
+        pullPolicy: IfNotPresent
+      extraEnv: &staging
+        - name: PEERDB_CATALOG_SSL_MODE
+          value: verify-full
+        - name: PGSSLROOTCERT
+          value: /etc/peerdb-ca/ca.crt
+        - name: PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef: {name: peerdb-rustfs-credentials, key: ACCESS_KEY_ID}
+        - name: PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef: {name: peerdb-rustfs-credentials, key: ACCESS_SECRET_KEY}
+        - name: PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_REGION
+          value: us-east-1
+        - name: PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ENDPOINT_URL_S3
+          value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+        - name: PEERDB_CLICKHOUSE_AWS_S3_BUCKET_NAME
+          value: analytics-service-cdc
+      resources:
+        requests: {cpu: 25m, memory: 128Mi}
+        limits: {memory: 256Mi}
+    flowWorker:
+      replicaCount: 1
+      version: stable-v0.37.5@sha256:2f284658fb57a35cd92ab35205f0158a04971373ce1c96332b1d315026a04078
+      image:
+        pullPolicy: IfNotPresent
+      extraEnv: *staging
+      resources:
+        requests: {cpu: 100m, memory: 256Mi, ephemeral-storage: 1Gi}
+        limits: {memory: 1Gi, ephemeral-storage: 4Gi}
+    flowSnapshotWorker:
+      replicaCount: 1
+      version: stable-v0.37.5@sha256:6524767f749548caf9ac1e7379485922cda8866f662390531531093dff4c3432
+      image:
+        pullPolicy: IfNotPresent
+      extraEnv: *staging
+      resources:
+        requests: {cpu: 50m, memory: 256Mi, ephemeral-storage: 1Gi}
+        limits: {memory: 1Gi, ephemeral-storage: 4Gi}
+  # The CA for verify-full lives in a Secret the chart cannot mount: add it to
+  # every workload that connects to the catalog or a source.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              group: apps
+              version: v1
+              labelSelector: app.kubernetes.io/instance=peerdb
+            patch: |
+              - op: add
+                path: /spec/template/spec/volumes
+                value:
+                  - name: peerdb-ca
+                    secret:
+                      secretName: peerdb-ca-trust
+                      items:
+                        - {key: ca.crt, path: ca.crt}
+              - op: add
+                path: /spec/template/spec/containers/0/volumeMounts
+                value:
+                  - name: peerdb-ca
+                    mountPath: /etc/peerdb-ca
+                    readOnly: true

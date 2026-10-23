@@ -44,6 +44,7 @@ resources:
   # The temporal-operator source retired with the operator (ADR-030).
   - helm/temporalio.yaml
   - helm/altinity.yaml
+  - helm/peerdb.yaml
 # RFC-0027 / ADR-058: the jaegertracing Helm repository retired with Jaeger
 # (helm/jaegertracing.yaml.bak).
 # RFC-0027 / ADR-059: grafana-community existed only to ship the Tempo chart

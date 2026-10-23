@@ -1,0 +1,34 @@
+# PeerDB CDC from product-db into ClickHouse (RFC-0030 phases 1-7 / ADR-066).
+# Its own wave: it needs the catalog on platform-db, the `peerdb` Temporal
+# namespace (temporal-config carries the MirrorName attribute), the staging
+# bucket and the CA, and nothing downstream waits on it yet.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cdc-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: cdc
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./configs/cdc
+  prune: true
+  # No `wait`: it would disable the healthChecks below (AGENTS.md gotcha).
+  # The HelmRelease turns Ready only once Helm saw every workload Ready.
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: peerdb
+      namespace: peerdb
+  dependsOn:
+    - name: databases-local
+    - name: temporal-config-local
+    - name: secrets-local
+    - name: storage-local
+    - name: cert-manager-local

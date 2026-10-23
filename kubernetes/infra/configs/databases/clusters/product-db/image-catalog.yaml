@@ -1,0 +1,15 @@
+# The product-db operand: CNPG PostgreSQL 18.6 plus pg_cron 1.6.8
+# (duynhlab/images, postgresql-cron) for the CDC heartbeats (RFC-0030 /
+# ADR-068). A catalog, not imageName: CNPG infers the PostgreSQL major from an
+# image tag, and this image's tag is its own release version. Shared by
+# product-db and product-db-replica; move the digest together with pg-stat-ch,
+# which is built against the same operand.
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: postgresql-cron
+  namespace: product
+spec:
+  images:
+    - major: 18
+      image: ghcr.io/duynhlab/images/postgresql-cron:1.0.0@sha256:bb613b2a7359bd49b9eedea4659d1f9d65637594aa24fcb4f2edb4b50877bf49

@@ -243,14 +243,13 @@ def serving():
     for db, tables in ALLOW.items():
         for table, columns in tables.items():
             name = db + '_' + table
-            # A tuple preserves NULLs from the latest row; per-column argMax would skip NULL.
-            fields = ','.join(f'latest.{i+1} AS {c}' for i, c in enumerate(columns))
+            # PeerDB's ReplacingMergeTree(_peerdb_version) keeps the whole highest-version
+            # row, NULLs included; FINAL reads it without a per-call GROUP BY, and fails
+            # loudly if a mirror was ever created with a non-replacing engine.
             ch(f'''GRANT SELECT ON analytics.{name} TO analytics_view_owner;
  CREATE OR REPLACE VIEW analytics.{name}_live
  DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
- SELECT {fields} FROM (
- SELECT id,argMax(tuple({','.join(columns)},_peerdb_is_deleted),_peerdb_version) AS latest
- FROM analytics.{name} GROUP BY id) WHERE latest.{len(columns)+1}=0;
+ SELECT {','.join(columns)} FROM analytics.{name} FINAL WHERE _peerdb_is_deleted = 0;
  GRANT SELECT ON analytics.{name}_live TO analytics_reader;''')
 
 

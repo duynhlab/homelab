@@ -149,8 +149,12 @@ Repository and Compose inspection on 2026-10-13:
    longer to recover than an isolated restart. The gate keeps its explicit
    deadlines and records failures rather than treating a running container as
    proof of catch-up.
-4. Serving views use one `argMax(tuple(...), _peerdb_version)` and filter the
-   latest tombstone afterwards. Independent `argMax` values can skip NULLs.
+4. Serving views read `FINAL` over PeerDB's `ReplacingMergeTree(_peerdb_version)`
+   and filter tombstones afterwards: the whole highest-version row, NULLs
+   included. The first shape, one `argMax(tuple(...), _peerdb_version)` per id,
+   had the same semantics but recomputed a full `GROUP BY` on every read and
+   cost the whole 2 s budget at one million ledger facts
+   ([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)).
 
 5. A normal ClickHouse view without explicit SQL security requires the reader
    to access the raw table. Serving views now use `SQL SECURITY DEFINER` with

@@ -71,49 +71,11 @@ platform moves to ClickHouse Cloud — the triggers ADR-066 records.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph K8S["Kind cluster · homelab"]
-        subgraph PRODUCT["product-db (namespace product)"]
-            PG[("order · checkout · payment<br/>publications analytics_&lt;db&gt;")]
-            CRON["pg_cron<br/>heartbeat every 30 s"]
-            POOL["product-db-pooler-cdc<br/>PgBouncer · session mode"]
-        end
-        subgraph PEERDB["namespace peerdb"]
-            API["flow-api"]
-            W["flow-worker"]
-            SW["flow-snapshot-worker"]
-        end
-        CAT[("peerdb_catalog<br/>platform-db")]
-        TMP["Temporal<br/>namespace peerdb"]
-        S3[("RustFS<br/>analytics-service-cdc")]
-        subgraph CH["ClickHouse · database analytics"]
-            RAW[("raw &lt;db&gt;_&lt;table&gt;<br/>ReplicatedReplacingMergeTree")]
-            VIEW["serving views<br/>&lt;db&gt;_&lt;table&gt;_live · FINAL"]
-        end
-        ANA["analytics-service"]
-    end
-    CRON -->|"upsert heartbeat"| PG
-    PG -->|"logical replication<br/>verify-full"| POOL
-    POOL -->|"replication=database"| W
-    POOL -->|"snapshot"| SW
-    W & SW -->|"Avro batches"| S3
-    S3 -->|"load"| RAW
-    W -->|"state"| CAT
-    W -->|"workflows"| TMP
-    API -->|"peers · mirrors"| CAT
-    RAW --> VIEW
-    VIEW -->|"analytics_reader"| ANA
+The topology answers which components carry a committed row from product-db to
+the analytics read API, and what each hop speaks.
 
-    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
-    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
-    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
-    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class ANA,API service
-    class W,SW,CRON worker
-    class POOL,TMP platform
-    class PG,CAT,S3,RAW,VIEW data
-```
+<p align="center"><a href="../../architecture/databases/cdc.svg"><img src="../../architecture/databases/cdc.svg" alt="Commerce CDC path: pg_cron heartbeats and logical replication on product-db flow through the CDC pooler to PeerDB's flow-worker and snapshot worker, which stage Avro in RustFS and load ClickHouse raw tables; serving views feed analytics-service; flow-api and peerdb-server use Temporal and the platform-db catalog" width="960"></a></p>
+<p align="center"><sub>Source <a href="../../architecture/databases/cdc.drawio"><code>databases/cdc.drawio</code></a> · <a href="../../architecture/databases/img/cdc.png">PNG</a></sub></p>
 
 A row's path through one mirror:
 
@@ -197,6 +159,8 @@ recovery) whose results this page will record.
 kubectl -n peerdb port-forward svc/flow-api 18113:8113 &
 curl -s localhost:18113/v1/mirrors/list            # every mirror STATUS_RUNNING
 scripts/analytics/cdc-source-check.sh               # source side: G3.1–G3.4
+scripts/analytics/cdc-target-check.sh [--pii]       # slots + mirrors (G6.2); --pii mutates (G6.4)
+scripts/db-tls-check.sh                             # includes the cdc-pooler hop (G3.6)
 kubectl -n product exec <primary> -c postgres -- psql -d postgres -Atc \
   "SELECT slot_name, active, wal_status FROM pg_replication_slots WHERE slot_type='logical'"
 ```
@@ -231,6 +195,23 @@ curl -s -X POST localhost:18113/v1/mirrors/state_change -H 'Content-Type: applic
 kubectl -n peerdb delete job peerdb-bootstrap && flux reconcile kustomization cdc-local -n flux-system
 ```
 
+**Restoring product-db** works on the `postgresql-cron` operand like any other
+recovery. `scripts/analytics/pgcron-restore-check.sh` restores a throwaway
+cluster from the Barman store and asserts pg_cron is available. A recovery
+Cluster must set `min_wal_size`/`max_wal_size` itself: product-db uses 64 MiB
+WAL segments, and PostgreSQL refuses a `min_wal_size` below two of them.
+
+**Rolling pg_cron back** has one safe order: drop `pg_cron` from
+`shared_preload_libraries` first, then move to the stock operand. The stock
+image has no `pg_cron.so`, so the reverse order leaves instances that cannot
+start. Heartbeats stop while pg_cron is unloaded, and the read API turns stale
+after 120 s. Rolling forward is the mirror image: put `imageCatalogRef` back
+and remove `imageName` in one patch, then add the preload. Flux cannot do that
+step alone, because it never owned the hand-set `imageName`: server-side apply
+keeps the field, and CNPG rejects `imageName` next to `imageCatalogRef`.
+`scripts/analytics/pgcron-rollback-drill.sh` rehearses the whole round trip
+with Flux suspended.
+
 **Traps learned the hard way (Kind, 2026-10-23):**
 
 - `cron.schedule_in_database(…, username)` from a non-superuser fails even
@@ -238,6 +219,11 @@ kubectl -n peerdb delete job peerdb-bootstrap && flux reconcile kustomization cd
 - Without `replicated: true` PeerDB creates plain `ReplacingMergeTree` tables
   inside the Replicated database: they live on one replica, and the load
   balancer then answers from the other two with "table does not exist".
+- A primary restart drops every mirror's stream: PgBouncer answers
+  `server conn crashed? (SQLSTATE 08P01)`. PeerDB reconnected on its own
+  about three minutes later. During that gap every mirror still reports
+  `STATUS_RUNNING`, so judge health by `pg_replication_slots.active` and
+  heartbeat age, never by mirror status (G2.5 run, 2026-10-23).
 - The worker logs `relation "dynamic_settings" does not exist` for a few
   seconds after a fresh install, until `peerdb-server` finishes the catalog
   migrations — harmless.

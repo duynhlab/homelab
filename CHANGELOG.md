@@ -269,6 +269,14 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The CDC edges have gate scripts** (RFC-0030 G1.3, G2.5, G3.6, G6.2,
+  G6.4). `cdc-target-check.sh` checks the mirrors and slots, and with `--pii`
+  proves marker rows reach neither the raw tables, the retained Avro staging
+  nor PeerDB's logs. `db-tls-check.sh` covers the CDC pooler hop.
+  `pgcron-restore-check.sh` restores product-db onto the pg_cron operand, and
+  `pgcron-rollback-drill.sh` rehearses leaving it and coming back. The CDC hub
+  records the restore WAL-size setting and the rollback order.
+
 - **CDC source on product-db** (RFC-0030 phase 3, ADR-067/068). CNPG
   `Publication`s `analytics_order|checkout|payment` hold exactly the ADR-067
   tables and columns plus each database's `analytics_cdc_heartbeat`; the
@@ -589,6 +597,11 @@ Skeleton (copy what you need):
   default to different stacks.
 
 #### Docs
+
+- **The CDC path is a Draw.io diagram** (`docs/architecture/databases/cdc`).
+  It is generated from an IR checked against the PeerDB, pooler and bootstrap
+  manifests, and replaces the hub's Mermaid flowchart. The row-sequence
+  diagram stays Mermaid.
 
 - **Commerce CDC hub** (`docs/databases/cdc/`): what PeerDB is, how it compares
   with Debezium, `MaterializedPostgreSQL`, ClickPipes, batch and Airbyte, the

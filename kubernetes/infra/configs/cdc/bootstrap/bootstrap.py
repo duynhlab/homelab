@@ -58,6 +58,17 @@ def pg(db, sql):
     return out.stdout.strip()
 
 
+def source_ready(db):
+    """Every allowlisted table is in the publication and readable as peerdb_<db>."""
+    tables = ALLOW[db]
+    published = pg(db, f"SELECT count(*) FROM pg_publication_tables WHERE pubname = 'analytics_{db}'")
+    if int(published or 0) < len(tables):
+        return False
+    for table in tables:
+        pg(db, f'SELECT 1 FROM public.{table} LIMIT 0')
+    return True
+
+
 def wait_for(check, what, timeout):
     deadline = time.time() + timeout
     while True:
@@ -124,6 +135,9 @@ def main():
     running = {m['name'] for m in api('/v1/mirrors/list').get('mirrors', [])}
     for db in ORDER:
         name = f'analytics_service_{db}'
+        # On a cold start the service migrations create these tables while this
+        # Job runs; the publication and the grants converge after them.
+        wait_for(lambda db=db: source_ready(db), f'{db} publication and grants', 1800)
         if name in running:
             log(f'mirror {name}: exists')
         else:

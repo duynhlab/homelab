@@ -124,7 +124,7 @@ sequenceDiagram
 ## Platform behavior
 
 **What crosses is declared, twice.** The column-listed CNPG `Publication`s
-(`kubernetes/infra/configs/databases/clusters/product-db/cdc/publications.yaml`)
+(`kubernetes/infra/configs/cdc/source/publications.yaml`)
 decide what PostgreSQL emits; each mirror's table mapping excludes every
 column outside the same allowlist, so a column added upstream reaches neither
 the stream nor the target. The allowlist file exists twice —
@@ -134,7 +134,16 @@ publications and `views.sql` are generated from it: change them together.
 
 **Who may read what.** Each `peerdb_<db>` is a CNPG `DatabaseRole` (REPLICATION
 is a superuser-only attribute) with SELECT on its published tables only,
-declared in the pgroles policies, which revoke anything undeclared. product-db's
+declared in its own pgroles policy (`configs/cdc/source/grants.yaml`), which
+revokes anything undeclared for that role.
+
+**Why the publications and grants sit in the CDC wave.** Both name app tables,
+which the service migrations create in `apps-local`. In `databases-local`,
+whose `wait: true` waits on every object it applies, they deadlocked a cold
+bring-up: the wave waited on grants for tables that only exist once the wave is
+Ready. In `cdc-local` they fail and retry until the tables exist, and
+`peerdb-bootstrap` waits for every published table to be readable as
+`peerdb_<db>` before it creates a mirror (cold bring-up, 2026-10-23). product-db's
 HBA admits each role to its own database only; PeerDB reaches product-db only
 through the CDC pooler, which a NetworkPolicy opens to the `peerdb` namespace
 alone. In ClickHouse, `analytics_ingest` owns the `analytics` database and

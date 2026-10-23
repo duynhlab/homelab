@@ -33,11 +33,6 @@ spec:
       external: true
     - name: order_runtime
       external: true
-    # CDC (RFC-0030): CNPG DatabaseRoles in ../../cdc/roles.yaml.
-    - name: peerdb_order
-      external: true
-    - name: analytics_heartbeat
-      external: true
   default_privileges:
     - owner: order_owner
       schema: public
@@ -74,29 +69,3 @@ spec:
     - role: order_runtime
       object: { type: sequence, schema: public, name: "*" }
       privileges: [USAGE, SELECT]
-    # CDC (RFC-0030 / ADR-067): exact-table SELECT for the PeerDB source role,
-    # and the heartbeat writer's three rights on its one table (ADR-068).
-    - role: peerdb_order
-      object: { type: database, name: order }
-      privileges: [CONNECT]
-    - role: peerdb_order
-      object: { type: schema, name: public }
-      privileges: [USAGE]
-    - role: peerdb_order
-      object: { type: table, schema: public, name: orders }
-      privileges: [SELECT]
-    - role: peerdb_order
-      object: { type: table, schema: public, name: order_items }
-      privileges: [SELECT]
-    - role: peerdb_order
-      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
-      privileges: [SELECT]
-    - role: analytics_heartbeat
-      object: { type: database, name: order }
-      privileges: [CONNECT]
-    - role: analytics_heartbeat
-      object: { type: schema, name: public }
-      privileges: [USAGE]
-    - role: analytics_heartbeat
-      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
-      privileges: [SELECT, INSERT, UPDATE]

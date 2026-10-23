@@ -1,0 +1,183 @@
+# CDC grants on product-db (RFC-0030 / ADR-067, ADR-068): one pgroles policy
+# per source database, declaring only the CDC roles, so the service policies in
+# databases/clusters/product-db/authz/ never touch them (adopt mode manages
+# declared roles only). They live in the cdc-local wave, not databases-local:
+# the grants name app tables that the service migrations create in apps-local,
+# and databases-local waits on every object it applies. Until a table exists
+# its plan fails and retries; nothing waits on it.
+---
+apiVersion: pgroles.io/v1alpha1
+kind: PostgresPolicy
+metadata:
+  name: product-db-order-cdc
+  namespace: product
+spec:
+  connection:
+    params:
+      host: product-db-rw.product.svc
+      dbname: order
+      sslMode: require
+      usernameSecret:
+        name: product-db-db-authz-secret
+        key: username
+      passwordSecret:
+        name: product-db-db-authz-secret
+        key: password
+      # authz_admin inherits order_owner, so it can grant on every object.
+      setRole: authz_admin
+  mode: apply
+  reconciliation_mode: adopt
+  approval: auto
+  interval: 5m
+  roles:
+    # CNPG DatabaseRoles in databases/clusters/product-db/cdc/roles.yaml.
+    - name: peerdb_order
+      external: true
+    - name: analytics_heartbeat
+      external: true
+  grants:
+    # Exact-table SELECT for the PeerDB source role,
+    # and the heartbeat writer's three rights on its one table (ADR-068).
+    - role: peerdb_order
+      object: { type: database, name: order }
+      privileges: [CONNECT]
+    - role: peerdb_order
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    - role: peerdb_order
+      object: { type: table, schema: public, name: orders }
+      privileges: [SELECT]
+    - role: peerdb_order
+      object: { type: table, schema: public, name: order_items }
+      privileges: [SELECT]
+    - role: peerdb_order
+      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
+      privileges: [SELECT]
+    - role: analytics_heartbeat
+      object: { type: database, name: order }
+      privileges: [CONNECT]
+    - role: analytics_heartbeat
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    - role: analytics_heartbeat
+      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
+      privileges: [SELECT, INSERT, UPDATE]
+
+---
+apiVersion: pgroles.io/v1alpha1
+kind: PostgresPolicy
+metadata:
+  name: product-db-checkout-cdc
+  namespace: product
+spec:
+  connection:
+    params:
+      host: product-db-rw.product.svc
+      dbname: checkout
+      sslMode: require
+      usernameSecret:
+        name: product-db-db-authz-secret
+        key: username
+      passwordSecret:
+        name: product-db-db-authz-secret
+        key: password
+      # authz_admin inherits checkout_owner, so it can grant on every object.
+      setRole: authz_admin
+  mode: apply
+  reconciliation_mode: adopt
+  approval: auto
+  interval: 5m
+  roles:
+    # CNPG DatabaseRoles in databases/clusters/product-db/cdc/roles.yaml.
+    - name: peerdb_checkout
+      external: true
+    - name: analytics_heartbeat
+      external: true
+  grants:
+    # Exact-table SELECT for the PeerDB source role,
+    # and the heartbeat writer's three rights on its one table (ADR-068).
+    - role: peerdb_checkout
+      object: { type: database, name: checkout }
+      privileges: [CONNECT]
+    - role: peerdb_checkout
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    - role: peerdb_checkout
+      object: { type: table, schema: public, name: checkout_sessions }
+      privileges: [SELECT]
+    - role: peerdb_checkout
+      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
+      privileges: [SELECT]
+    - role: analytics_heartbeat
+      object: { type: database, name: checkout }
+      privileges: [CONNECT]
+    - role: analytics_heartbeat
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    - role: analytics_heartbeat
+      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
+      privileges: [SELECT, INSERT, UPDATE]
+
+---
+apiVersion: pgroles.io/v1alpha1
+kind: PostgresPolicy
+metadata:
+  name: product-db-payment-cdc
+  namespace: product
+spec:
+  connection:
+    params:
+      host: product-db-rw.product.svc
+      dbname: payment
+      sslMode: require
+      usernameSecret:
+        name: product-db-db-authz-secret
+        key: username
+      passwordSecret:
+        name: product-db-db-authz-secret
+        key: password
+      # authz_admin inherits payment_owner, so it can grant on every object.
+      setRole: authz_admin
+  mode: apply
+  reconciliation_mode: adopt
+  approval: auto
+  interval: 5m
+  roles:
+    # CNPG DatabaseRoles in databases/clusters/product-db/cdc/roles.yaml.
+    - name: peerdb_payment
+      external: true
+    - name: analytics_heartbeat
+      external: true
+  grants:
+    # Exact-table SELECT for the PeerDB source role,
+    # and the heartbeat writer's three rights on its one table (ADR-068).
+    - role: peerdb_payment
+      object: { type: database, name: payment }
+      privileges: [CONNECT]
+    - role: peerdb_payment
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    - role: peerdb_payment
+      object: { type: table, schema: public, name: payments }
+      privileges: [SELECT]
+    - role: peerdb_payment
+      object: { type: table, schema: public, name: ledger_transactions }
+      privileges: [SELECT]
+    - role: peerdb_payment
+      object: { type: table, schema: public, name: ledger_entries }
+      privileges: [SELECT]
+    - role: peerdb_payment
+      object: { type: table, schema: public, name: ledger_accounts }
+      privileges: [SELECT]
+    - role: peerdb_payment
+      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
+      privileges: [SELECT]
+    - role: analytics_heartbeat
+      object: { type: database, name: payment }
+      privileges: [CONNECT]
+    - role: analytics_heartbeat
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    - role: analytics_heartbeat
+      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
+      privileges: [SELECT, INSERT, UPDATE]

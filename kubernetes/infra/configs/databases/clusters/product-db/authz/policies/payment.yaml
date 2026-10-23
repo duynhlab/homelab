@@ -33,11 +33,6 @@ spec:
       external: true
     - name: payment_runtime
       external: true
-    # CDC (RFC-0030): CNPG DatabaseRoles in ../../cdc/roles.yaml.
-    - name: peerdb_payment
-      external: true
-    - name: analytics_heartbeat
-      external: true
   default_privileges:
     - owner: payment_owner
       schema: public
@@ -74,35 +69,3 @@ spec:
     - role: payment_runtime
       object: { type: sequence, schema: public, name: "*" }
       privileges: [USAGE, SELECT]
-    # CDC (RFC-0030 / ADR-067): exact-table SELECT for the PeerDB source role,
-    # and the heartbeat writer's three rights on its one table (ADR-068).
-    - role: peerdb_payment
-      object: { type: database, name: payment }
-      privileges: [CONNECT]
-    - role: peerdb_payment
-      object: { type: schema, name: public }
-      privileges: [USAGE]
-    - role: peerdb_payment
-      object: { type: table, schema: public, name: payments }
-      privileges: [SELECT]
-    - role: peerdb_payment
-      object: { type: table, schema: public, name: ledger_transactions }
-      privileges: [SELECT]
-    - role: peerdb_payment
-      object: { type: table, schema: public, name: ledger_entries }
-      privileges: [SELECT]
-    - role: peerdb_payment
-      object: { type: table, schema: public, name: ledger_accounts }
-      privileges: [SELECT]
-    - role: peerdb_payment
-      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
-      privileges: [SELECT]
-    - role: analytics_heartbeat
-      object: { type: database, name: payment }
-      privileges: [CONNECT]
-    - role: analytics_heartbeat
-      object: { type: schema, name: public }
-      privileges: [USAGE]
-    - role: analytics_heartbeat
-      object: { type: table, schema: public, name: analytics_cdc_heartbeat }
-      privileges: [SELECT, INSERT, UPDATE]

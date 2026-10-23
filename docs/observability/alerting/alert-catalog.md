@@ -26,15 +26,9 @@ prove every expression matched data.
   before firing. **Impact** explains the real-world consequence — the reason the metric is
   worth paging on.
 
-## Planned analytics rules
-
-The five [ADR-069 analytics rule candidates](../analytics/) are not deployed
-and are excluded from the inventory below. Install them with the analytics
-dark launch after backend-name and failure/recovery verification.
-
 ## Summary
 
-**251 statically defined alerts** exist in `.yaml` files under
+**266 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -43,19 +37,19 @@ rg '^\s*- alert:' \
   -g '*.yaml' | wc -l
 ```
 
-The 2026-10-15 breakdown is: postgres 67 (three `PgStatCh*` export-health
-rules joined the 2026-10-14 count of 64), microservices 52,
-victoriametrics 31, kubernetes 29, observability 26, envoy-gateway 16, gitops 9,
-valkey 7, keycloak 5, kyverno 4, keda 4, and one root watchdog. The glob excludes
-retired `.yaml.bak` files. Two CNPG topology rules are gated and therefore not
-applied, leaving **249 deployed rules** from this tree.
+The 2026-10-23 breakdown is: postgres 73 (six CDC rules, [§4d](#4d-cdc-and-analytics-rfc-0030)),
+microservices 58 (five analytics rules), victoriametrics 31, kubernetes 29,
+observability 26, envoy-gateway 16, gitops 9, valkey 7, keycloak 5, kyverno 4,
+keda 4, pooler 3, and one root watchdog. The glob excludes retired `.yaml.bak`
+files. Two CNPG topology rules are gated and therefore not applied, leaving
+**264 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **261
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **276
 hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **305**. Of the 249 deployed entries from
+22 SLOs, bringing the cluster total to **320**. Of the 264 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **243**. The inert
+need do not exist; effective Kind coverage for that tree is **258**. The inert
 rules and both gated rules are marked inline rather than presented as working
 coverage.
 
@@ -74,6 +68,7 @@ error forward a fourth time.
 | [Keycloak identity](#2b-keycloak-identity) | 5 | The identity provider — new logins and token refreshes, and the DB pool + token endpoint behind them |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 53 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
+| [CDC and analytics](#4d-cdc-and-analytics-rfc-0030) | 11 | The PeerDB slots on product-db, the three mirrors, and the analytics freshness they feed (RFC-0030) |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
@@ -307,6 +302,30 @@ checked here. Every guarded edge and its expected options are listed in the quer
 | CNPGRoleConfigDrift | critical | `max by (cnpg_io_cluster, role) (cnpg_pg_role_config_drift)` >0 | A migrator lost `role=<owner>`: the next migration fails or creates objects the runtime cannot use | 15m | [CNPGRoleConfigDrift](../runbooks/postgresql/CNPGRoleConfigDrift.md) |
 | CNPGDefaultPrivilegesDrift | critical | `max by (cnpg_io_cluster, datname, objtype) (cnpg_pg_default_privileges_drift)` >0 | An owner's default privileges differ: new tables unreadable, over-granted, or functions executable by PUBLIC | 15m | [CNPGDefaultPrivilegesDrift](../runbooks/postgresql/CNPGDefaultPrivilegesDrift.md) |
 | CNPGAuthorizationGuardMissing | warning | `absent(cnpg_pg_role_config_drift{…})` or `absent(cnpg_pg_default_privileges_drift{…})` | The authorization guards stopped reporting, so drift would go unseen | 15m | [CNPGAuthorizationGuardMissing](../runbooks/postgresql/CNPGAuthorizationGuardMissing.md) |
+
+### 4d. CDC and analytics (RFC-0030)
+
+`prometheusrules/postgres/cdc-alerts.yaml` reads the three PeerDB slots from
+CNPG's exporter, primary's view only, and PeerDB's own OTLP metrics.
+`prometheusrules/microservices/analytics-alerts.yaml` reads the analytics
+sampler. All eleven share the [CDC operations](../../databases/cdc/README.md#operations)
+and [analytics recovery](../analytics/README.md#investigation-and-recovery) runbooks.
+The older `CNPGInactiveSlotRetainingWAL` cannot cover these slots: it waits for
+1 GiB, and `max_slot_wal_keep_size` invalidates them at 1 GB.
+
+| Alert | Sev | Metric & trigger | Impact | for |
+|-------|-----|------------------|--------|-----|
+| CDCReplicationSlotInactive | warning | `cnpg_pg_replication_slots_active` = 0 on a `peerflow_slot_analytics_service_*` slot | No consumer; WAL piles up. Mirrors still report RUNNING | 5m |
+| CDCReplicationSlotRetentionHigh | warning | `cnpg_pg_replication_slots_pg_wal_lsn_diff` > 512 MiB | Half-way to slot invalidation | 5m |
+| CDCReplicationSlotNearInvalidation | critical | same > 900 MiB | The next step is a full resync | 1m |
+| CDCReplicationSlotMissing | warning | fewer than 3 CDC slots on product-db | A mirror was terminated or never created | 15m |
+| PeerDBMirrorNotRunning | warning | `peerdb_flow_status{flowStatus!="STATUS_RUNNING"}` | Mirror paused, resyncing or failed | 10m |
+| PeerDBMetricsMissing | warning | `absent_over_time(peerdb_instance_status[10m])` | flow-worker or its export is down; mirror alerts blind | 5m |
+| AnalyticsSourceStale | warning | `analytics_source_state_ratio{analytics_source_state="stale"}` | A source heartbeat is 120–300 s old | 1m |
+| AnalyticsSourceUnavailable | critical | same, `unavailable` | Heartbeat > 300 s; the API answers 503 | 1m |
+| AnalyticsFreshnessUnknown | warning | same, `unknown` | The sampler cannot certify freshness | 1m |
+| AnalyticsSamplerMissing | warning | runtime series without sampler series | The sampler stopped inside a live pod | 1m |
+| AnalyticsServiceMissing | critical | `absent_over_time(go_goroutine_count{service_name="analytics"}[2m])` | analytics-service or its telemetry is gone | 1m |
 
 ## 5. Kubernetes
 

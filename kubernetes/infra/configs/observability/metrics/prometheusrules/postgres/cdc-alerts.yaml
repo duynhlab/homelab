@@ -1,0 +1,96 @@
+# CDC source alerts (RFC-0030, ADR-067/068): the three PeerDB logical slots on
+# product-db, read from CNPG's own exporter so they hold even when PeerDB is
+# down. Only the primary's view is authoritative for slots (replication-health.yaml).
+#
+# Thresholds follow what was measured on Kind, 2026-10-23:
+# - a primary restart drops every stream and PeerDB reconnects about 3 minutes
+#   later, so "inactive" waits 5 minutes;
+# - max_slot_wal_keep_size is 1GB (product-db instance.yaml), so 512 MiB warns
+#   and 900 MiB is the last stop before the slot is invalidated.
+# The cdc-peerdb group reads PeerDB's own OTLP metrics (prefix peerdb_).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cdc-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: alerting-rules
+spec:
+  groups:
+    - name: cdc-source
+      interval: 30s
+      rules:
+        - alert: CDCReplicationSlotInactive
+          expr: |
+            max by (namespace, cnpg_io_cluster, database, slot_name) (
+              cnpg_pg_replication_slots_active{slot_name=~"peerflow_slot_analytics_service_.+", cnpg_io_instanceRole="primary"}
+            ) == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CDC slot {{ $labels.slot_name }} has no consumer"
+            description: "PeerDB is not streaming from {{ $labels.database }} and the slot is retaining WAL. A mirror can still report STATUS_RUNNING while this fires."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+        - alert: CDCReplicationSlotRetentionHigh
+          expr: |
+            max by (namespace, cnpg_io_cluster, database, slot_name) (
+              cnpg_pg_replication_slots_pg_wal_lsn_diff{slot_name=~"peerflow_slot_analytics_service_.+", cnpg_io_instanceRole="primary"}
+            ) > 512 * 1024 * 1024
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CDC slot {{ $labels.slot_name }} retains {{ $value | humanize1024 }}B of WAL"
+            description: "Half of the 1 GB max_slot_wal_keep_size. Past it PostgreSQL invalidates the slot and the mirror needs a full resync."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+        - alert: CDCReplicationSlotNearInvalidation
+          expr: |
+            max by (namespace, cnpg_io_cluster, database, slot_name) (
+              cnpg_pg_replication_slots_pg_wal_lsn_diff{slot_name=~"peerflow_slot_analytics_service_.+", cnpg_io_instanceRole="primary"}
+            ) > 900 * 1024 * 1024
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CDC slot {{ $labels.slot_name }} is about to be invalidated"
+            description: "{{ $value | humanize1024 }}B retained against the 1 GB cap. Resume or fix the mirror now, or plan the resync."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+        # Fires while a mirror is terminated for a resync, and on a cold bring-up
+        # until peerdb-bootstrap has created all three; 15 minutes covers the latter.
+        - alert: CDCReplicationSlotMissing
+          expr: |
+            (
+              count(cnpg_pg_replication_slots_active{cnpg_io_cluster="product-db", slot_name=~"peerflow_slot_analytics_service_.+", cnpg_io_instanceRole="primary"})
+              or vector(0)
+            ) < 3
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $value }} of 3 CDC slots exist on product-db"
+            description: "A mirror was terminated or its slot was dropped. peerdb-bootstrap recreates the mirror and its slot."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+    - name: cdc-peerdb
+      interval: 30s
+      rules:
+        # PeerDB emits 1 on the series of each mirror's current status.
+        - alert: PeerDBMirrorNotRunning
+          expr: |
+            max by (flowName, flowStatus) (peerdb_flow_status{flowStatus!="STATUS_RUNNING"}) == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PeerDB mirror {{ $labels.flowName }} is {{ $labels.flowStatus }}"
+            description: "The mirror is paused, resyncing or failed. A resync or a pause for maintenance also fires this; past 10 minutes, check the mirror."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+        - alert: PeerDBMetricsMissing
+          expr: absent_over_time(peerdb_instance_status[10m])
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PeerDB stopped exporting metrics"
+            description: "flow-worker is down or cannot reach the OTel collector; the mirror alerts above are blind. The slot alerts still work."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"

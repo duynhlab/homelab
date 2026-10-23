@@ -1,0 +1,133 @@
+# scripts/promtool-test.sh postgres/cdc-alerts.yaml postgres/cdc-alerts.test.yaml
+rule_files:
+  - cdc-alerts.rules.yaml
+evaluation_interval: 30s
+tests:
+  - name: a 3-minute reconnect stays quiet, a 6-minute gap fires and resolves
+    interval: 30s
+    input_series:
+      - series: cnpg_pg_replication_slots_active{namespace="product",cnpg_io_cluster="product-db",cnpg_io_instanceRole="primary",database="order",slot_name="peerflow_slot_analytics_service_order",pod="product-db-1"}
+        values: 1x4 0x6 1x4 0x12 1x4
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CDCReplicationSlotInactive
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: CDCReplicationSlotInactive
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: product
+              cnpg_io_cluster: product-db
+              database: order
+              slot_name: peerflow_slot_analytics_service_order
+            exp_annotations:
+              summary: "CDC slot peerflow_slot_analytics_service_order has no consumer"
+              description: "PeerDB is not streaming from order and the slot is retaining WAL. A mirror can still report STATUS_RUNNING while this fires."
+              runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+      - eval_time: 16m
+        alertname: CDCReplicationSlotInactive
+        exp_alerts: []
+
+  - name: a replica's stale view never fires
+    interval: 30s
+    input_series:
+      - series: cnpg_pg_replication_slots_active{namespace="product",cnpg_io_cluster="product-db",cnpg_io_instanceRole="replica",database="order",slot_name="peerflow_slot_analytics_service_order",pod="product-db-2"}
+        values: 0x20
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CDCReplicationSlotInactive
+        exp_alerts: []
+
+  - name: retention warns at 512 MiB and goes critical past 900 MiB
+    interval: 30s
+    input_series:
+      # 600 MiB for 6 minutes, then 950 MiB, then back to a few KiB.
+      - series: cnpg_pg_replication_slots_pg_wal_lsn_diff{namespace="product",cnpg_io_cluster="product-db",cnpg_io_instanceRole="primary",database="payment",slot_name="peerflow_slot_analytics_service_payment",pod="product-db-1"}
+        values: 629145600x12 996147200x4 90000x8
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CDCReplicationSlotRetentionHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: product
+              cnpg_io_cluster: product-db
+              database: payment
+              slot_name: peerflow_slot_analytics_service_payment
+            exp_annotations:
+              summary: "CDC slot peerflow_slot_analytics_service_payment retains 600MiB of WAL"
+              description: "Half of the 1 GB max_slot_wal_keep_size. Past it PostgreSQL invalidates the slot and the mirror needs a full resync."
+              runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+      - eval_time: 6m30s
+        alertname: CDCReplicationSlotNearInvalidation
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CDCReplicationSlotNearInvalidation
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: product
+              cnpg_io_cluster: product-db
+              database: payment
+              slot_name: peerflow_slot_analytics_service_payment
+            exp_annotations:
+              summary: "CDC slot peerflow_slot_analytics_service_payment is about to be invalidated"
+              description: "950MiB retained against the 1 GB cap. Resume or fix the mirror now, or plan the resync."
+              runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+      - eval_time: 12m
+        alertname: CDCReplicationSlotRetentionHigh
+        exp_alerts: []
+
+  - name: a terminated mirror's missing slot fires after 15 minutes
+    interval: 1m
+    input_series:
+      - series: cnpg_pg_replication_slots_active{namespace="product",cnpg_io_cluster="product-db",cnpg_io_instanceRole="primary",slot_name="peerflow_slot_analytics_service_order"}
+        values: 1x40
+      - series: cnpg_pg_replication_slots_active{namespace="product",cnpg_io_cluster="product-db",cnpg_io_instanceRole="primary",slot_name="peerflow_slot_analytics_service_checkout"}
+        values: 1x40
+      - series: cnpg_pg_replication_slots_active{namespace="product",cnpg_io_cluster="product-db",cnpg_io_instanceRole="primary",slot_name="peerflow_slot_analytics_service_payment"}
+        # Last sample at 2m; absent once the 5m lookback passes (7m), fires 15m later.
+        values: 1x2 _x25 1x8
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CDCReplicationSlotMissing
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: CDCReplicationSlotMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "2 of 3 CDC slots exist on product-db"
+              description: "A mirror was terminated or its slot was dropped. peerdb-bootstrap recreates the mirror and its slot."
+              runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+      - eval_time: 33m
+        alertname: CDCReplicationSlotMissing
+        exp_alerts: []
+
+  - name: a paused mirror fires after 10 minutes and resolves on resume
+    interval: 1m
+    input_series:
+      - series: peerdb_flow_status{flowName="analytics_service_order",flowStatus="STATUS_PAUSED"}
+        values: 1x12 _x10
+      - series: peerdb_instance_status{instanceStatus="ready"}
+        values: 1x22
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: PeerDBMirrorNotRunning
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              flowName: analytics_service_order
+              flowStatus: STATUS_PAUSED
+            exp_annotations:
+              summary: "PeerDB mirror analytics_service_order is STATUS_PAUSED"
+              description: "The mirror is paused, resyncing or failed. A resync or a pause for maintenance also fires this; past 10 minutes, check the mirror."
+              runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+      - eval_time: 20m
+        alertname: PeerDBMirrorNotRunning
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PeerDBMetricsMissing
+        exp_alerts: []

@@ -168,6 +168,11 @@ kubectl -n product exec <primary> -c postgres -- psql -d postgres -Atc \
 The read API's own verdict is the end-to-end check: `/analytics/v1/protected/commerce/overview`
 answers `stale=false` while every heartbeat is under 120 s old.
 
+**Alerts** watch the path from both ends: the slots from CNPG's exporter, the
+mirrors from PeerDB's own metrics, and freshness from analytics-service
+([catalog §4d](../../observability/alerting/alert-catalog.md#4d-cdc-and-analytics-rfc-0030)).
+PeerDB exports OTLP metrics to the platform collector with the `peerdb_` prefix.
+
 **Bring-up on a fresh cluster** needs nothing by hand: `cdc-local` installs
 PeerDB, `product-db-cdc-bootstrap` creates the heartbeats, `peerdb-bootstrap`
 creates the peers and admits the mirrors one source at a time (order, then

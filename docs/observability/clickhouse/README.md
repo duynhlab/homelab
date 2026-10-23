@@ -1160,11 +1160,12 @@ authoritative.
 Deployed today: the `analytics` database with PeerDB-shaped
 `ReplacingMergeTree(_peerdb_version)` raw tables and ten `*_live` views read
 with `FINAL`, and the `analytics_reader` user (native `:9000`, no TLS
-listener — password plus NetworkPolicy fence) that analytics-service uses. The
-data is a **fixture**: `scripts/analytics/serving-fixture.sh` on Kind and the
-`analytics-fixture` compose service seed it, and `analytics-heartbeat` refreshes
-the three source heartbeats every 30 s. The PeerDB CDC mirrors that replace the
-fixture are **planned** (RFC-0030 phases 1–7).
+listener — password plus NetworkPolicy fence) that analytics-service uses. On
+Kind the raw tables are written by PeerDB's three mirrors as `analytics_ingest`
+(`ReplicatedReplacingMergeTree`) and the views are owned by the non-login
+`analytics_view_owner` ([docs/databases/cdc](../../databases/cdc/README.md)); in
+local-stack the `analytics-fixture` compose service seeds the same shape and
+`analytics-heartbeat` refreshes the three source heartbeats every 30 s.
 
 ---
 

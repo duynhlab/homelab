@@ -107,6 +107,16 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Real CDC replaces the Kind fixture** (RFC-0030 phases 5–6, ADR-066). The
+  `cdc-local` wave now runs `peerdb-bootstrap` (peers + the three mirrors,
+  admitted one source at a time on heartbeat and row counts) and
+  `analytics-views` (the ten `*_live` views, definer `analytics_view_owner`).
+  ClickHouse gains `analytics_ingest` and the non-login `analytics_view_owner`;
+  `clickhouse-ddl` 2.1.0 creates the Replicated `analytics` database. The
+  ClickHouse peer is `replicated: true`, and the ingest profile sets
+  `database_replicated_allow_replicated_engine_arguments = 2` so PeerDB's
+  `ReplicatedReplacingMergeTree` DDL takes the database's own Keeper path.
+  `scripts/analytics/serving-fixture.sh` is gone; local-stack keeps its fixture.
 - **PeerDB runs on Kind** (RFC-0030 phases 1 and 4, ADR-066). Upstream chart
   `peerdb` 0.9.17 (core v0.37.5, images digest-pinned) in the `peerdb`
   namespace and a new `cdc-local` wave gated on the HelmRelease: catalog
@@ -579,6 +589,11 @@ Skeleton (copy what you need):
   default to different stacks.
 
 #### Docs
+
+- **Commerce CDC hub** (`docs/databases/cdc/`): what PeerDB is, how it compares
+  with Debezium, `MaterializedPostgreSQL`, ClickPipes, batch and Airbyte, the
+  architecture and a row's path, platform behavior, operations and traps;
+  linked from the databases hub, extensions (pg_cron) and poolers (CDC pooler).
 
 - **The analytics contract is as-built.** `docs/api/analytics.md` moves from
   *Planned* to live on a fixture-backed serving layer with the compose and Kind

@@ -652,6 +652,14 @@ by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
 
 ## Implementation history
 
+- 2026-10-23 — Phases 1–6 on Kind (#1368, #1369 and this change): pg_cron operand
+  `postgresql-cron` 1.0.0 via an `ImageCatalog`, PeerDB 0.9.17 (core v0.37.5) from
+  the upstream chart, column-listed publications and `peerdb_<db>` roles, the
+  session-mode PgBouncer CDC pooler (replication through it verified, U1), and
+  three mirrors into a Replicated `analytics` database. The Kind fixture is
+  retired; local-stack keeps its own. Phase 7 (drills, alerts, dashboard)
+  remains. Operations: [docs/databases/cdc](../../../databases/cdc/README.md).
+
 - 2026-10-23 — Read-path follow-up: the serving views read `FINAL` over
   `ReplacingMergeTree(_peerdb_version)` instead of a per-call `argMax`
   (homelab#1366), and the reader joins the ledger on typed keys with an order

@@ -64,6 +64,7 @@ docs/
 │   ├── README.md                 # Learn / understand / operate / reference hub
 │   ├── architecture.md           # Current cluster and connection topology
 │   ├── cloudnativepg.md          # Current operator boundary
+│   ├── cdc/README.md             # Commerce CDC: PeerDB, pg_cron heartbeats, CDC pooler
 │   ├── backup-policy.md          # Current schedules, retention, object paths
 │   ├── disaster-recovery.md      # Recovery policy and DR topology
 │   ├── reliability-targets.md    # RPO/RTO targets and evidence

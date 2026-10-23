@@ -85,6 +85,13 @@ cache on the replica it lands on. Every login is the service's
 PgDog, and every `migrate` init container connects to `product-db-rw:5432`
 directly. The order and checkout workers use their service's runtime login.
 
+
+**CDC pooler.** `product-db-pooler-cdc` is a third pooler with one job: carry
+PeerDB's logical-replication and snapshot connections to product-db. It is a
+CNPG PgBouncer in **session** mode (a replication connection keeps its server
+connection for life, which PgDog's transaction mode cannot), TLS on both hops,
+admitting only the `peerdb` namespace — see [Commerce CDC](./cdc/README.md).
+
 ## TLS
 
 PgDog terminates client TLS with the cert-manager `Certificate`

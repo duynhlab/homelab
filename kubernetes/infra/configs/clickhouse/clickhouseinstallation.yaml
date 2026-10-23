@@ -116,10 +116,50 @@ spec:
         - "GRANT SELECT ON analytics.order_analytics_cdc_heartbeat_live"
         - "GRANT SELECT ON analytics.checkout_analytics_cdc_heartbeat_live"
         - "GRANT SELECT ON analytics.payment_analytics_cdc_heartbeat_live"
+      # analytics_ingest: PeerDB's ClickHouse peer (RFC-0030 / ADR-066). Owns the
+      # analytics database's raw tables (ALL there, nothing elsewhere) and stages
+      # Avro through S3. Password from the ESO-managed clickhouse-analytics-ingest
+      # Secret (OpenBAO .../clickhouse/analytics_ingest).
+      analytics_ingest/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-analytics-ingest
+            key: password
+      analytics_ingest/networks/ip:
+        - "0.0.0.0/0"
+        - "::/0"
+      analytics_ingest/profile: analytics_ingest
+      analytics_ingest/quota: default
+      analytics_ingest/grants/query:
+        - "GRANT ALL ON analytics.*"
+        - "GRANT CREATE TEMPORARY TABLE, S3 ON *.*"
+      # analytics_view_owner: the DEFINER of the serving views (cdc/bootstrap/
+      # views.sql). SELECT on the raw tables by name; it can never log in —
+      # the only allowed address is :: (no client has it) and the password is
+      # the hash of a value nobody holds.
+      analytics_view_owner/password_sha256_hex: "0e435868ddb2e53affb52f39d55fe6ed8c0d6e226ea716799fe3281916555f92"
+      analytics_view_owner/networks/ip: "::/128"
+      analytics_view_owner/profile: default
+      analytics_view_owner/quota: default
+      analytics_view_owner/grants/query:
+        - "GRANT SELECT ON analytics.order_orders"
+        - "GRANT SELECT ON analytics.order_order_items"
+        - "GRANT SELECT ON analytics.order_analytics_cdc_heartbeat"
+        - "GRANT SELECT ON analytics.checkout_checkout_sessions"
+        - "GRANT SELECT ON analytics.checkout_analytics_cdc_heartbeat"
+        - "GRANT SELECT ON analytics.payment_payments"
+        - "GRANT SELECT ON analytics.payment_ledger_transactions"
+        - "GRANT SELECT ON analytics.payment_ledger_entries"
+        - "GRANT SELECT ON analytics.payment_ledger_accounts"
+        - "GRANT SELECT ON analytics.payment_analytics_cdc_heartbeat"
     # ClickHouse 26.x answers in ZSTD by default; the extension's client only
     # speaks LZ4, so the writer's profile pins the network codec.
     profiles:
       pg_stat_ch/network_compression_method: LZ4
+      # PeerDB names an explicit Keeper path in its ReplicatedReplacingMergeTree
+      # DDL; inside a Replicated database that is refused (0) unless ClickHouse
+      # may replace it with the database's default path (2).
+      analytics_ingest/database_replicated_allow_replicated_engine_arguments: "2"
       # The reader's server-side belt: the service sends the same limits per
       # query, the profile makes them hold even for a misconfigured client.
       analytics_reader/max_memory_usage: "536870912"

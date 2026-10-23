@@ -1,0 +1,124 @@
+# Phase 6 of RFC-0030: PeerDB peers and mirrors (bootstrap.py, in peerdb) and
+# the serving views over their tables (views.sh, in monitoring, where the
+# ClickHouse admin credential lives). Both idempotent; both re-run when their
+# script changes (the ConfigMap hash is in the pod template).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: peerdb-bootstrap
+  namespace: peerdb
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: enabled
+  labels:
+    app.kubernetes.io/name: peerdb-bootstrap
+    app.kubernetes.io/component: cdc
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: peerdb-bootstrap
+        app.kubernetes.io/component: cdc
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 26
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          # psql + python3 in one pinned image already used by the platform.
+          image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+          command: ["python3", "/bootstrap/bootstrap.py"]
+          env:
+            - {name: FLOW_API, value: "http://flow-api.peerdb.svc.cluster.local:8113"}
+            - {name: SOURCE_HOST, value: product-db-pooler-cdc.product.svc}
+            - {name: CA_FILE, value: /ca/ca.crt}
+            - {name: ALLOWLIST, value: /bootstrap/allowlist.json}
+            - {name: CLICKHOUSE_HOST, value: clickhouse-clickhouse.monitoring.svc.cluster.local}
+            - {name: CLICKHOUSE_HTTP, value: "http://clickhouse-clickhouse.monitoring.svc.cluster.local:8123"}
+            - {name: CLICKHOUSE_USER, value: analytics_ingest}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom: {secretKeyRef: {name: clickhouse-analytics-ingest, key: password}}
+            - {name: S3_ENDPOINT, value: "http://rustfs-svc.rustfs.svc.cluster.local:9000"}
+            - name: S3_ACCESS_KEY_ID
+              valueFrom: {secretKeyRef: {name: peerdb-rustfs-credentials, key: ACCESS_KEY_ID}}
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: peerdb-rustfs-credentials, key: ACCESS_SECRET_KEY}}
+            - name: PEERDB_ORDER_PASSWORD
+              valueFrom: {secretKeyRef: {name: product-db-peerdb-order-secret, key: password}}
+            - name: PEERDB_CHECKOUT_PASSWORD
+              valueFrom: {secretKeyRef: {name: product-db-peerdb-checkout-secret, key: password}}
+            - name: PEERDB_PAYMENT_PASSWORD
+              valueFrom: {secretKeyRef: {name: product-db-peerdb-payment-secret, key: password}}
+          resources:
+            requests: {cpu: 10m, memory: 64Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: bootstrap, mountPath: /bootstrap, readOnly: true}
+            - {name: ca, mountPath: /ca, readOnly: true}
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: peerdb-bootstrap
+        - name: ca
+          secret:
+            secretName: peerdb-ca-trust
+            items:
+              - {key: ca.crt, path: ca.crt}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: analytics-views
+  namespace: monitoring
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: enabled
+  labels:
+    app.kubernetes.io/name: analytics-views
+    app.kubernetes.io/component: cdc
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: analytics-views
+        app.kubernetes.io/component: cdc
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: views
+          image: clickhouse/clickhouse-server:26.9
+          command: ["bash", "/views/views.sh"]
+          env:
+            - {name: CLICKHOUSE_HOST, value: clickhouse-clickhouse.monitoring.svc.cluster.local}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom: {secretKeyRef: {name: clickhouse-credentials, key: password}}
+          resources:
+            requests: {cpu: 10m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: views, mountPath: /views, readOnly: true}
+      volumes:
+        - name: views
+          configMap:
+            name: analytics-views

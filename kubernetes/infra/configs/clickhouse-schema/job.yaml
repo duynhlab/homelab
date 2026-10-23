@@ -114,9 +114,14 @@ spec:
               DB_FILES_pg_stat_ch="05-pg_stat_ch_database.sql"
               TABLE_FILES_pg_stat_ch="50-pg_stat_ch_events_raw.sql 60-pg_stat_ch_query_stats_5m.sql 70-pg_stat_ch_db_app_user_1m.sql 80-pg_stat_ch_errors_recent.sql"
               OBJECTS_pg_stat_ch=7
-              DATABASES="otel pg_stat_ch"
+              # analytics (RFC-0030): the database only — PeerDB's mirrors create
+              # its tables and the cdc wave its views, so "-" skips the count.
+              DB_FILES_analytics="06-analytics_database.sql"
+              TABLE_FILES_analytics=""
+              OBJECTS_analytics=-
+              DATABASES="otel pg_stat_ch analytics"
               echo "==> DDL files in /sql:"
-              for f in $DB_FILES_otel $TABLE_FILES_otel $DB_FILES_pg_stat_ch $TABLE_FILES_pg_stat_ch; do
+              for f in $DB_FILES_otel $TABLE_FILES_otel $DB_FILES_pg_stat_ch $TABLE_FILES_pg_stat_ch $DB_FILES_analytics; do
                 [ -s "/sql/$f" ] || { echo "FAIL: /sql/$f missing or empty -- is the image volume a real image?"; ls -la /sql; exit 1; }
                 echo "    $f ($(wc -c < "/sql/$f") bytes)"
               done
@@ -233,6 +238,7 @@ spec:
                   cli "$FIRST.monitoring.svc.cluster.local" --queries-file "/sql/$f"
                 done
 
+                [ "$want" = "-" ] && { echo "==> [$db] tables are not this Job's"; continue; }
                 echo "==> [$db] waiting for $want objects to land on every replica"
                 for h in $HOSTS; do
                   n=0
@@ -295,7 +301,7 @@ spec:
       volumes:
         - name: sql
           image:
-            reference: ghcr.io/duynhlab/images/clickhouse-ddl:2.0.0@sha256:3551ad6cabfcf0ff13d5cf35d77c1890532f052e11fc6a296aa76385d31179b8
+            reference: ghcr.io/duynhlab/images/clickhouse-ddl:2.1.0@sha256:75e40a73b89df6e43b0e7c02b3efdadf51388d1f337a8bbf76d100ee2c3f3f40
             pullPolicy: IfNotPresent
         - name: tmp
           emptyDir: {}

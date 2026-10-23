@@ -63,6 +63,15 @@ def _num(style: str, key: str, default: float) -> float:
         return default
 
 
+def _title_band(frame, rect: list[float], height: float) -> list[float]:
+    """Rectangle of a frame's title text: its own font size, on the side its
+    `align` puts it (inner frames are right-aligned, house-style.md)."""
+    st = frame.get("style") or ""
+    w = min(rect[2], text_width(_plain(frame.get("value"))[0], _num(st, "fontSize", 13), bold=True) + 30)
+    x0 = rect[0] + rect[2] - w if "align=right" in st else rect[0]
+    return [x0, rect[1], w, height]
+
+
 def _plain(value: str) -> list[str]:
     text = re.sub(r"<br\s*/?>", "\n", value or "", flags=re.I)
     text = html.unescape(re.sub(r"<[^>]+>", "", text))
@@ -451,7 +460,7 @@ def gate_typography(d: Diagram, routes: dict) -> list[dict]:
         fr = d.abs_rect(f.get("id"))
         if not fr or d.in_legend(f.get("id")):
             continue
-        band = [fr[0], fr[1], min(fr[2], text_width(_plain(f.get("value"))[0], 13, bold=True) + 30), 22]
+        band = _title_band(f, fr, 22)
         for eid, poly in routes.items():
             if any(_seg_hits_rect(p, q, band, shrink=0) for p, q in zip(poly, poly[1:])):
                 out.append(finding("WARN", "typography.edge_over_frame_title", [eid, f.get("id")],
@@ -474,7 +483,7 @@ def gate_typography(d: Diagram, routes: dict) -> list[dict]:
         label_boxes.append((eid, text, box))
         for f in frames:
             fr = d.abs_rect(f.get("id"))
-            band = [fr[0], fr[1], min(fr[2], text_width(_plain(f.get("value"))[0], 13, bold=True) + 30), 24] if fr else None
+            band = _title_band(f, fr, 24) if fr else None
             if band and not d.in_legend(f.get("id")) and _overlap(box, band):
                 out.append(finding("WARN", "typography.label_over_shape", [eid, f.get("id")],
                                    f"label '{text}' covers the title of frame '{_plain(f.get('value'))[0]}'",

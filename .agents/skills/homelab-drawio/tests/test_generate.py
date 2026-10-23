@@ -201,6 +201,24 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("layout.unframed_node", {x["rule_id"] for x in f})
         self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
 
+    def test_frame_titles_follow_the_hierarchy(self):
+        ir = _ir()
+        ir["boundaries"] = [{"id": "f_cluster", "label": "Kind cluster · homelab"},
+                            {"id": "f_ns", "label": "apps namespace", "parent": "f_cluster"},
+                            {"id": "f_apps", "label": "Applications", "parent": "f_ns"}]
+        for n in ir["nodes"]:
+            if n["id"] in ("gw", "db"):
+                n["parent"] = "f_cluster"
+        cells = _cells(generate.build(ir))
+        st = {f: cells[f].get("style") for f in ("f_cluster", "f_ns", "f_apps")}
+        self.assertIn("fontSize=14;", st["f_cluster"])            # system boundary
+        self.assertIn("align=left;", st["f_cluster"])
+        self.assertIn("fontSize=11;", st["f_apps"])                # innermost frame
+        self.assertIn("align=right;", st["f_apps"])
+        self.assertIn("fontSize=11;", st["f_ns"])                  # holds a frame: stays left
+        self.assertIn("align=left;", st["f_ns"])
+        self.assertIn("fontSize=13;", cells["legend"].get("style"))  # the legend keeps its own size
+
     def test_animate_marks_primary_flow_only(self):
         ir = _ir()
         ir["diagram"]["animate"] = ["traffic"]

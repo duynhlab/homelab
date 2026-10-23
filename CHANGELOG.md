@@ -259,6 +259,17 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **CDC source on product-db** (RFC-0030 phase 3, ADR-067/068). CNPG
+  `Publication`s `analytics_order|checkout|payment` hold exactly the ADR-067
+  tables and columns plus each database's `analytics_cdc_heartbeat`; the
+  `peerdb_<db>` roles are CNPG `DatabaseRole`s (REPLICATION is
+  superuser-only) with exact-table SELECT declared in the pgroles policies; a
+  bootstrap Job (CronJob every 10 min) creates the heartbeat tables as each
+  owner and schedules three 30-second pg_cron jobs plus a daily history
+  cleanup as `analytics_heartbeat`. PeerDB's only path in is
+  `product-db-pooler-cdc`, a session-mode CNPG PgBouncer Pooler with TLS on
+  both hops and a NetworkPolicy admitting only the `peerdb` namespace.
+  `scripts/analytics/cdc-source-check.sh` asserts G3.1–G3.4.
 - **pg_cron on product-db** (RFC-0030 phase 2, ADR-068). The operand is
   `postgresql-cron` 1.0.0 (CNPG 18.6 + pg_cron 1.6.8, duynhlab/images) through
   an `ImageCatalog`, because CNPG reads the PostgreSQL major from an image tag

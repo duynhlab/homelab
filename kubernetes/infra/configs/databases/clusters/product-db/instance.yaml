@@ -94,6 +94,14 @@ spec:
       # OpenBAO's rotation administrator (ADR-025) logs in to `product` only;
       # ALTER ROLE is cluster-wide, so one database is enough.
       - hostssl product   vault_rotator all scram-sha-256
+      # CDC (RFC-0030): each PeerDB source role reaches its own database only,
+      # through the CDC pooler; a logical-replication connection matches by
+      # database name. analytics_heartbeat logs in to `postgres` to schedule
+      # its pg_cron jobs (ADR-068).
+      - hostssl order     peerdb_order       all scram-sha-256
+      - hostssl checkout  peerdb_checkout    all scram-sha-256
+      - hostssl payment   peerdb_payment     all scram-sha-256
+      - hostssl postgres  analytics_heartbeat all scram-sha-256
       - host    all     all     all reject
 
     synchronous:

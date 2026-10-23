@@ -1,0 +1,95 @@
+# CDC roles (RFC-0030). REPLICATION is a superuser-only attribute, so CNPG —
+# not the db-authz catalog Job — owns these. Grants live in the pgroles
+# policies (../authz/policies/<db>.yaml); the HBA lines in ../instance.yaml.
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-peerdb-order
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: peerdb_order
+  comment: "PeerDB source for order: logical replication + exact-table SELECT (ADR-067)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: true
+  bypassrls: false
+  connectionLimit: 5
+  inRoles: []
+  passwordSecret:
+    name: product-db-peerdb-order-secret
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-peerdb-checkout
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: peerdb_checkout
+  comment: "PeerDB source for checkout: logical replication + exact-table SELECT (ADR-067)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: true
+  bypassrls: false
+  connectionLimit: 5
+  inRoles: []
+  passwordSecret:
+    name: product-db-peerdb-checkout-secret
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-peerdb-payment
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: peerdb_payment
+  comment: "PeerDB source for payment: logical replication + exact-table SELECT (ADR-067)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: true
+  bypassrls: false
+  connectionLimit: 5
+  inRoles: []
+  passwordSecret:
+    name: product-db-peerdb-payment-secret
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-analytics-heartbeat
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: analytics_heartbeat
+  comment: "Owns the CDC heartbeat cron jobs (ADR-068); created by postInitSQL"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: 2
+  inRoles: []
+  passwordSecret:
+    name: product-db-analytics-heartbeat-secret
+  databaseRoleReclaimPolicy: retain

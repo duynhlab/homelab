@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1325](https://github.com/duynhlab/homelab/issues/1325) — native Task sub-issues and tradeoff log |
-| **Adoption** | Partial — pg_cron runs on product-db (postgresql-cron 1.0.0); heartbeat jobs pending (RFC-0030 phase 3) |
+| **Adoption** | Partial — pg_cron and the three 30-second heartbeat jobs run on product-db (Kind); target-side observation pending the mirrors (RFC-0030 phase 6) |
 
 ## Context
 
@@ -205,3 +205,4 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
 | 2026-10-23 | Accepted / Partial | Owner chose CNPG `postInitSQL` for `CREATE EXTENSION pg_cron`, the `analytics_heartbeat` role, `USAGE ON SCHEMA cron` and `EXECUTE ON cron.schedule_in_database`; a cluster that already exists applies the same four statements once by hand. product-db runs `postgresql-cron` 1.0.0 through an `ImageCatalog` with pg_cron preloaded; the scheduler runs on the primary only (Kind, 1 launcher on the primary, 0 on both replicas) |
+| 2026-10-23 | Accepted / Partial | Heartbeat jobs scheduled by `analytics_heartbeat` itself without the `username` argument: pg_cron 1.6.8 demands a superuser whenever that argument is passed, even when it names the caller. Three jobs at 30 s, 9/9 runs succeeded, every row ≤1 s old at the check |

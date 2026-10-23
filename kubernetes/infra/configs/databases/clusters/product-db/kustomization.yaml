@@ -23,6 +23,7 @@ resources:
   - instance.yaml
   - vault-rotator.yaml  # ADR-025: OpenBAO rotation administrator
   - authz/  # ADR-088: db_authz + role catalog Job/CronJob + pgroles policies
+  - cdc/    # RFC-0030: CDC roles, publications, heartbeats, session pooler
   - services/
   - openbao-db-config.yaml  # ADR-025: static roles for the six runtimes
   - configmaps/monitoring-queries.yaml

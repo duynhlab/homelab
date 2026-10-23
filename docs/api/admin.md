@@ -40,7 +40,7 @@ Known gaps: [three platform gaps](../frontend/admin-portal/README.md#known-gaps)
 ```mermaid
 flowchart LR
   OP["Operator browser<br/>staff token"]
-  EG["Envoy Gateway<br/>jwt-edge · staff issuer"]
+  EG["Envoy Gateway<br/>jwt-edge-staff · staff issuer"]
 
   subgraph OWN["Owning services — /protected/"]
     PROD["product<br/>9 ops"]
@@ -49,17 +49,18 @@ flowchart LR
     ORD["order<br/>3 ops"]
     USER["user<br/>2 ops"]
     SHIP["shipping<br/>2 ops"]
+    ANA["analytics<br/>1 op"]
   end
 
   OP -->|"Bearer"| EG
-  EG --> PROD & INV & PAY & ORD & USER & SHIP
+  EG --> PROD & INV & PAY & ORD & USER & SHIP & ANA
 
   classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
   classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   class OP external
   class EG edge
-  class PROD,INV,PAY,ORD,USER,SHIP service
+  class PROD,INV,PAY,ORD,USER,SHIP,ANA service
 ```
 
 No service calls the portal, and the portal calls no service east-west. Every
@@ -179,7 +180,7 @@ This index is derived, so it can be re-derived. From the repo root, with
 
 ```bash
 grep -rhoE "/[a-z-]+/v1/protected/[^\"'\`]*" ../admin-service/src/features/*/api.ts \
-  | sort -u | wc -l          # expect 23 distinct paths
+  | sort -u | wc -l          # expect 24 distinct paths
 ```
 
 Two invariants are worth asserting whenever the portal's pin moves: the count

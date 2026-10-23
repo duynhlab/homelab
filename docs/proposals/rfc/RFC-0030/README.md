@@ -2,11 +2,15 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — PeerDB + `pg_cron` direction audited 2026-09-08 | 2026-09-07 | 2026-09-09 |
+| Accepted | platform-wide | [./research.md](./research.md) — PeerDB + `pg_cron` direction audited 2026-09-08 | 2026-09-07 | 2026-10-23 |
 
-> **Accepted target architecture; Phase 0 qualification in progress.**
-> PeerDB and commerce CDC have an opt-in Compose prototype. Cluster rollout,
-> the analytics API, and the Admin route remain planned and not deployed. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
+> **Accepted target architecture; consumer half deployed on a fixture.**
+> `analytics-service`, the `api-analytics-protected` route and the Backoffice
+> `/analytics` page (phases 8–10) run in local-stack and on Kind against a
+> fixture-backed serving layer (ADR-069 Adoption Partial). The CDC half —
+> pooled source access, PeerDB, mirrors and `pg_cron` heartbeats (phases 1–7)
+> — is **planned** and not deployed; PeerDB has only an opt-in Compose
+> prototype. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
 > bounded-eventual read model.
 
 Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
@@ -26,16 +30,16 @@ Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
 - [ ] Phase 0 implementation must close the release/chart, licence, freshness,
       column-publication, schema-evolution, restore, and CNPG failover gates
       before any component rollout.
-- [x] All four ADRs remain at Adoption `Not started`; acceptance installs no
-      component.
+- [x] Acceptance installed no component. Since 2026-10-23 ADR-069 is at
+      Adoption `Partial`; ADR-066 through ADR-068 remain `Not started`.
 
 ## Summary
 
 Self-host PeerDB to continuously replicate an explicit PostgreSQL base-table
 and column allowlist from the `order`, `checkout`, and `payment` databases
 into an isolated ClickHouse `analytics` database. Three database-local mirrors
-feed versioned raw tables; serving views deduplicate with `argMax` and remove
-tombstones. A thin read-only `analytics-service` exposes one staff endpoint,
+feed versioned raw tables; serving views read the latest version with `FINAL`
+and remove tombstones. A thin read-only `analytics-service` exposes one staff endpoint,
 and the Admin Portal consumes it from a lazy `/analytics` page.
 
 The freshness objective is **two minutes end to end**, not a two-minute batch
@@ -118,8 +122,9 @@ owned lifecycle.
    every 30 seconds with `clock_timestamp()`. Measure freshness only when that
    timestamp is visible in ClickHouse after normalization.
 4. Write versioned raw rows with `_peerdb_version`, `_peerdb_is_deleted`, and
-   sync metadata. Serving views select the latest version with `argMax`, then
-   discard tombstones.
+   sync metadata into `ReplacingMergeTree(_peerdb_version)` tables. Serving
+   views read them with `FINAL` to select the latest version, then discard
+   tombstones.
 5. Normalize the inconsistent source `order_id` types to `String` in the
    serving model without modifying transactional schemas.
 6. Let `analytics-service` query only serving objects, enforce the staff issuer
@@ -159,8 +164,9 @@ that the acceptance prototype must verify.
 ## Resource naming
 
 Resources use the `analytics-service` workload name; commerce remains the
-business domain and API route. These names describe the planned cluster
-contract and the opt-in Compose implementation, not deployed cluster resources.
+business domain and API route. The `analytics` database and `analytics_reader`
+are deployed (the database seeded by the fixture); the CDC names describe the
+planned cluster contract and the opt-in Compose implementation.
 
 | Resource | Name |
 |---|---|
@@ -191,14 +197,16 @@ for the fresh-project requirement and historical-evidence boundary.
 
 ## Architecture
 
-This diagram answers one question: **what is the planned trust and data path?**
-Solid green stores and the blue gateway exist today. Every PeerDB, commerce,
-analytics, and heartbeat object is planned and not installed.
+This diagram answers one question: **what is the trust and data path, and
+which part of it is deployed?** The staff page, edge route, `analytics-service`
+and the ClickHouse `analytics` tables and serving views are current; a fixture
+seeds the tables today. Every PeerDB, CDC, commerce-publication and
+`pg_cron` heartbeat object is planned and not installed.
 
 ```mermaid
 flowchart LR
   STAFF["Staff browser"]
-  EDGE["Envoy Gateway<br/>deployed staff issuer"]
+  EDGE["Envoy Gateway<br/>jwt-edge-staff"]
 
   subgraph PG["product-db — deployed CNPG"]
     CRON["pg_cron scheduler<br/>planned — primary only"]
@@ -217,12 +225,13 @@ flowchart LR
   end
 
   subgraph CH["ClickHouse — deployed engine"]
-    RAW[("analytics raw tables<br/>planned")]
-    SERVE[("analytics serving views<br/>planned")]
+    RAW[("analytics raw tables<br/>ReplacingMergeTree")]
+    SERVE[("analytics *_live views<br/>FINAL + tombstone filter")]
   end
 
-  ANA["analytics-service<br/>planned — read only"]
-  PAGE["Admin /analytics<br/>planned"]
+  FIX["serving fixture + heartbeat<br/>current — replaced by mirrors"]
+  ANA["analytics-service<br/>read only"]
+  PAGE["Backoffice /analytics"]
 
   CRON -.->|"planned 30-second UPSERT"| ORD & CHECK & PAY
   CDCPOOL["CDC pooler profile<br/>planned — not qualified"]
@@ -232,25 +241,32 @@ flowchart LR
   FLOW --- APICTL & CAT & TEMP
   FLOW -.->|"planned staged load"| STAGE
   STAGE -.->|"planned object read"| RAW
-  RAW -.->|"planned argMax + tombstone filter"| SERVE
-  SERVE -.->|"planned bounded SELECT"| ANA
-  STAFF -.->|"planned page"| PAGE
-  PAGE -.->|"planned staff Bearer request"| EDGE
-  EDGE -.->|"planned protected route"| ANA
+  FIX -.->|"fixture (current) seed + 30 s heartbeat"| RAW
+  RAW -->|"FINAL"| SERVE
+  SERVE -->|"analytics_reader · native :9000"| ANA
+  STAFF --> PAGE
+  PAGE -->|"staff Bearer request"| EDGE
+  EDGE -->|"api-analytics-protected"| ANA
 
   classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class CDCPOOL planned;
   class STAFF external;
   class EDGE edge;
-  class PG,CH data;
-  class CRON,ORD,CHECK,PAY,FLOW,SNAP,APICTL,CAT,TEMP,STAGE,RAW,SERVE,ANA,PAGE planned;
+  class ANA,PAGE service;
+  class FIX worker;
+  class PG,CH,RAW,SERVE data;
+  class CRON,ORD,CHECK,PAY,FLOW,SNAP,APICTL,CAT,TEMP,STAGE planned;
 ```
 
-**Legend** — grey: human client · blue: deployed edge · green: deployed data
-boundary · dashed border/dotted edge: planned, not installed.
+**Legend** — grey: human client · blue: deployed edge · cyan: deployed service
+or page · green: deployed data · amber: the fixture that stands in for CDC today
+(dotted edge, labelled) · dashed border/dotted edge with `planned`: not
+installed.
 
 ### Bounded-eventual response states
 
@@ -402,7 +418,7 @@ references are in [research](./research.md#pooled-source-access-review).
 
 ## API and Admin Portal
 
-The only planned read operation is:
+The only read operation is:
 
 ```text
 GET /analytics/v1/protected/commerce/overview?currency=USD&from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -566,8 +582,10 @@ restart. No rollback writes transactional business data.
   or when the authority is unavailable.
 - Reconcile nightly 7-day and weekly 90-day source/target checksums.
 - Load at least one million representative facts and prove correct 7/30/90-day
-  output, `argMax` query p95 ≤500 ms, peak query memory ≤512 MiB, and no
-  ClickHouse pod restart.
+  output, serving query p95 ≤500 ms, peak query memory ≤512 MiB, and no
+  ClickHouse pod restart. (The 90-day funnel query misses the 500 ms bar at
+  ~0.55 s median; the owner accepted that as a known limit on 2026-10-23 —
+  see the implementation history.)
 - Test API validation/auth/errors and Admin loading, empty, stale, unavailable,
   keyboard, reduced-motion, and responsive states.
 - Run `make validate`, compose/Kind k6 gates, and the complete local-stack A/B/C
@@ -600,21 +618,20 @@ Implementation cannot advance beyond Phase 0 until qualification proves:
 
 ## Resulting decisions
 
-Architecture review split these choices into one accepted ADR each. Adoption is
-`Not started`; acceptance records the direction and does not claim the
-qualification or rollout evidence exists.
+Architecture review split these choices into one accepted ADR each.
+Acceptance records the direction; each row's Adoption reflects what is
+deployed, not the decision.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
 | Adopt self-hosted PeerDB PostgreSQL → ClickHouse CDC with isolated reuse of Temporal, RustFS, and `platform-db` | [ADR-066](../../adr/ADR-066-adopt-peerdb-for-commerce-cdc/) | Accepted / Not started |
 | Manage allowlisted base-table columns through CNPG `Publication` resources and accept table-wide source `SELECT` for the replication credential | [ADR-067](../../adr/ADR-067-constrain-commerce-cdc-source-allowlist/) | Accepted / Not started |
 | Package and operate `pg_cron` in a custom CNPG system image for target-observed heartbeat scheduling | [ADR-068](../../adr/ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Accepted / Not started |
-| Add a thin read-only `analytics-service` as the ADR-048 aggregation escape hatch | [ADR-069](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) | Accepted / Not started |
+| Add a thin read-only `analytics-service` as the ADR-048 aggregation escape hatch | [ADR-069](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) | Accepted / Partial |
 
-The draft `docs/api/analytics.md` contract exists; rollout must still update the
-service rollup in `docs/api/README.md`, the Admin consumer index
-`docs/api/admin.md`, the cross-service topology in `docs/api/api.md`, and the
-relevant feature ownership in `docs/api/microservices.md`.
+The as-built contract is [`docs/api/analytics.md`](../../../api/analytics.md);
+the service rollup, Admin consumer index, cross-service topology and feature
+ownership in `docs/api/` carry the deployed service.
 
 ## Implementation tracking
 
@@ -634,6 +651,15 @@ not qualify later commits or a pooled-source deployment.
 by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
 
 ## Implementation history
+
+- 2026-10-23 — Read-path follow-up: the serving views read `FINAL` over
+  `ReplacingMergeTree(_peerdb_version)` instead of a per-call `argMax`
+  (homelab#1366), and the reader joins the ledger on typed keys with an order
+  semi-join (analytics-service#5). On one million ledger facts, two threads,
+  the 90-day medians are 0.23 s daily, 0.25 s captured, 0.38 s products and
+  0.55 s funnel. The owner accepted the funnel's miss of the 500 ms bar as a
+  known limit and deferred the daily rollup (analytics-service#4); that no
+  longer holds the first service tag.
 
 - 2026-10-23 — Phases 8–10 (the consumer half) landed on a **fixture-backed
   serving layer**: analytics-service `8e4667fb` reads `analytics.*_live` as
@@ -693,7 +719,7 @@ by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
 ## Analytics telemetry qualification
 
 The [ADR-069 telemetry decision](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/)
-and [operations guide](../../../observability/analytics/) define the planned
+and [operations guide](../../../observability/analytics/) define the deployed
 idle sampler, standard DB instrumentation, bounded diagnostics and C22/G8/G10
 checks. Source review is recorded in the [telemetry audit](../../../observability/analytics/audit.md).
 Implementation evidence does not complete Adoption or the Linux runtime gates.

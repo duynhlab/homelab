@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1331](https://github.com/duynhlab/homelab/issues/1331) — native Task sub-issues and tradeoff log |
-| **Adoption** | Partial — service, route and Admin page live on a fixture-backed serving layer (2026-10-23); the performance bar (G8.5) and the first tag are open on [analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4) |
+| **Adoption** | Partial — service, route and Admin page live (2026-10-23), but the serving layer is fixture-backed while the CDC mirrors (RFC-0030 phases 1–7) are **planned**, and the 90-day funnel query stays over the 500 ms bar as an owner-accepted known limit ([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)) |
 
 ## Context
 
@@ -50,7 +50,7 @@ a component that does not own them.
 - PeerDB control APIs and ClickHouse raw-table access.
 - The Admin page's visual implementation details.
 
-## Telemetry decision (implementation planned)
+## Telemetry decision (implemented)
 
 The service owns a 30-second background freshness sampler with a 2-second
 query budget, immediate startup sampling and no overlapping queries. Observable
@@ -104,9 +104,10 @@ minutes of lag is explicitly stale; more than five minutes or unknown freshness
 returns `503` rather than a plausible zero.
 
 Admin commands continue directly through the edge to their owning services.
-The protected analytics route and portal navigation remain absent until the
-service passes dark-launch correctness, authorization, freshness, and failure
-gates.
+The protected analytics route and portal navigation stayed absent until the
+service passed the dark-launch correctness, authorization, freshness, and
+failure gates; both were added once those gates passed (Kind rows K4.13 and
+K4.14, 2026-10-23).
 
 The [contract](../../../api/analytics.md) selects USD-only v1, decimal integer
 JSON strings for money, ledger event-date totals, and checkout-created cohorts
@@ -116,11 +117,17 @@ with current observed stages. The service (`sha-8e4667f`), the
 serving layer** (PeerDB's table shape, CDC not yet deployed); the Linux
 evidence is on [#1332](https://github.com/duynhlab/homelab/issues/1332),
 [#1334](https://github.com/duynhlab/homelab/issues/1334) and
-[#1335](https://github.com/duynhlab/homelab/issues/1335). Adoption is
-**Partial**: the one-million-fact performance bar fails because the serving
-views and the reader's joins recompute over every row per call
-([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4));
-the service is not tagged until that is settled.
+[#1335](https://github.com/duynhlab/homelab/issues/1335). The first
+one-million-fact run failed the performance bar because the serving views
+recomputed `argMax` over every row per call and the reader joined on string
+keys. The views now read `FINAL` over `ReplacingMergeTree(_peerdb_version)`
+([homelab#1366](https://github.com/duynhlab/homelab/pull/1366)) and the reader
+joins on typed keys
+([analytics-service#5](https://github.com/duynhlab/analytics-service/pull/5)).
+Adoption stays **Partial**: the serving data is a fixture, and the 90-day
+funnel query (0.55 s median) remains over the 500 ms bar, which the owner
+accepted as a known limit on 2026-10-23
+([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)).
 
 ### Decision rules
 
@@ -220,7 +227,7 @@ the least controllable tier.
 | Authorization | Customer issuer, missing role, expired token, and direct-backend attempts fail; authorized staff succeeds |
 | Bounded query | Invalid currency/range, empty interval, over-90-day interval, and arbitrary parameter tests fail closed |
 | Freshness contract | Fresh returns `200`; 2–5 minute lag returns `200 stale=true`; over 5 minutes or unknown returns `503` |
-| Correctness and performance | One-million-fact 7/30/90-day checksums match; ClickHouse query p95 ≤500 ms and peak memory ≤512 MiB |
+| Correctness and performance | One-million-fact 7/30/90-day checksums match; ClickHouse query p95 ≤500 ms and peak memory ≤512 MiB. **Accepted deviation (owner, 2026-10-23):** the 90-day funnel query measures ~0.55 s median on one million facts with two threads (daily 0.23 s, captured 0.25 s, products 0.38 s meet the bar); the daily-rollup remedy is deferred ([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)) |
 | Isolation | Stop analytics dependencies and prove checkout, order, and payment continue without changed error budgets |
 
 ## Revisit triggers
@@ -250,3 +257,4 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
 | 2026-10-23 | Accepted / Partial | Service, edge route and Admin page deployed on a fixture-backed serving layer; compose A25/B11/C23 and Kind K3.12, K4.12–K4.14, K5.11 pass (homelab#1361, #1360); the one-million-fact performance bar fails (analytics-service#4) and holds the first tag |
+| 2026-10-23 | Accepted / Partial | Serving views read `FINAL` over `ReplacingMergeTree(_peerdb_version)` (homelab#1366) and the reader joins on typed keys (analytics-service#5); 90-day medians 0.23/0.25/0.38/0.55 s (daily/captured/products/funnel) on one million facts; owner accepted the funnel's miss of the 500 ms bar as a known limit and deferred the daily rollup (analytics-service#4) |

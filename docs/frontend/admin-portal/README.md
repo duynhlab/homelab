@@ -45,7 +45,7 @@ The shape of it is one decision repeated three times:
 flowchart TB
   OP["Operator browser<br/>backoffice.duynh.me"]
   KC["Keycloak<br/>realm duynhlab-staff<br/>client admin-portal (PKCE S256)"]
-  EG["Envoy Gateway<br/>HTTPRoute backoffice<br/>+ jwt-edge SecurityPolicy"]
+  EG["Envoy Gateway<br/>HTTPRoute backoffice — static, no JWT<br/>jwt-edge-staff on each /protected/ route"]
   PORTAL["admin-service<br/>Nginx :80 · static bundle"]
 
   subgraph OWN["Owning services — /protected/, staff issuer"]
@@ -55,6 +55,7 @@ flowchart TB
     PAY["payment"]
     SHIP["shipping"]
     USER["user"]
+    ANA["analytics<br/>read only"]
   end
 
   OP -->|"1 · load the bundle"| EG
@@ -71,7 +72,7 @@ flowchart TB
   class OP external
   class EG edge
   class KC,PORTAL platform
-  class PROD,INV,ORD,PAY,SHIP,USER service
+  class PROD,INV,ORD,PAY,SHIP,USER,ANA service
 ```
 
 **Legend** — grey: the operator's browser · blue: the platform edge · purple:
@@ -80,12 +81,13 @@ resolves itself rather than a request path.
 
 ## How the trust boundary works here
 
-**The edge checks issuer and signature. It does not check the role.** Six
-`/protected/` route groups carry a `jwt-edge` SecurityPolicy pinned to the staff
-issuer — `product`, `inventory`, `order`, `payment`, `shipping`, `user`
+**The edge checks issuer and signature. It does not check the role.** Seven
+`/protected/` route groups carry a `jwt-edge-staff` SecurityPolicy pinned to the
+staff issuer — `product`, `inventory`, `order`, `payment`, `shipping`, `user`,
+`analytics`
 ([`policies/security-jwt.yaml`](../../../kubernetes/infra/configs/envoy-gateway/policies/security-jwt.yaml)).
 The role gate on `backoffice_admin` lives in the services: the ResourceSet injects
-the staff issuer and JWKS URL into the six that carry the `staffauthmw: true`
+the staff issuer and JWKS URL into the seven that carry the `staffauthmw: true`
 flag, and the service's own middleware does the role check.
 That split is deliberate and is the same defense-in-depth shape the platform uses
 for `/private/`: a coarse edge check, with the owning service as the

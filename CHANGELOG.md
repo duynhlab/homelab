@@ -761,6 +761,16 @@ Skeleton (copy what you need):
   (29 lines each way in 30 minutes on Kind); the label is added.
   `service.version` said 2.5.0 while the image is 2.8.0.
 
+#### Observability
+
+- **The analytics alert and dashboard candidates match the stored state
+  label.** `docs/observability/analytics/` matched and grouped on
+  `analytics_source_state_ratio="…"`, but only the metric name takes the
+  `_ratio` unit suffix: the OTel attribute `analytics.source.state` lands as
+  the label `analytics_source_state`, so every state matcher selected nothing.
+  The rules, their promtool tests and the dashboard legend now use the label
+  as stored; `promtool test rules` passes.
+
 #### Databases
 
 - **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
@@ -814,6 +824,19 @@ Skeleton (copy what you need):
   mirrors so both PII gates check column allowlists across all ten tables.
 
 #### Docs
+
+- **Analytics go-live docs describe what is deployed.** `analytics-service`,
+  its edge route and the Backoffice page are current in RFC-0030 (status,
+  architecture diagram, `FINAL` instead of `argMax`), ADR-069 (telemetry
+  implemented, Adoption `Partial` with the 90-day funnel's ~0.55 s recorded as
+  the owner-accepted deviation from the 500 ms bar), the ADR/RFC indexes,
+  `docs/api/` (contract TLS and read-path text, eleven services, 27 protected
+  operations, staff verifiers and JWKS namespaces), the edge inventory (36
+  reconciled HTTPRoutes, 34 policies, the `api-analytics-protected` row), the
+  ClickHouse and Keycloak guides, the Admin Portal page and the
+  platform-api, request-path and secrets Draw.io diagrams. CDC, PeerDB and the
+  `pg_cron` heartbeats stay **planned**; the serving data is the fixture. Kind
+  row K4.12's edge-404 check now applies only before the route lands.
 
 - Link RFC-0030's four accepted ADRs to dedicated tracking issues and native
   obligation tasks; retain the Linux handoff as an index and historical evidence.

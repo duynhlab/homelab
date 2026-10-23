@@ -170,11 +170,12 @@ Which services carry which:
 |---------|:---:|:---:|
 | cart · checkout · notification · review | ✅ | — |
 | inventory · order · payment · product · shipping · user | ✅ | ✅ |
+| analytics | — | ✅ |
 
-Ten services verify customer tokens; six of them also verify staff tokens. That
-list is load-bearing beyond the env: the `identity` NetworkPolicy allows JWKS
-egress from **exactly these ten namespaces**, so adding an eleventh consumer
-means editing the policy too — see
+Ten services verify customer tokens; seven of the eleven verify staff tokens
+(analytics verifies only the staff realm). That list is load-bearing beyond the
+env: the `identity` NetworkPolicy allows JWKS egress from **exactly these eleven
+namespaces**, so adding a twelfth consumer means editing the policy too — see
 [Keycloak (platform) § Network reachability](../platform/keycloak.md#network-reachability).
 
 `frontend` and `backoffice` get no `OIDC_*` env: they are browsers. The realm,

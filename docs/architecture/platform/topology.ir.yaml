@@ -14,6 +14,10 @@
 # workers -> PgDog edge; OpenBao now also serves the rotated DB credentials.
 # 2026-10-22 (#1339): Keycloak and Temporal SQL edges name their TLS state (JDBC
 # prefer, unverified; Temporal plaintext, #1296), as in docs/secrets/cert-manager.md §12.
+# 2026-10-23: analytics makes eleven Go services (services/analytics.yaml, no db_host);
+# it reads ClickHouse analytics.*_live as analytics_reader on :9000 (analytics-rs.yaml).
+# That read is in n_sql and the ClickHouse label, not an edge: an svc -> ch edge took
+# the crossings from 9 to 18; without it the count is 10.
 diagram:
   id: topology
   title: "duynhlab homelab — Request-path topology"
@@ -22,7 +26,7 @@ diagram:
   level: L2
   animate: [traffic, data, telemetry]
   assumptions:
-    - "The ten Go services are one box: per-service routes live in docs/api/, not here."
+    - "The eleven Go services are one box: per-service routes live in docs/api/, not here."
     - "Pooling split follows each service's db_host: PgDog for product-db, the CNPG PgBouncer Pooler for platform-db."
 
 layers: [client, edge, apps, workflow, pooling, data, view]
@@ -45,7 +49,7 @@ nodes:
   - {id: openbao, label: "OpenBao\nHA Raft", role: platform, layer: edge, parent: f_sec, icon: openbao}
 
   - {id: spa, label: "Storefront SPA\nlocal.duynh.me", role: service, layer: apps, parent: f_apps}
-  - {id: svc, label: "10 Go services\nidentity · catalog · checkout\nfulfillment · comms", role: service, layer: apps, parent: f_apps, icon: go}
+  - {id: svc, label: "11 Go services\nidentity · catalog · checkout\nfulfillment · comms · analytics", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: bo, label: "Back-office portal\nbackoffice.duynh.me", role: service, layer: apps, parent: f_apps}
   - {id: eso, label: "External Secrets Operator", role: platform, layer: apps, parent: f_sec, icon: external-secrets}
 
@@ -62,7 +66,7 @@ nodes:
   - {id: vm, label: "VictoriaMetrics · VictoriaLogs · VictoriaTraces\nvmagent ingest · 7 d", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
   - {id: platformdb, label: "platform-db\nHA", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
   - {id: pyro, label: "Pyroscope\nprofiles · 7 d", role: profile, layer: data, parent: f_obs, icon: pyroscope}
-  - {id: ch, label: "ClickHouse\notel_logs · otel_traces · 90 d", role: data, layer: data, parent: f_obs, icon: clickhouse}
+  - {id: ch, label: "ClickHouse\notel_logs · otel_traces · 90 d\nanalytics serving views", role: data, layer: data, parent: f_obs, icon: clickhouse}
 
   - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_obs, icon: grafana}
 
@@ -101,7 +105,7 @@ edges:
   - {id: e_gf_pyro, source: pyro, target: grafana, type: data, label: queried}
 
 notes:
-  - {id: n_sql, title: "Database access", text: "PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology."}
+  - {id: n_sql, title: "Database access", text: "PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. analytics has no PostgreSQL: it reads ClickHouse serving views (fixture-seeded until CDC lands) over plaintext native :9000. All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology."}
 
 tests:
   - {rule: no-public-datastore}

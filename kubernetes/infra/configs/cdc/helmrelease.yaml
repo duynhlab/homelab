@@ -102,6 +102,10 @@ spec:
           value: http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
         - name: PEERDB_OTEL_METRICS_NAMESPACE
           value: peerdb_
+        # New slots get FAILOVER true (PG 17+), so CNPG's slot sync keeps a copy
+        # on each standby and a mirror survives a promotion (G7.3, U7).
+        - name: PEERDB_POSTGRES_ENABLE_FAILOVER_SLOTS
+          value: "true"
       resources:
         requests: {cpu: 25m, memory: 128Mi}
         limits: {memory: 256Mi}

@@ -181,6 +181,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **CDC and analytics alerts are live** (RFC-0030, ADR-069). `cdc-alerts.yaml`
+  watches the three PeerDB slots through CNPG's exporter (inactive 5 min,
+  WAL retained over 512 MiB and over 900 MiB, a slot missing) and the mirrors
+  through PeerDB's metrics. PeerDB now exports OTLP metrics with the `peerdb_`
+  prefix. The five analytics freshness rules move from a docs candidate to
+  `analytics-alerts.yaml`.
+
 - **RFC-0030 telemetry qualification:** document the planned idle freshness sampler, standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
 
 - **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`

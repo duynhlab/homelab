@@ -61,3 +61,5 @@ resources:
   - cnpg-platform-db/cluster-low_disk_space-warning.yaml
   # ADR-086 membership guard (homelab-authored, ns monitoring).
   - role-membership-alerts.yaml
+  # RFC-0030 CDC slots on product-db (homelab-authored, ns monitoring).
+  - cdc-alerts.yaml

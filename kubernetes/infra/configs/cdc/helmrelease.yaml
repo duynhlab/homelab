@@ -95,6 +95,13 @@ spec:
           value: http://rustfs-svc.rustfs.svc.cluster.local:9000
         - name: PEERDB_CLICKHOUSE_AWS_S3_BUCKET_NAME
           value: analytics-service-cdc
+        # OTLP/HTTP metrics to the platform collector; names get a peerdb_ prefix.
+        - name: ENABLE_OTEL_METRICS
+          value: "true"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+        - name: PEERDB_OTEL_METRICS_NAMESPACE
+          value: peerdb_
       resources:
         requests: {cpu: 25m, memory: 128Mi}
         limits: {memory: 256Mi}

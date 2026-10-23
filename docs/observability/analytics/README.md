@@ -7,15 +7,14 @@ heartbeat path (pg_cron in product-db → PeerDB → ClickHouse,
 fixture's `analytics-heartbeat` container stands in for it. It does not replace the per-request freshness checks that authorize an API
 response.
 
-**Status: the signals are deployed; the alert rules and dashboard in this
-directory are still candidates.** The sampler, its three gauges, the DB duration
+**Status: the signals and the alert rules are deployed; the dashboard in this
+directory is still a candidate.** The sampler, its three gauges, the DB duration
 histogram and the ClickHouse client spans ship with `analytics-service`
 (`v0.1.0`) in local-stack (row C23) and on Kind (row K5.11, run
-2026-10-23). `alerts.yaml` and `dashboard.json` are reviewable candidates,
-deliberately not wired into Flux: promote them with the metric names
-VictoriaMetrics stores (metric `analytics_source_state_ratio`, state label
-`analytics_source_state`). The read-path finding (analytics-service#4) is
-settled as an owner-accepted known limit, so promotion no longer waits on it.
+2026-10-23). The five alerts below load on Kind from
+[`analytics-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/analytics-alerts.yaml).
+The CDC path under them has its own slot alerts in the
+[CDC hub](../../databases/cdc/README.md#operations).
 
 | Fact | Contract |
 |---|---|
@@ -98,15 +97,16 @@ No product/customer ID, filter date, SQL, error text or trace ID is a metric
 label. Historical series from replaced versions/pods add churn; measure the
 active head and the retention-window total separately.
 
-## Dashboard and alert candidates
+## Dashboard and alerts
 
 [dashboard.json](dashboard.json) is an importable Grafana dashboard, using a
 Prometheus-compatible datasource variable. It shows individual source/pod lag,
 one-hot state, time since sampler success, and query p95. **Never sum lag across
 replicas**: summation makes two healthy replicas appear twice as stale.
 
-[alerts.yaml](alerts.yaml) contains Prometheus-format rule candidates, not a
-loaded `PrometheusRule`. The names are the ones VictoriaMetrics stores after
+The alerts are a loaded `PrometheusRule`
+([`analytics-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/analytics-alerts.yaml)).
+The names are the ones VictoriaMetrics stores after
 OTLP-to-Prometheus unit suffixing, verified on local-stack 2026-10-22:
 `analytics_source_lag_seconds`, `analytics_source_state_ratio` (unit `1`
 becomes `_ratio`), `analytics_freshness_last_success_time_seconds` and
@@ -121,8 +121,8 @@ retained on both platform and Compose OTLP paths.
 | AnalyticsSamplerMissing | 1 min | Runtime signal exists but state telemetry has no sample in 2 min | State export resumes for the same live pod |
 | AnalyticsServiceMissing | 1 min after 2 min absence | Entire service/runtime telemetry absent; inspect deployment, process, SDK and collector | Runtime signal resumes; then verify sampler state |
 
-Install missing-service rules only when analytics is expected to run. These
-rules detect freshness and telemetry loss; the platform deployment/pod alerts
+The missing-service rules assume analytics is expected to run, which is true
+wherever these rules are installed. These rules detect freshness and telemetry loss; the platform deployment/pod alerts
 still own a missing individual replica and the collector's own outage. Never
 use scrape `up` as the health signal for an OTLP push application.
 
@@ -148,15 +148,7 @@ use scrape `up` as the health signal for an OTLP push application.
    with expected state. Re-run the API freshness boundary cases. Retain failure
    and recovery evidence in #1266; do not mark G8/G10 complete from a unit test.
 
-Rule checks (Prometheus `promtool`):
-
-```bash
-promtool check rules docs/observability/analytics/alerts.yaml
-promtool test rules docs/observability/analytics/alerts.test.yaml
-```
-
-The tests cover all five firing and recovery paths. The one-minute dwell is a
-planned noise guard across two 30-second sampler cycles; the 120/300-second
+The one-minute dwell is a noise guard across two 30-second sampler cycles; the 120/300-second
 thresholds come from the API freshness contract. Validate delivery and tune the
 dwell from Linux failure/recovery evidence before enabling notifications.
 

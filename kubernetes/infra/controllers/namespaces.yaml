@@ -261,6 +261,17 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # PeerDB CDC (RFC-0030 / ADR-066). Platform tier, not app tier: its ingress
+    # fence is network-policies/peerdb.yaml. The label hands it the shared
+    # RustFS key for the analytics-service-cdc staging bucket (U5 gap).
+    platform.duynhlab/s3-peerdb: "true"
+  name: peerdb
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
     # No app-tier label: Keycloak is a platform component (like temporal),
     # not a domain service — the app-tier default-deny generation and
     # pss-restricted-apps policy do not apply here (RFC-0022 / RFC-0024 P1).

@@ -19,6 +19,7 @@ resources:
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml
   - server-tls.yaml
+  - image-catalog.yaml
   - instance.yaml
   - vault-rotator.yaml  # ADR-025: OpenBAO rotation administrator
   - authz/  # ADR-088: db_authz + role catalog Job/CronJob + pgroles policies

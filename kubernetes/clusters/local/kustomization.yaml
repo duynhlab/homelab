@@ -37,5 +37,6 @@ resources:
   - keda.yaml            # KEDA autoscaler (controllers/keda; ADR-055) — before temporal-local and apps-local
   - temporal.yaml        # Temporal server chart (controllers/temporal)
   - temporal-config.yaml # its ingress + alerts (configs/temporal, after temporal-local)
+  - cdc.yaml             # PeerDB CDC (configs/cdc; RFC-0030), after temporal-config + databases
   - keycloak.yaml        # Keycloak identity provider (controllers/keycloak, RFC-0024 P1)
   - apps.yaml            # Microservices

@@ -11,3 +11,4 @@ resources:
   - review.yaml
   - temporal.yaml
   - keycloak.yaml
+  - peerdb-catalog.yaml

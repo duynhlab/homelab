@@ -180,6 +180,30 @@ def _snap(v: float, g: int = GRID) -> int:
     return int(math.floor(v / g + 0.5) * g)
 
 
+def frame_title_style(ir: dict, fid: str) -> dict:
+    """Title size, colour and side of a frame: the outermost frame is the system
+    boundary, every frame inside it is an inner frame (assets/homelab.json
+    frame.titles)."""
+    bounds = {b["id"]: b for b in ir.get("boundaries", [])}
+    kind = "inner" if bounds.get(fid, {}).get("parent") else "boundary"
+    t = dict(load_preset()["frame"]["titles"][kind])
+    # A frame that holds frames keeps its title on the left, so it never stacks
+    # in the corner its innermost child already uses.
+    if kind == "inner" and any(b.get("parent") == fid for b in bounds.values()):
+        t["align"] = "left"
+    return t
+
+
+def title_span(ir: dict, fid: str, rect: list[float]) -> tuple[float, float]:
+    """x-span of a frame's title text, on the side the title is drawn."""
+    label = next((b["label"] for b in ir.get("boundaries", []) if b["id"] == fid), "")
+    t = frame_title_style(ir, fid)
+    w = text_width(label, t["fontSize"], bold=True) + 30
+    if t["align"] == "right":
+        return (rect[0] + rect[2] - w, rect[0] + rect[2])
+    return (rect[0], rect[0] + w)
+
+
 def node_size(n: dict, font_size: int) -> tuple[int, int]:
     lines = n["label"].split("\n")
     multi = len(lines) > 1
@@ -385,14 +409,11 @@ class Layout:
             return []
         top = self.rows[layer][0]
         above = self.rows[layer - 1][1] if layer > 0 and self.rows[layer - 1] else top - 200
-        labels = {b["id"]: b["label"] for b in self.ir.get("boundaries", [])}
-        return [(f[0], f[0] + text_width(labels.get(fid, ""), 13, bold=True) + 30)
-                for fid, f in self.frame.items() if above <= f[1] <= top]
+        return [title_span(self.ir, fid, f) for fid, f in self.frame.items() if above <= f[1] <= top]
 
     def frame_title(self, fid: str) -> list[tuple[float, float, float]]:
-        label = next((b["label"] for b in self.ir.get("boundaries", []) if b["id"] == fid), "")
         f = self.frame[fid]
-        return [(f[0], f[0] + text_width(label, 13, bold=True) + 30, f[1])]
+        return [(*title_span(self.ir, fid, f), f[1])]
 
     def ancestor_titles(self, nid: str) -> list[tuple[float, float, float]]:
         """(x0, x1, frame top) of the title text of every frame around `nid`."""
@@ -402,7 +423,7 @@ class Layout:
         while parent:
             f = self.frame.get(parent)
             if f:
-                spans.append((f[0], f[0] + text_width(bounds[parent]["label"], 13, bold=True) + 30, f[1]))
+                spans.append((*title_span(self.ir, parent, f), f[1]))
             parent = bounds[parent].get("parent")
         return spans
 
@@ -676,10 +697,11 @@ def place_labels(ir: dict, lay: Layout, routes: dict[str, dict]) -> dict[str, fl
     none free, the first candidate is kept and validate.py reports it."""
     placed: list[list[float]] = []
     # Boxes, plus each frame's title band -- a label there hides the frame's name.
-    titles = {b["id"]: b["label"] for b in ir.get("boundaries", [])}
-    boxes = list(lay.box.values()) + [
-        [f[0], f[1], min(f[2], text_width(titles.get(fid, ""), 13, bold=True) + 30), FRAME_TITLE_H]
-        for fid, f in lay.frame.items()]
+    boxes = list(lay.box.values())
+    for fid, f in lay.frame.items():
+        x0, x1 = title_span(ir, fid, f)
+        x0 = max(x0, f[0])
+        boxes.append([x0, f[1], min(f[0] + f[2], x1) - x0, FRAME_TITLE_H])
     out: dict[str, float] = {}
     for e in ir["edges"]:
         label, r = _edge_label(e), routes[e["id"]]
@@ -771,12 +793,19 @@ def build(ir: dict) -> str:
     def origin(parent: str | None) -> tuple[int, int]:
         return (lay.frame[parent][0], lay.frame[parent][1]) if parent else (0, 0)
 
+    def titled(fid: str) -> str:
+        t = frame_title_style(ir, fid)
+        side = "align=right;spacingRight=10;" if t["align"] == "right" else "align=left;spacingLeft=10;"
+        return (P["shapes"]["container"] + f"fillColor={FR['fillColor']};strokeColor={FR['strokeColor']};"
+                f"strokeWidth={FR['strokeWidth']};fontColor={t['fontColor']};fontFamily={font['fontFamily']};"
+                f"fontSize={t['fontSize']};fontStyle={FR['fontStyle']};{side}spacingTop=2;")
+
     def emit_frames(parent: str | None) -> None:
         for b in ir.get("boundaries", []):
             if b.get("parent") == parent and b["id"] in lay.frame:
                 x, y, w, h = lay.frame[b["id"]]
                 ox, oy = origin(parent)
-                _cell(root, b["id"], html.escape(b["label"], quote=False), frame_style,
+                _cell(root, b["id"], html.escape(b["label"], quote=False), titled(b["id"]),
                       parent or "1", (x - ox, y - oy, w, h))
                 emit_frames(b["id"])
 

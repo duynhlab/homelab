@@ -115,7 +115,12 @@
     "strokeWidth": 1.5,
     "fontSize": 13,
     "fontStyle": 1,
-    "note": "the neutral frame every domain group and the legend use; frames never take a role colour or a logo"
+    "note": "the neutral frame every domain group and the legend use; frames never take a role colour or a logo",
+    "titles": {
+      "boundary": {"fontSize": 14, "fontColor": "#1E293B", "align": "left"},
+      "inner": {"fontSize": 11, "fontColor": "#64748B", "align": "right"}
+    },
+    "_titles_note": "Type hierarchy (owner, 2026-10-23): diagram title 18 > system boundary (the outermost frame) 14 > inner frames 11, muted and top-right, so a namespace never competes with the cluster or with the cards' 11 px bold names. An inner frame that holds other frames keeps its title top-left, so two titles never stack in one corner (measured on the 18 committed diagrams: 112 -> 111 crossings, no title collision). The legend keeps fontSize/fontColor above."
   },
   "_shadow_note": "No drop shadows (v2): on a canvas of 30+ boxes a shadow per box adds weight without meaning. Hierarchy comes from frames and strokes."
 }

@@ -10,7 +10,7 @@
         <mxCell id="scope" value="ADR-087 Proposed • reference paths, not installed. Entry policy does not replace destination authorization." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry x="40" y="54" width="900" height="36" as="geometry" />
         </mxCell>
-        <mxCell id="cluster" value="Mini-PC cluster / proposed, not deployed" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
+        <mxCell id="cluster" value="Mini-PC cluster / proposed, not deployed" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#1E293B;fontFamily=Helvetica;fontSize=14;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
           <mxGeometry x="40" y="375" width="620" height="610" as="geometry" />
         </mxCell>
         <mxCell id="admin" value="&lt;b&gt;Operator device&lt;/b&gt;&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
@@ -64,8 +64,8 @@
           <mxGeometry relative="1" as="geometry" x="-0.93">
             <Array as="points">
               <mxPoint x="200" y="355" />
-              <mxPoint x="326.56" y="355" />
-              <mxPoint x="326.56" y="405" />
+              <mxPoint x="345.53" y="355" />
+              <mxPoint x="345.53" y="405" />
               <mxPoint x="200" y="405" />
             </Array>
           </mxGeometry>

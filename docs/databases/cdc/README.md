@@ -42,10 +42,36 @@ from the platform:
 | `flow-api` | API for peers, mirrors and status (`:8113` HTTP, `:8112` gRPC) |
 | `flow-worker` | Temporal worker that runs the CDC workflows |
 | `flow-snapshot-worker` | Holds the exported snapshot while the initial copy runs |
-| `peerdb-server` | Applies the catalog migrations |
+| `peerdb-server` | PeerDB's SQL layer (Postgres wire protocol); runs the catalog migrations at start. Peers and mirrors here are created through `flow-api`, not SQL |
 | `peerdb_catalog` (platform-db) | Peers, mirrors, schema history, batch progress |
 | Temporal (namespace `peerdb`) | Durable scheduling and retries of every mirror step |
 | RustFS bucket `analytics-service-cdc` | Avro staging between a batch and its ClickHouse load |
+
+The chart also ships a web UI, its own catalog PostgreSQL, its own Temporal, and
+Datadog and Pyroscope hooks. All five are turned off here: the catalog and
+Temporal come from the platform, and the control API stays cluster-internal.
+
+### Why Temporal
+
+PeerDB does not run its own loop. Every mirror is a long-running **Temporal
+workflow**, and every step of it (pull a batch, stage it, load it, normalize)
+is an activity that Temporal records, times out and retries with backoff. That
+is what makes a restart harmless: when `flow-worker` dies, another worker
+picks the workflow up at the step it reached. On Kind a primary restart
+reconnected in about three minutes and a PeerDB restart in about six, with no
+manual step. Pause, resume and terminate are signals to the workflow, so a
+mirror stops at a safe point instead of mid-batch. A separate scheduled
+workflow records slot sizes and metrics every minute.
+
+Temporal is mandatory, not optional. The chart supports three ways to provide
+it: its own bundled Temporal (the upstream default), Temporal Cloud, or an
+external server. This platform uses the external mode with the server it
+already runs for the order and checkout sagas: namespace `peerdb`, task queue
+`homelab`, search attribute `MirrorName` (ADR-066, *Dependency isolation*).
+The cost is a shared blast radius. If Temporal stops, the mirrors stop but lose
+nothing: the slots keep the WAL, and `CDCReplicationSlotInactive` fires long
+before the 1 GB cap. Move PeerDB to its own Temporal only if CDC and the sagas
+start to contend for the frontend or the history shards.
 
 ClickHouse acquired PeerDB; its managed form is ClickHouse Cloud's ClickPipes
 for Postgres. This platform runs the open core itself under its ELv2 licence
@@ -145,11 +171,9 @@ the database's own path instead.
 can retain at most that much WAL before PostgreSQL invalidates its slot. An
 invalidated slot needs a resync (below) — it never fills the primary's disk.
 
-**Planned, not installed:** the CDC alert rules and dashboard (candidates in
-[`docs/observability/analytics/`](../../observability/analytics/)), automatic
-credential rotation (manual, 90 days, ADR-089), and the phase-7 drills
-(failover through the pooler, schema change, WAL invalidation, outage
-recovery) whose results this page will record.
+**Not installed yet:** the analytics and CDC dashboard (a candidate in
+[`docs/observability/analytics/`](../../observability/analytics/)) and automatic
+credential rotation (manual, 90 days, ADR-089).
 
 ## Operations
 
@@ -216,6 +240,18 @@ step alone, because it never owned the hand-set `imageName`: server-side apply
 keeps the field, and CNPG rejects `imageName` next to `imageCatalogRef`.
 `scripts/analytics/pgcron-rollback-drill.sh` rehearses the whole round trip
 with Flux suspended.
+
+**Drills** (`scripts/analytics/cdc-drills.sh <drill>`, Kind, 2026-10-23).
+Each one writes rows with negative ids and deletes them afterwards. Run them one
+at a time:
+
+| Gate | Drill | Result |
+|---|---|---|
+| G7.1 | insert, update, NULL to value and back, delete on `orders` | each visible in the `_live` view in about 11 s; the delete leaves a tombstone in the raw table |
+| G7.2 | heartbeat age sampled for 10 min | max 40 s against the 120 s stale threshold |
+| G7.4 | add and drop a column that is not on the allowlist | the column never reaches ClickHouse; the mirror stays RUNNING |
+| G7.8 | pause the pg_cron heartbeats (`GATE=kind scripts/analytics-freshness-drill.sh`) | stale at +126 s, 503 at +301 s, healthy 47 s after resuming |
+| G1.3, G2.5 | restore and rollback (`pgcron-*` scripts) | see above |
 
 **Traps learned the hard way (Kind, 2026-10-23):**
 

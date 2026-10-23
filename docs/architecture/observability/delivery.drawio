@@ -10,7 +10,7 @@
         <mxCell id="scope" value="How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see signal-flow.drawio." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry x="40" y="54" width="1230" height="36" as="geometry" />
         </mxCell>
-        <mxCell id="f_cluster" value="Kind cluster · homelab — Flux waves" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
+        <mxCell id="f_cluster" value="Kind cluster · homelab — Flux waves" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#1E293B;fontFamily=Helvetica;fontSize=14;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
           <mxGeometry x="40" y="100" width="1230" height="940" as="geometry" />
         </mxCell>
         <mxCell id="w_controllers" value="&lt;b&gt;controllers-local&lt;/b&gt;&lt;br&gt;./controllers&lt;br&gt;gate: wait — operators + namespaces" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_cluster">
@@ -57,11 +57,11 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.16;exitY=1;exitDx=0;exitDy=0;entryX=0.59;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="w_controllers" target="w_monitoring">
+        <mxCell id="d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.16;exitY=1;exitDx=0;exitDy=0;entryX=0.62;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="w_controllers" target="w_monitoring">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="845" y="245" />
-              <mxPoint x="399.54" y="245" />
+              <mxPoint x="406.81" y="245" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -207,13 +207,13 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.48;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="w_monitoring" target="w_dash">
+        <mxCell id="d17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.52;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="w_monitoring" target="w_dash">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="380" y="435" />
               <mxPoint x="300" y="435" />
               <mxPoint x="300" y="560" />
-              <mxPoint x="374.54" y="560" />
+              <mxPoint x="386.81" y="560" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -225,11 +225,11 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="w_folders" target="w_dash">
+        <mxCell id="d19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.76;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="w_folders" target="w_dash">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="470" y="560" />
-              <mxPoint x="449.54" y="560" />
+              <mxPoint x="451.81" y="560" />
             </Array>
           </mxGeometry>
         </mxCell>

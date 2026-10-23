@@ -67,16 +67,33 @@ carry meaning (label the state too).
   cell as part of the cylinder, not as a node or a frame.
 
 Fonts: **Helvetica** everywhere (web-safe, resolves locally, so SVG export needs
-no embedded font). Titles use `fontSize=13; fontStyle=1`. macOS ships Helvetica;
+no embedded font). macOS ships Helvetica;
 Linux has none and fontconfig substitutes a metric-compatible clone (Nimbus Sans
 from `fonts-urw-base35`, or Liberation Sans), so a label measures the same on
 both and the style never needs a per-OS font. `doctor.py` reports the
 substitute; a non-metric fallback such as DejaVu Sans is wider and can overflow
 a box.
 
+Text has one hierarchy, largest first, so a reader finds the diagram, then the
+system, then the group, then the thing (`frame.titles` in the preset):
+
+| Text | Size | Weight / colour | Place |
+|---|---|---|---|
+| Diagram title | 18 | bold, `#1E293B` | top of the canvas |
+| Scope line | 12 | regular, `#475569` | under the title |
+| System boundary (the outermost frame) | 14 | bold, `#1E293B` | top-left |
+| Inner frame (namespace, domain, build) | 11 | bold, muted `#64748B` | **top-right**; top-left when it holds frames itself |
+| Card name / body | 11 | first line bold / regular | inside the card |
+| Edge label | 10 | regular, `#334155` | on the edge |
+
+An inner frame's title sits top-right because primary flows enter a frame from
+above near its middle and left; a frame that holds frames keeps its title
+top-left so two titles never stack in one corner. Routing and label placement
+read each title's real size and side, and so does `validate.py`.
+
 Frames (domain groups and the legend) are neutral: `fillColor=#F8FAFC;
-strokeColor=#CBD5E1;fontColor=#334155;fontSize=13;fontStyle=1` (`frame` in the
-preset). A frame never takes a role colour.
+strokeColor=#CBD5E1` (`frame` in the preset), and the legend keeps
+`fontColor=#334155;fontSize=13;fontStyle=1`. A frame never takes a role colour.
 
 ## Edges
 

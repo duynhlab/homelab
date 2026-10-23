@@ -605,6 +605,22 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **CDC hub: components, Temporal and drill results** (RFC-0030). The
+  components table names what `peerdb-server` is and what the chart ships but
+  the platform turns off; a new "Why Temporal" section explains why PeerDB
+  needs it and why it shares the platform server. The Operations section
+  records the G7.1, G7.2, G7.4 and G7.8 drill results, and
+  `scripts/analytics/cdc-drills.sh` lands. The CDC diagram is re-laid out:
+  RustFS, Temporal and the catalog share one tier, so the data path runs
+  straight down (0 crossings, 0 warnings).
+
+- **Draw.io diagrams have a title hierarchy.** The `homelab-drawio` skill sizes
+  frame titles by depth: diagram title 18, the cluster frame 14, every inner
+  frame 11 and muted, top-right (top-left when it holds frames itself). Routing,
+  label placement and `validate.py` read each title's real size and side. All 18
+  generated diagrams are regenerated: crossings 112 to 111, warnings unchanged,
+  no title collisions.
+
 - **The CDC path is a Draw.io diagram** (`docs/architecture/databases/cdc`).
   It is generated from an IR checked against the PeerDB, pooler and bootstrap
   manifests, and replaces the hub's Mermaid flowchart. The row-sequence

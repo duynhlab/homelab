@@ -11,6 +11,8 @@
 # bootstrap.sh: pg_cron 30-second heartbeat per database), the
 # clickhouse-analytics-reader ClusterExternalSecret, docs/api/analytics.md
 # (native :9000), and live Kind (kubectl -n peerdb get deploy,sts).
+# Re-laid out 2026-10-23 (owner review): RustFS, Temporal and the catalog share
+# the stores tier after the PeerDB workers, so the data path has no detour.
 diagram:
   id: cdc
   title: "duynhlab homelab — Commerce CDC path (PeerDB)"
@@ -39,26 +41,28 @@ boundaries:
   - {id: f_platform, label: "platform namespace", parent: f_cluster}
   - {id: f_temporal, label: "temporal namespace", parent: f_cluster}
   - {id: f_rustfs, label: "rustfs namespace", parent: f_cluster}
-  - {id: f_ch, label: "monitoring namespace · ClickHouse", parent: f_cluster}
+  - {id: f_ch, label: "monitoring namespace", parent: f_cluster}
   - {id: f_analytics, label: "analytics namespace", parent: f_cluster}
 
 nodes:
+  # Order measured 2026-10-23 over every peer and store ordering, both pin_order
+  # settings: 0 crossings, 0 warnings, and flow-worker -> raw runs straight down.
   - {id: cron, label: "pg_cron (inside product-db)\nheartbeat upsert every 30 s\nper database", role: worker, layer: source, parent: f_product}
   - {id: productdb, label: "product-db primary\norder · checkout · payment\npublications analytics_<db>", role: data, layer: source, parent: f_product, shape: datastore, icon: postgresql}
 
   - {id: pooler, label: "product-db-pooler-cdc\nPgBouncer · session mode\nclient TLS required", role: data, layer: pooling, parent: f_product}
 
-  - {id: worker, label: "flow-worker\nCDC: one mirror per database", role: worker, layer: cdc, parent: f_peerdb}
   - {id: snapshot, label: "flow-snapshot-worker\ninitial snapshot", role: worker, layer: cdc, parent: f_peerdb}
-  - {id: api, label: "flow-api :8113\npeers · mirrors", role: service, layer: cdc, parent: f_peerdb}
+  - {id: worker, label: "flow-worker\nCDC: one mirror per database", role: worker, layer: cdc, parent: f_peerdb}
   - {id: server, label: "peerdb-server\ncatalog migrations", role: service, layer: cdc, parent: f_peerdb}
+  - {id: api, label: "flow-api :8113\npeers · mirrors", role: service, layer: cdc, parent: f_peerdb}
 
   - {id: rustfs, label: "RustFS bucket\nanalytics-service-cdc\nAvro staging", role: data, layer: stores, parent: f_rustfs, shape: datastore, icon: rustfs}
   - {id: temporal, label: "Temporal server\nnamespace peerdb", role: platform, layer: stores, parent: f_temporal, icon: temporal}
   - {id: catalog, label: "platform-db\npeerdb_catalog", role: data, layer: stores, parent: f_platform, shape: datastore, icon: postgresql}
 
-  - {id: raw, label: "analytics.<db>_<table> (raw)\nReplicatedReplacingMergeTree\n+ _peerdb_raw_* staging", role: data, layer: warehouse, parent: f_ch, shape: datastore, icon: clickhouse}
-  - {id: views, label: "analytics.<db>_<table>_live\nFINAL · no tombstones\ndefiner analytics_view_owner", role: data, layer: warehouse, parent: f_ch}
+  - {id: raw, label: "ClickHouse raw tables\nanalytics.<db>_<table>\nReplicatedReplacingMergeTree", role: data, layer: warehouse, parent: f_ch, shape: datastore, icon: clickhouse}
+  - {id: views, label: "ClickHouse serving views\nanalytics.<db>_<table>_live\nFINAL · no tombstones", role: data, layer: warehouse, parent: f_ch}
 
   - {id: analytics, label: "analytics-service\n/analytics/v1/protected", role: service, layer: consumers, parent: f_analytics, icon: go}
 
@@ -83,7 +87,7 @@ edges:
 notes:
   - id: note_scope
     title: "What crosses"
-    text: "The column-listed publications decide what PostgreSQL emits, and each mirror's column exclusions decide what PeerDB writes, so a non-allowlisted column never reaches ClickHouse, the Avro staging or PeerDB's logs (gate G6.4). peerdb-bootstrap admits one source at a time: order, then checkout, then payment, each after its heartbeat and every table's row count arrive."
+    text: "The column-listed publications decide what PostgreSQL emits, and each mirror's column exclusions decide what PeerDB writes, so a non-allowlisted column never reaches ClickHouse, the Avro staging or PeerDB's logs (gate G6.4). peerdb-bootstrap admits one source at a time: order, then checkout, then payment, each after its heartbeat and every table's row count arrive. Beside each raw table PeerDB keeps a _peerdb_raw_<mirror> staging table; the _live views run as definer analytics_view_owner, so analytics_reader needs no grant on the raw tables."
   - id: note_boot
     title: "Who creates the path"
     text: "Nothing is created by hand. In the cdc-local wave, peerdb-bootstrap calls flow-api to upsert the peers and create the three mirrors, and analytics-views creates the ten *_live views once the raw tables exist. product-db-cdc-bootstrap, in the databases wave, creates the heartbeat tables and schedules the pg_cron jobs."

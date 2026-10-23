@@ -24,6 +24,7 @@ FAIL=0
 HOPS="
 pgdog|product|pgdog-product|product|6432|product|product_runtime|product-db-ca-trust|only TLS connections are allowed|
 pgbouncer|user|platform-db-pooler-rw|platform|5432|user|user_runtime|platform-db-ca-trust|SSL required|
+cdc-pooler|peerdb|product-db-pooler-cdc|product|5432|order|peerdb_order|peerdb-ca-trust|SSL required|
 product-rw|product|product-db-rw|product|5432|product|product_migrator|product-db-ca-trust|pg_hba.conf rejects connection|
 platform-rw|user|platform-db-rw|platform|5432|user|user_migrator|platform-db-ca-trust|pg_hba.conf rejects connection|
 product-rep|product|product-db-replica-rw|product|5432|product|product_migrator|product-db-ca-trust|pg_hba.conf rejects connection|optional

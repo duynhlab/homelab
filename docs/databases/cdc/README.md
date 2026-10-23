@@ -224,6 +224,37 @@ curl -s -X POST localhost:18113/v1/mirrors/state_change -H 'Content-Type: applic
 kubectl -n peerdb delete job peerdb-bootstrap && flux reconcile kustomization cdc-local -n flux-system
 ```
 
+**Failover keeps the mirrors.** PeerDB creates its slots with `FAILOVER true`
+(`PEERDB_POSTGRES_ENABLE_FAILOVER_SLOTS`), and CNPG syncs failover slots to
+every standby (`replicationSlots.highAvailability.synchronizeLogicalDecoding`,
+which sets `sync_replication_slots` and `synchronized_standby_slots`). After a
+promotion the new primary already holds each slot at a position the old
+primary's standbys confirmed, so PeerDB resumes without a resync. Check a
+standby with `SELECT slot_name, synced FROM pg_replication_slots`. A slot
+created before the setting was on has `failover = false` and no standby copy:
+pause its mirror, run the line below as the superuser, then resume.
+
+```bash
+psql "dbname=<db> replication=database" -c \
+  "ALTER_REPLICATION_SLOT peerflow_slot_analytics_service_<db> (FAILOVER true)"
+```
+
+**After every switchover, check the old primary.** A primary demoted cleanly
+(a switchover, which also ends every rolling update) keeps its own copies of
+the PeerDB slots. They are not synced, and the slot-sync worker then stops with
+`same name slot "…" already exists on the standby`, so that standby has no
+valid failover copy and pins old WAL. Drop them on that standby; the worker
+recreates them as synced copies within seconds:
+
+```bash
+kubectl -n product exec <old-primary> -c postgres -- psql -Atc \
+  "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots
+   WHERE slot_type = 'logical' AND NOT synced AND pg_is_in_recovery()"
+```
+
+The `pg_is_in_recovery()` guard makes it a no-op on the primary, where every
+slot reads `synced = false` and dropping one would break its mirror.
+
 **Restoring product-db** works on the `postgresql-cron` operand like any other
 recovery. `scripts/analytics/pgcron-restore-check.sh` restores a throwaway
 cluster from the Barman store and asserts pg_cron is available. A recovery
@@ -249,6 +280,8 @@ at a time:
 |---|---|---|
 | G7.1 | insert, update, NULL to value and back, delete on `orders` | each visible in the `_live` view in about 11 s; the delete leaves a tombstone in the raw table |
 | G7.2 | heartbeat age sampled for 10 min | max 40 s against the 120 s stale threshold |
+| G7.3 | promote a standby (`kubectl cnpg promote`) with writes before and after | 100/100 rows in ClickHouse 36 s later, no duplicates; the synced slots were active on the new primary |
+| G7.5 | pause a mirror, write ~1.2 GB of WAL past the 1 GB cap, resync | slot invalidated (`wal_status = lost`), data volume 36 %; resync back to RUNNING with every order in 33 s, the new slot created as a failover slot |
 | G7.4 | add and drop a column that is not on the allowlist | the column never reaches ClickHouse; the mirror stays RUNNING |
 | G7.8 | pause the pg_cron heartbeats (`GATE=kind scripts/analytics-freshness-drill.sh`) | stale at +126 s, 503 at +301 s, healthy 47 s after resuming |
 | G1.3, G2.5 | restore and rollback (`pgcron-*` scripts) | see above |

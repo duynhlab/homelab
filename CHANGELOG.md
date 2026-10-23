@@ -276,6 +276,12 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **CDC mirrors survive a promotion** (RFC-0030 G7.3, U7). PeerDB now creates
+  its replication slots with `FAILOVER true`, and CNPG's slot sync keeps a copy
+  on each standby. On Kind a promotion lost no rows: 100/100 arrived 36 s
+  later, with no duplicates and no resync. The CDC hub has the one-line fix for
+  slots created before the setting.
+
 - **The CDC edges have gate scripts** (RFC-0030 G1.3, G2.5, G3.6, G6.2,
   G6.4). `cdc-target-check.sh` checks the mirrors and slots, and with `--pii`
   proves marker rows reach neither the raw tables, the retained Avro staging

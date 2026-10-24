@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1331](https://github.com/duynhlab/homelab/issues/1331) — native Task sub-issues and tradeoff log |
-| **Adoption** | Partial — service, route and Admin page live (2026-10-23), but the serving layer is fixture-backed while the CDC mirrors (RFC-0030 phases 1–7) are **planned**, and the 90-day funnel query stays over the 500 ms bar as an owner-accepted known limit ([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)) |
+| **Adoption** | Partial — service, route and Admin page read real CDC data on Kind (2026-10-23); the admin default-window fix runs as `sha-e97325a` until the v0.5.2 release passes the full E2E audit (#1334); the 90-day funnel over the 500 ms bar is an owner-accepted known limit ([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)) |
 
 ## Context
 
@@ -258,3 +258,4 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
 | 2026-10-23 | Accepted / Partial | Service, edge route and Admin page deployed on a fixture-backed serving layer; compose A25/B11/C23 and Kind K3.12, K4.12–K4.14, K5.11 pass (homelab#1361, #1360); the one-million-fact performance bar fails (analytics-service#4) and holds the first tag |
 | 2026-10-23 | Accepted / Partial | Serving views read `FINAL` over `ReplacingMergeTree(_peerdb_version)` (homelab#1366) and the reader joins on typed keys (analytics-service#5); 90-day medians 0.23/0.25/0.38/0.55 s (daily/captured/products/funnel) on one million facts; owner accepted the funnel's miss of the 500 ms bar as a known limit and deferred the daily rollup (analytics-service#4) |
+| 2026-10-23 | Accepted / Partial | The serving layer now reads real CDC (RFC-0030 phases 1–7 complete); analytics freshness alerts load (#1373); a cold bring-up reaches a ready analytics-service with no manual step (#1378). Remaining: admin-service v0.5.2 |

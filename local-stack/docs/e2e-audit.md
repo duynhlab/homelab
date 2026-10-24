@@ -189,10 +189,10 @@ already mint their own for this reason.
 > | Rows | Command |
 > |---|---|
 > | A1, A2, A3, A7, A11 | `make e2e-smoke GATE=compose` |
-> | A4, A5 | `make e2e-session` — separate because A4 kills the realm session on purpose |
-> | A17, A18, A19, A21 | `make e2e-staff` |
+> | A4, A5 | `make e2e-session GATE=compose` — separate because A4 kills the realm session on purpose |
+> | A17, A18, A19, A21 | `make e2e-staff GATE=compose` |
 > | A25 | `make e2e-analytics-api GATE=compose`, then `GATE=compose scripts/analytics-freshness-drill.sh` and `GATE=compose scripts/analytics-failure-drill.sh` |
-> | A20 | `make e2e-operator` |
+> | A20 | `make e2e-operator GATE=compose` |
 > | C6, C16, C17, C18, C19, C20, C21 | `make e2e-smoke GATE=compose`, `make e2e-observability` |
 >
 > **How far this has been verified, precisely.** Every one of these scripts has
@@ -2273,15 +2273,17 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 #      `analytics.overview`, which parents a `SELECT analytics.*` CLIENT span
 #      -- whose trace id ClickHouse's own query_log also carries, so the
 #      correlation holds on the server side too.
+#      The PromQL goes through -G --data-urlencode: curl treats a bare `{…}` in a
+#      URL as a glob, and VictoriaMetrics then answers an error with no `data`.
 for m in analytics_source_lag_seconds analytics_source_state_ratio analytics_freshness_last_success_time_seconds; do
-  curl -s "http://localhost:8428/api/v1/query?query=count($m{service_name=\"analytics\"})" \
+  curl -sG http://localhost:8428/api/v1/query --data-urlencode "query=count($m{service_name=\"analytics\"})" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; n=int(r[0]['value'][1]) if r else 0; \
       print('C23 $m series:', 'OK %d' % n if n > 0 else 'FAIL 0')"
 done
-curl -s 'http://localhost:8428/api/v1/query?query=sum(analytics_source_state_ratio{service_name="analytics"})%20by%20(analytics_source_name)' \
+curl -sG http://localhost:8428/api/v1/query --data-urlencode 'query=sum(analytics_source_state_ratio{service_name="analytics"}) by (analytics_source_name)' \
   | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
     print('C23 one-hot per source:', 'OK' if r and all(v['value'][1]=='1' for v in r) and len(r)==3 else 'FAIL %r' % [(v['metric'].get('analytics_source_name'), v['value'][1]) for v in r])"
-curl -s 'http://localhost:8428/api/v1/query?query=count(db_client_operation_duration_seconds_count{service_name="analytics",db_system_name="clickhouse"})' \
+curl -sG http://localhost:8428/api/v1/query --data-urlencode 'query=count(db_client_operation_duration_seconds_count{service_name="analytics",db_system_name="clickhouse"})' \
   | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; n=int(r[0]['value'][1]) if r else 0; \
     print('C23 db.client.operation.duration (clickhouse):', 'OK %d series' % n if n > 0 else 'FAIL 0')"
 curl -s "$CH" -u default:otel --data-binary "

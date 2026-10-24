@@ -1064,6 +1064,10 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **admin-service `0.5.2`** replaces the `sha-e97325a` pin: the same commit,
+  now released after the full local-stack E2E audit (A/B/C, C22) on
+  2026-10-24. The Analytics page's default window includes today (#1334).
+
 - **analytics-service 0.1.0 and Backoffice 0.5.1.** analytics-service's
   first release (replacing `sha-8e4667f`) carries the typed ledger joins and
   the orders semi-join (analytics-service#5); with the `FINAL` serving views the

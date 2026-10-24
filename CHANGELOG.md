@@ -858,6 +858,18 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **A cold bring-up no longer deadlocks on the CDC grants** (RFC-0030). The
+  exact-table grants for the PeerDB roles, and the publications, named app
+  tables that only the service migrations create. In `databases-local`, whose
+  `wait: true` waits on every object it applies, they kept that wave from ever
+  going Ready, so `apps-local` and its migrations never started. Each service
+  policy's failed plan also withheld the runtime default privileges. pgroles
+  allows one policy per database, so `product-db-cdc-bootstrap` now owns the
+  CDC grants: SELECT on exactly the tables each publication carries, revoked
+  and granted in one transaction, re-asserted every 10 min. The publications
+  move to the `cdc-local` wave (`configs/cdc/source/`), and `peerdb-bootstrap`
+  waits until every published table is readable before it creates a mirror.
+
 - **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
   recycle pooled connections within about 60 s (`DB_POOL_MAX_CONN_LIFETIME=45s`,
   `DB_POOL_HEALTH_CHECK_PERIOD=10s`) and PgDog's `preStop` is 70 s (grace 140 s),

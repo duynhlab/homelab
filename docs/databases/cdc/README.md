@@ -124,7 +124,7 @@ sequenceDiagram
 ## Platform behavior
 
 **What crosses is declared, twice.** The column-listed CNPG `Publication`s
-(`kubernetes/infra/configs/databases/clusters/product-db/cdc/publications.yaml`)
+(`kubernetes/infra/configs/cdc/source/publications.yaml`)
 decide what PostgreSQL emits; each mirror's table mapping excludes every
 column outside the same allowlist, so a column added upstream reaches neither
 the stream nor the target. The allowlist file exists twice —
@@ -134,7 +134,21 @@ publications and `views.sql` are generated from it: change them together.
 
 **Who may read what.** Each `peerdb_<db>` is a CNPG `DatabaseRole` (REPLICATION
 is a superuser-only attribute) with SELECT on its published tables only,
-declared in the pgroles policies, which revoke anything undeclared. product-db's
+granted by `product-db-cdc-bootstrap` (Job, then a CronJob every 10 min): in one
+transaction it revokes the role's table privileges and grants SELECT on exactly
+the tables in publication `analytics_<db>`, so the publication is the only list.
+
+**Why not pgroles, and why the publications sit in the CDC wave.** The grants
+and the publications name app tables, which the service migrations create in
+`apps-local`. Inside the service pgroles policies, in `databases-local` (whose
+`wait: true` waits on every object it applies), they deadlocked a cold
+bring-up: the wave waited on grants for tables that exist only once it is
+Ready, and each failed plan also withheld the runtime default privileges.
+pgroles allows one policy per database, so a separate CDC policy is refused
+(`ConflictingPolicy`). The publications now live in `cdc-local` and converge
+once the tables exist; the bootstrap CronJob grants what they publish; and
+`peerdb-bootstrap` waits for every published table to be readable as
+`peerdb_<db>` before it creates a mirror (cold bring-up, 2026-10-23). product-db's
 HBA admits each role to its own database only; PeerDB reaches product-db only
 through the CDC pooler, which a NetworkPolicy opens to the `peerdb` namespace
 alone. In ClickHouse, `analytics_ingest` owns the `analytics` database and

@@ -5,4 +5,5 @@ kind: Kustomization
 resources:
   - catalog.yaml
   - helmrelease.yaml
+  - source/
   - bootstrap/

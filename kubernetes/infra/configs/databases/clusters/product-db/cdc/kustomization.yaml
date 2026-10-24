@@ -1,13 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# CDC source on product-db (RFC-0030 phase 3): roles, publications, heartbeat
-# bootstrap and the session-mode PgBouncer pooler PeerDB connects through.
+# CDC source on product-db (RFC-0030 phase 3): roles, heartbeat bootstrap and
+# the session-mode PgBouncer pooler PeerDB connects through. The publications
+# name app tables, so they live in the cdc-local wave (configs/cdc/source/);
+# bootstrap.sh grants SELECT on whatever they publish.
 resources:
   - secrets.yaml
   - roles.yaml
   - bootstrap.yaml
-  - publications.yaml
   - pooler.yaml
 
 configMapGenerator:

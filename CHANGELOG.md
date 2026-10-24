@@ -709,6 +709,11 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0030 CDC half complete.** ADR-066, ADR-067 and ADR-068 are
+  `Accepted / Complete`: drills, alerts, failover slots and a cold bring-up all
+  passed on Kind. ADR-069 stays `Partial` until the admin-service v0.5.2
+  release passes the E2E audit (#1334).
+
 - **ADR-069 Adoption `Not started` → `Partial`; RFC-0030 phases 8–10 landed**
   (#1360, #1361). The service, the edge route and the Backoffice page are
   deployed on a fixture-backed serving layer and pass their compose and Kind

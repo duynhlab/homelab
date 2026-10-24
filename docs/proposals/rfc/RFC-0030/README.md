@@ -624,9 +624,9 @@ deployed, not the decision.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Adopt self-hosted PeerDB PostgreSQL → ClickHouse CDC with isolated reuse of Temporal, RustFS, and `platform-db` | [ADR-066](../../adr/ADR-066-adopt-peerdb-for-commerce-cdc/) | Accepted / Not started |
-| Manage allowlisted base-table columns through CNPG `Publication` resources and accept table-wide source `SELECT` for the replication credential | [ADR-067](../../adr/ADR-067-constrain-commerce-cdc-source-allowlist/) | Accepted / Not started |
-| Package and operate `pg_cron` in a custom CNPG system image for target-observed heartbeat scheduling | [ADR-068](../../adr/ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Accepted / Not started |
+| Adopt self-hosted PeerDB PostgreSQL → ClickHouse CDC with isolated reuse of Temporal, RustFS, and `platform-db` | [ADR-066](../../adr/ADR-066-adopt-peerdb-for-commerce-cdc/) | Accepted / Complete |
+| Manage allowlisted base-table columns through CNPG `Publication` resources and accept table-wide source `SELECT` for the replication credential | [ADR-067](../../adr/ADR-067-constrain-commerce-cdc-source-allowlist/) | Accepted / Complete |
+| Package and operate `pg_cron` in a custom CNPG system image for target-observed heartbeat scheduling | [ADR-068](../../adr/ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Accepted / Complete |
 | Add a thin read-only `analytics-service` as the ADR-048 aggregation escape hatch | [ADR-069](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) | Accepted / Partial |
 
 The as-built contract is [`docs/api/analytics.md`](../../../api/analytics.md);
@@ -651,6 +651,13 @@ not qualify later commits or a pooled-source deployment.
 by ADR-089; dependent RFC-0030 tasks reuse its access/rotation evidence.
 
 ## Implementation history
+
+- 2026-10-23 — Phase 7 and the cold bring-up: drills G7.1–G7.8 passed and are
+  recorded in the [CDC hub](../../../databases/cdc/README.md); PeerDB metrics and
+  eleven CDC and analytics alerts (#1373); failover slots that survive a
+  promotion (#1376); the CDC grants follow the publications, which moved to the
+  `cdc-local` wave after a cold `make up` deadlocked (#1378). ADR-066/067/068 are
+  Complete; ADR-069 waits on the admin-service v0.5.2 release (#1334).
 
 - 2026-10-23 — Phases 1–6 on Kind (#1368, #1369 and this change): pg_cron operand
   `postgresql-cron` 1.0.0 via an `ImageCatalog`, PeerDB 0.9.17 (core v0.37.5) from

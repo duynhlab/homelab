@@ -11,7 +11,7 @@
           <mxGeometry x="40" y="54" width="900" height="36" as="geometry" />
         </mxCell>
         <mxCell id="cluster" value="Mini-PC cluster / proposed, not deployed" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#1E293B;fontFamily=Helvetica;fontSize=14;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="375" width="620" height="610" as="geometry" />
+          <mxGeometry x="40" y="385" width="620" height="610" as="geometry" />
         </mxCell>
         <mxCell id="admin" value="&lt;b&gt;Operator device&lt;/b&gt;&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="85" y="106" width="230" height="58" as="geometry" />
@@ -38,7 +38,7 @@
           <mxGeometry x="335" y="45" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="hostapi" value="&lt;b&gt;Host management API&lt;/b&gt;&lt;br&gt;Talos if selected / LAN route&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="675" y="420" width="250" height="70" as="geometry" />
+          <mxGeometry x="675" y="430" width="250" height="70" as="geometry" />
         </mxCell>
         <mxCell id="api" value="&lt;b&gt;Kubernetes API&lt;/b&gt;&lt;br&gt;Kubernetes RBAC&lt;br&gt;planned" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;image=data:image/png,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;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;dashed=1;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
           <mxGeometry x="45" y="205" width="230" height="70" as="geometry" />
@@ -61,20 +61,20 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="tail_proxy" value="Permitted API access (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tailscale" target="proxy">
-          <mxGeometry relative="1" as="geometry" x="-0.93">
+          <mxGeometry relative="1" as="geometry" x="-0.03">
             <Array as="points">
-              <mxPoint x="200" y="355" />
-              <mxPoint x="345.53" y="355" />
-              <mxPoint x="345.53" y="405" />
-              <mxPoint x="200" y="405" />
+              <mxPoint x="200" y="358" />
+              <mxPoint x="345.53" y="358" />
+              <mxPoint x="345.53" y="415" />
+              <mxPoint x="200" y="415" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="proxy_api" value="Authenticated requests (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="proxy" target="api">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
-              <mxPoint x="200" y="535" />
-              <mxPoint x="200" y="535" />
+              <mxPoint x="200" y="545" />
+              <mxPoint x="200" y="545" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -87,34 +87,34 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="access_tunnel" value="Tunnel delivery (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cf" target="tunnel">
-          <mxGeometry relative="1" as="geometry" x="-0.01">
+          <mxGeometry relative="1" as="geometry" x="0.28">
             <Array as="points">
-              <mxPoint x="510" y="355" />
-              <mxPoint x="510" y="355" />
+              <mxPoint x="510" y="358" />
+              <mxPoint x="510" y="358" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="tunnel_envoy" value="Validated origin HTTPS (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tunnel" target="envoy">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
-              <mxPoint x="510" y="535" />
-              <mxPoint x="510" y="535" />
+              <mxPoint x="510" y="545" />
+              <mxPoint x="510" y="545" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="envoy_apps" value="Allowed web routes (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="apps">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
-              <mxPoint x="510" y="695" />
-              <mxPoint x="510" y="695" />
+              <mxPoint x="510" y="705" />
+              <mxPoint x="510" y="705" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="apps_oidc" value="Existing identity contract (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="apps" target="keycloak">
           <mxGeometry relative="1" as="geometry" x="-0.7">
             <Array as="points">
-              <mxPoint x="510" y="855" />
-              <mxPoint x="510" y="855" />
+              <mxPoint x="510" y="865" />
+              <mxPoint x="510" y="865" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -129,22 +129,22 @@
         <mxCell id="lan_host" value="Host recovery (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="lan" target="hostapi">
           <mxGeometry relative="1" as="geometry" x="-0.01">
             <Array as="points">
-              <mxPoint x="800" y="355" />
-              <mxPoint x="800" y="355" />
+              <mxPoint x="800" y="358" />
+              <mxPoint x="800" y="358" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="separate" value="&lt;b&gt;Access boundaries&lt;/b&gt;&lt;br&gt;The LAN column is independent recovery, not a Tailscale Operator feature. A remote Talos/LAN route is still an open design. Access IdP is not selected; the Keycloak card represents application identity only. No WARP is required." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1015" width="900" height="60" as="geometry" />
+          <mxGeometry x="40" y="1025" width="900" height="60" as="geometry" />
         </mxCell>
         <mxCell id="policy" value="&lt;b&gt;Publication and authorization&lt;/b&gt;&lt;br&gt;This view follows private web access. Explicit public web routes are a separate allowlist decision and retain application auth. Management APIs and datastores have no public Tunnel route. Selected private services need their own tailnet restrictions; this view shows the Kubernetes API path." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1087" width="900" height="60" as="geometry" />
+          <mxGeometry x="40" y="1097" width="900" height="60" as="geometry" />
         </mxCell>
         <mxCell id="origin" value="&lt;b&gt;Origin and recovery gates&lt;/b&gt;&lt;br&gt;Validate Access tokens at cloudflared or the origin; preserve Host/SNI and TLS verification. Review forwarded headers and admin CIDR trust. Recovery credentials and LAN procedures must work without connectors or in-cluster identity." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1159" width="900" height="60" as="geometry" />
+          <mxGeometry x="40" y="1169" width="900" height="60" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1249" width="900" height="66" as="geometry" />
+          <mxGeometry x="40" y="1259" width="900" height="66" as="geometry" />
         </mxCell>
         <mxCell id="legend-role-planned" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;dashed=1;fillColor=#FFFFFF;strokeColor=#64748B;strokeWidth=1.5;" vertex="1" parent="legend">
           <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />

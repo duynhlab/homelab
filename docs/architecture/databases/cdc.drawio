@@ -11,28 +11,28 @@
           <mxGeometry x="40" y="54" width="780" height="36" as="geometry" />
         </mxCell>
         <mxCell id="f_cluster" value="Kind cluster · homelab" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#1E293B;fontFamily=Helvetica;fontSize=14;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="100" width="780" height="1040" as="geometry" />
+          <mxGeometry x="40" y="100" width="780" height="1190" as="geometry" />
         </mxCell>
         <mxCell id="f_product" value="product namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
           <mxGeometry x="120" y="40" width="540" height="320" as="geometry" />
         </mxCell>
         <mxCell id="f_peerdb" value="peerdb namespace · PeerDB v0.37.5" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="20" y="390" width="740" height="120" as="geometry" />
+          <mxGeometry x="20" y="410" width="740" height="120" as="geometry" />
         </mxCell>
         <mxCell id="f_platform" value="platform namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="120" y="540" width="190" height="140" as="geometry" />
+          <mxGeometry x="120" y="630" width="190" height="140" as="geometry" />
         </mxCell>
         <mxCell id="f_temporal" value="temporal namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="320" y="550" width="200" height="120" as="geometry" />
+          <mxGeometry x="320" y="640" width="200" height="120" as="geometry" />
         </mxCell>
         <mxCell id="f_rustfs" value="rustfs namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="530" y="530" width="210" height="160" as="geometry" />
+          <mxGeometry x="530" y="620" width="210" height="160" as="geometry" />
         </mxCell>
         <mxCell id="f_ch" value="monitoring namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="260" y="720" width="500" height="150" as="geometry" />
+          <mxGeometry x="260" y="850" width="500" height="150" as="geometry" />
         </mxCell>
         <mxCell id="f_analytics" value="analytics namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="540" y="900" width="220" height="120" as="geometry" />
+          <mxGeometry x="540" y="1050" width="220" height="120" as="geometry" />
         </mxCell>
         <mxCell id="cron" value="&lt;b&gt;pg_cron (inside product-db)&lt;/b&gt;&lt;br&gt;heartbeat upsert every 30 s&lt;br&gt;per database" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#FEF3C7;strokeColor=#D97706;strokeWidth=1.5;fontColor=#78350F;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_product">
           <mxGeometry x="20" y="55" width="180" height="70" as="geometry" />
@@ -97,46 +97,46 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="e_cdc" value="pgoutput + snapshot copy · TLS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.29;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pooler" target="worker">
-          <mxGeometry relative="1" as="geometry" x="-0.95">
+          <mxGeometry relative="1" as="geometry" x="-0.31">
             <Array as="points">
-              <mxPoint x="545" y="475" />
-              <mxPoint x="810" y="475" />
-              <mxPoint x="810" y="520" />
-              <mxPoint x="690" y="520" />
+              <mxPoint x="545" y="485" />
+              <mxPoint x="569.97" y="485" />
+              <mxPoint x="569.97" y="540" />
+              <mxPoint x="690" y="540" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_snap" value="creates slot · exports snapshot" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pooler" target="snapshot">
-          <mxGeometry relative="1" as="geometry" x="0.82">
+          <mxGeometry relative="1" as="geometry" x="0.85">
             <Array as="points">
-              <mxPoint x="520" y="475" />
-              <mxPoint x="160" y="475" />
+              <mxPoint x="520" y="485" />
+              <mxPoint x="160" y="485" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_stage" value="Avro batches" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.14;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="rustfs">
-          <mxGeometry relative="1" as="geometry" x="0.12">
+          <mxGeometry relative="1" as="geometry" x="0.06">
             <Array as="points">
-              <mxPoint x="625" y="615" />
-              <mxPoint x="620" y="615" />
+              <mxPoint x="625" y="654" />
+              <mxPoint x="620" y="654" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_load" value="load + normalize" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.19;exitY=1;exitDx=0;exitDy=0;entryX=0.66;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="raw">
-          <mxGeometry relative="1" as="geometry" x="-0.32">
+          <mxGeometry relative="1" as="geometry" x="0.92">
             <Array as="points">
-              <mxPoint x="635" y="620" />
-              <mxPoint x="830" y="620" />
-              <mxPoint x="830" y="810" />
-              <mxPoint x="465" y="810" />
+              <mxPoint x="635" y="668" />
+              <mxPoint x="810" y="668" />
+              <mxPoint x="810" y="923" />
+              <mxPoint x="465" y="923" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_s3" value="read by s3()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.34;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="rustfs" target="raw">
-          <mxGeometry relative="1" as="geometry" x="0.72">
+          <mxGeometry relative="1" as="geometry" x="0.66">
             <Array as="points">
-              <mxPoint x="620" y="800" />
-              <mxPoint x="395" y="800" />
+              <mxPoint x="620" y="907" />
+              <mxPoint x="395" y="907" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -144,60 +144,60 @@
           <mxGeometry relative="1" as="geometry" x="-0.4" />
         </mxCell>
         <mxCell id="e_read" value=":9000 SELECT" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.12;exitY=1;exitDx=0;exitDy=0;entryX=0.14;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="views" target="analytics">
-          <mxGeometry relative="1" as="geometry" x="0.24">
+          <mxGeometry relative="1" as="geometry" x="0.46">
             <Array as="points">
-              <mxPoint x="635" y="985" />
-              <mxPoint x="625" y="985" />
+              <mxPoint x="635" y="1125" />
+              <mxPoint x="625" y="1125" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_wf" value="polls workflows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.06;exitY=1;exitDx=0;exitDy=0;entryX=0.12;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="temporal">
-          <mxGeometry relative="1" as="geometry" x="-0.93">
+          <mxGeometry relative="1" as="geometry" x="-0.77">
             <Array as="points">
-              <mxPoint x="610" y="625" />
-              <mxPoint x="400" y="625" />
+              <mxPoint x="610" y="696" />
+              <mxPoint x="400" y="696" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_api_wf" value="starts mirrors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.67;exitY=1;exitDx=0;exitDy=0;entryX=0.06;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="temporal">
-          <mxGeometry relative="1" as="geometry" x="-0.92">
+          <mxGeometry relative="1" as="geometry" x="0.55">
             <Array as="points">
-              <mxPoint x="530" y="620" />
-              <mxPoint x="390" y="620" />
+              <mxPoint x="530" y="682" />
+              <mxPoint x="390" y="682" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_state" value="mirror state" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.33;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="catalog">
-          <mxGeometry relative="1" as="geometry" x="-0.53">
+          <mxGeometry relative="1" as="geometry" x="0.43">
             <Array as="points">
-              <mxPoint x="490" y="620" />
-              <mxPoint x="360" y="620" />
-              <mxPoint x="360" y="670" />
-              <mxPoint x="275" y="670" />
+              <mxPoint x="490" y="668" />
+              <mxPoint x="205.37" y="668" />
+              <mxPoint x="205.37" y="760" />
+              <mxPoint x="275" y="760" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="e_migrate" value="migrates schema" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.81;exitY=1;exitDx=0;exitDy=0;entryX=0.32;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="catalog">
-          <mxGeometry relative="1" as="geometry" x="-0.42">
+          <mxGeometry relative="1" as="geometry" x="-0.92">
             <Array as="points">
-              <mxPoint x="390" y="615" />
-              <mxPoint x="360" y="615" />
-              <mxPoint x="360" y="670" />
-              <mxPoint x="225" y="670" />
+              <mxPoint x="390" y="654" />
+              <mxPoint x="205.37" y="654" />
+              <mxPoint x="205.37" y="760" />
+              <mxPoint x="225" y="760" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="note_scope" value="&lt;b&gt;What crosses&lt;/b&gt;&lt;br&gt;The column-listed publications decide what PostgreSQL emits, and each mirror's column exclusions decide what PeerDB writes, so a non-allowlisted column never reaches ClickHouse, the Avro staging or PeerDB's logs (gate G6.4). peerdb-bootstrap admits one source at a time: order, then checkout, then payment, each after its heartbeat and every table's row count arrive. Beside each raw table PeerDB keeps a _peerdb_raw_&amp;lt;mirror&amp;gt; staging table; the _live views run as definer analytics_view_owner, so analytics_reader needs no grant on the raw tables." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1170" width="780" height="80" as="geometry" />
+          <mxGeometry x="40" y="1320" width="780" height="80" as="geometry" />
         </mxCell>
         <mxCell id="note_boot" value="&lt;b&gt;Who creates the path&lt;/b&gt;&lt;br&gt;Nothing is created by hand. In the cdc-local wave, peerdb-bootstrap calls flow-api to upsert the peers and create the three mirrors, and analytics-views creates the ten *_live views once the raw tables exist. product-db-cdc-bootstrap, in the databases wave (Job, then a CronJob every 10 min), creates the heartbeat tables, schedules the pg_cron jobs and grants peerdb_&amp;lt;db&amp;gt; SELECT on exactly the tables its publication carries." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1262" width="780" height="70" as="geometry" />
+          <mxGeometry x="40" y="1412" width="780" height="70" as="geometry" />
         </mxCell>
         <mxCell id="note_tls" value="&lt;b&gt;Credentials and TLS&lt;/b&gt;&lt;br&gt;Every PostgreSQL hop verifies the homelab-ca certificate: PeerDB to the CDC pooler, the pooler to the primary, and PeerDB to its catalog. ClickHouse and RustFS are plaintext inside the cluster: ClickHouse TLS is ADR-069 obligation T1, and RustFS's shared key is the open part of ADR-066's isolation obligation (#1315). PeerDB logs in to each database as peerdb_&amp;lt;db&amp;gt; and to ClickHouse (native :9000) as analytics_ingest; analytics-service reads only the views, as analytics_reader. The flow-snapshot-worker holds the slot's exported snapshot while flow-worker copies the tables from it; flow-worker also writes mirror state to the catalog." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1344" width="780" height="100" as="geometry" />
+          <mxGeometry x="40" y="1494" width="780" height="100" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1474" width="780" height="110" as="geometry" />
+          <mxGeometry x="40" y="1624" width="780" height="110" as="geometry" />
         </mxCell>
         <mxCell id="legend-role-worker" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;strokeWidth=1.5;" vertex="1" parent="legend">
           <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />

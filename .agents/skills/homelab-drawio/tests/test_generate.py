@@ -287,6 +287,17 @@ class TestGenerate(unittest.TestCase):
                     self.assertEqual(generate.build(generate.load_ir(path)), fh.read(),
                                      "stale: run generate.py on this IR")
 
+    def test_repo_edges_stay_in_their_frames(self):
+        """No generated edge leaves the frame around both its ends, rides a
+        frame border, or runs a few px beside another edge."""
+        import validate
+        irs = sorted(glob.glob(os.path.join(REPO, "docs", "**", "*.ir.yaml"), recursive=True))
+        for path in irs:
+            with self.subTest(ir=os.path.relpath(path, REPO)):
+                found = {f["rule_id"] for f in validate.validate(path[: -len(".ir.yaml")] + ".drawio")}
+                self.assertFalse(found & {"geometry.edge_leaves_frame", "geometry.edge_on_frame_border",
+                                          "geometry.lanes_too_close"}, found)
+
 
 if __name__ == "__main__":
     unittest.main()

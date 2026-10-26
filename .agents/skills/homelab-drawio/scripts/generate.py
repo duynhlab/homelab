@@ -56,6 +56,9 @@ ICON_SIZE = 24         # px of the logo itself
 CYLINDER_CAP = 8       # px of the cylinder's top ellipse (`size=8`)
 LINE_H = 1.3           # line height, in em
 LANE_MIN = 10          # px between two lanes in a channel
+BORDER_GAP = 10        # px an edge run keeps from a frame border it runs beside
+LANE_GAP = 14          # px between two parallel lanes; a channel grows to fit its lanes
+ROUTE_PASSES = 4       # routing passes while channels are still growing
 EDGE_FONT = 10
 
 LEGEND_ROLE = {
@@ -427,22 +430,70 @@ class Layout:
             parent = bounds[parent].get("parent")
         return spans
 
-    def channel(self, upper: int) -> tuple[float, float]:
-        """Free vertical band between layer `upper` and `upper + 1`."""
+    def frames_around(self, nid: str) -> list[str]:
+        """The frames around `nid`, innermost first."""
+        bounds = {b["id"]: b for b in self.ir.get("boundaries", [])}
+        cur = {n["id"]: n.get("parent") for n in self.ir["nodes"]}.get(nid, bounds.get(nid, {}).get("parent"))
+        out = []
+        while cur:
+            out.append(cur)
+            cur = bounds[cur].get("parent")
+        return out
+
+    def scope(self, s: str, t: str) -> str | None:
+        """The innermost frame around both ends: the edge must not leave it."""
+        around_t = set(self.frames_around(t)) | {t}
+        return next((f for f in self.frames_around(s) if f in around_t and f in self.frame), None)
+
+    def insert_space(self, at: float, d: float) -> None:
+        """Open `d` px of vertical space at y=`at`: everything below moves
+        down, and every frame that spans or ends at `at` grows."""
+        for r in [*self.box.values(), *self.frame.values()]:
+            if r[1] >= at:
+                r[1] += d
+            elif r[1] + r[3] >= at:
+                r[3] += d
+        self.spline = {k: [(x, y + d if y >= at else y) for x, y in v] for k, v in self.spline.items()}
+        self.rows = [None if r is None else (r[0] + d if r[0] >= at else r[0], r[1] + d if r[1] >= at else r[1])
+                     for r in self.rows]
+
+    def channel(self, upper: int, scope: str | None = None) -> tuple[float, float]:
+        """Free vertical band between layer `upper` and `upper + 1`. A run
+        stays inside its scope frame (and the frames around it) and outside
+        every other frame, BORDER_GAP clear of each border."""
         lo, hi = self.rows[upper][1], self.rows[upper + 1][0]
         raw = (lo, hi)
-        for x, y, w, h in self.frame.values():
+        inside = set([scope, *self.frames_around(scope)]) if scope else set()
+        for fid, (x, y, w, h) in self.frame.items():
+            if fid in inside:
+                if lo < y + h <= hi:
+                    hi = min(hi, y + h)
+                if lo <= y < hi:
+                    lo = max(lo, y + FRAME_TITLE_H + 2)
+                continue
             if lo < y + h <= hi:
                 lo = max(lo, y + h)
             if lo <= y < hi:
                 hi = min(hi, y)
         if hi - lo >= 2 * LANE_MIN:
-            return (lo, hi)
+            # Lanes sit strictly inside the band; the gap keeps the outermost
+            # off the borders without starving a narrow band of lanes.
+            g = min(BORDER_GAP, (hi - lo - 2 * LANE_MIN) / 2)
+            return (lo + g, hi - g)
+        if hi > lo:
+            return (lo, hi)  # a real but narrow gutter: route_edges widens it
         # Frames touch, so there is no gap between them. Run the lanes inside
-        # the lower frame instead, but never in a frame's title band.
+        # the lower frame instead, but never in a frame's title band or on a
+        # border.
+        # Lanes sit strictly inside a free stretch, so a small gap is enough
+        # here; a full BORDER_GAP would push them into the frames below.
+        gap = BORDER_GAP / 2 - 1
+        blocked = [(f[1] - gap, f[1] + FRAME_TITLE_H + 2) for f in self.frame.values()
+                   if raw[0] <= f[1] < raw[1]]
+        blocked += [(f[1] + f[3] - gap, f[1] + f[3] + gap) for f in self.frame.values()
+                    if raw[0] <= f[1] + f[3] <= raw[1]]
         free, cur = [], raw[0]
-        for y0, y1 in sorted((f[1], f[1] + FRAME_TITLE_H + 2) for f in self.frame.values()
-                             if raw[0] <= f[1] < raw[1]):
+        for y0, y1 in sorted(blocked):
             if y0 > cur:
                 free.append((cur, y0))
             cur = max(cur, y1)
@@ -450,16 +501,45 @@ class Layout:
             free.append((cur, raw[1]))
         return max(free, key=lambda r: (r[1] - r[0], -r[0])) if free else raw
 
-    def free_x(self, layer: int, x: float, exclude: set[str]) -> float:
-        """Nearest x in `layer` whose vertical line hits no node."""
-        spans = sorted([(b[0], b[0] + b[2]) for n, b in self.box.items()
-                        if self.li[n] == layer and n not in exclude] + self._titles_opening(layer))
+    def clear_of_sides(self, x: float, y0: float, y1: float) -> float:
+        """`x`, moved right until a vertical run from y0 to y1 keeps
+        BORDER_GAP from every frame's side border."""
+        lo, hi = min(y0, y1), max(y0, y1)
+        moved = True
+        while moved:
+            moved = False
+            for fx, fy, fw, fh in self.frame.values():
+                if fy < hi and fy + fh > lo:
+                    for side in (fx, fx + fw):
+                        if abs(x - side) < BORDER_GAP:
+                            x, moved = side + BORDER_GAP, True
+        return x
+
+    def free_x(self, layer: int, x: float, exclude: set[str], scope: str | None = None) -> float:
+        """Nearest x in `layer` whose vertical line hits no node, runs on no
+        frame border, and stays inside the scope frame."""
+        spans = [(b[0], b[0] + b[2]) for n, b in self.box.items()
+                 if self.li[n] == layer and n not in exclude] + self._titles_opening(layer)
+        # The run spans the channels on either side of the layer, so it must
+        # clear the side borders of frames that open or close in them too.
+        top, bottom = self.rows[layer]
+        if layer > 0 and self.rows[layer - 1]:
+            top = self.rows[layer - 1][1]
+        if layer + 1 < len(self.rows) and self.rows[layer + 1]:
+            bottom = self.rows[layer + 1][0]
+        for fx, fy, fw, fh in self.frame.values():  # side borders beside this run
+            if fy < bottom and fy + fh > top:
+                spans += [(fx, fx), (fx + fw, fx + fw)]
+        if scope:
+            f = self.frame[scope]
+            spans += [(-1e8, f[0]), (f[0] + f[2], 1e8)]
+        spans.sort()
         if all(not (a - 10 < x < b + 10) for a, b in spans):
             return x
         gaps, prev = [], -1e9
         for a, b in spans:
             gaps.append((prev + 10, a - 10))
-            prev = b
+            prev = max(prev, b)
         gaps.append((prev + 10, 1e9))
         best = min((g for g in gaps if g[1] - g[0] >= 0),
                    key=lambda g: min(abs(x - max(g[0], min(x, g[1]))), 1e9))
@@ -496,10 +576,46 @@ def _route_into_frame(lay: Layout, sb: list, fr: list, title: list) -> dict:
     return {"points": [(sx, y), (tx, y)], "ports": ports}
 
 
+def _side_ports(lay: Layout, s: str, t: str) -> tuple | None:
+    """Ports for a straight side-to-side run between two peers of one layer
+    with nothing between their facing sides; None when there is no such run."""
+    sb, tb = lay.box[s], lay.box[t]
+    left, right = (sb, tb) if sb[0] < tb[0] else (tb, sb)
+    y = (max(sb[1], tb[1]) + min(sb[1] + sb[3], tb[1] + tb[3])) / 2
+    blocked = any(n not in (s, t) and lay.li[n] == lay.li[s] and left[0] + left[2] <= b[0] < right[0]
+                  and b[1] < y < b[1] + b[3] for n, b in lay.box.items())
+    if blocked or max(sb[1], tb[1]) >= min(sb[1] + sb[3], tb[1] + tb[3]):
+        return None
+    sx = 1 if sb[0] < tb[0] else 0
+    return (sx, (y - sb[1]) / sb[3], 1 - sx, (y - tb[1]) / tb[3])
+
+
 def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
-    """Per edge: ports (exit/entry fractions) and absolute waypoints."""
+    """Per edge: ports (exit/entry fractions) and absolute waypoints.
+
+    Dot spaces the layers without knowing how many lanes a channel will
+    carry, so route, widen every channel too narrow for its lanes
+    (LANE_GAP apart, which grows the gutter between the frames around it),
+    and route again until nothing grows."""
+    for _ in range(ROUTE_PASSES):
+        routes, bands = _route_pass(ir, lay)
+        grow: dict[float, float] = {}
+        for (lo, hi), n in bands.items():
+            short = (n + 1) * LANE_GAP - (hi - lo)
+            if short > 0:
+                grow[hi] = max(grow.get(hi, 0), short)
+        if not grow:
+            return routes
+        for at, d in sorted(grow.items(), reverse=True):
+            lay.insert_space(at, _ceil(d))
+    return _route_pass(ir, lay)[0]
+
+
+def _route_pass(ir: dict, lay: Layout) -> tuple[dict[str, dict], dict[tuple[float, float], int]]:
+    """One routing pass: the routes, and how many lanes each channel band holds."""
     routes: dict[str, dict] = {}
     plans = []
+    scope_of: dict[str, str | None] = {}
     for e in ir["edges"]:
         s, t = e["source"], e["target"]
         if t in lay.frame:
@@ -511,15 +627,12 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
         if e.get("via"):
             routes[e["id"]] = {"points": [tuple(p) for p in e["via"]], "ports": None}
             continue
+        scope_of[e["id"]] = lay.scope(s, t)
         if ls == lt:
             # Facing sides with nothing between: a straight side-to-side run.
-            left, right = (sb, tb) if sb[0] < tb[0] else (tb, sb)
-            y = (max(sb[1], tb[1]) + min(sb[1] + sb[3], tb[1] + tb[3])) / 2
-            blocked = any(n not in (s, t) and lay.li[n] == ls and left[0] + left[2] <= b[0] < right[0]
-                          and b[1] < y < b[1] + b[3] for n, b in lay.box.items())
-            if not blocked and max(sb[1], tb[1]) < min(sb[1] + sb[3], tb[1] + tb[3]):
-                sx = 1 if sb[0] < tb[0] else 0
-                routes[e["id"]] = {"points": [], "ports": (sx, (y - sb[1]) / sb[3], 1 - sx, (y - tb[1]) / tb[3])}
+            ports = _side_ports(lay, s, t)
+            if ports:
+                routes[e["id"]] = {"points": [], "ports": ports}
                 continue
             down = ls + 1 < len(lay.layers) and lay.rows[ls + 1] is not None
             chans = [ls if down else ls - 1]
@@ -534,7 +647,7 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
             x = _x_at(poly, ky)
             if x is None:
                 x = (sb[0] + sb[2] / 2 + tb[0] + tb[2] / 2) / 2
-            mids.append(lay.free_x(k, _snap(x), {s, t}))
+            mids.append(lay.free_x(k, _snap(x), {s, t}, scope_of[e["id"]]))
         plans.append((e, "bottom" if step == 1 else "top", "top" if step == 1 else "bottom", chans, mids))
 
     # Spread ports along each side, ordered by where the edge goes next, so
@@ -561,15 +674,17 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
             x = lo + _snap((hi - lo) * (i + 1) / (k + 1), 5)
             port_x[(eid, which)] = x
 
-    # Horizontal runs per channel, then one lane per overlapping run.
-    runs: dict[int, list[list]] = {}
+    # Horizontal runs per channel band (a channel clipped to each run's scope
+    # frame), then one lane per overlapping run.
+    runs: dict[tuple[float, float], list[list]] = {}
     for e, s_side, t_side, chans, mids in plans:
         xs = [port_x[(e["id"], "exit")], *mids, port_x[(e["id"], "entry")]]
         for j, c in enumerate(chans):
             a, b = xs[j], xs[j + 1]
-            runs.setdefault(c, []).append([min(a, b), max(a, b), e["id"], j, None])
+            runs.setdefault(lay.channel(c, scope_of[e["id"]]), []).append([min(a, b), max(a, b), e["id"], j, None])
     lane_y: dict[tuple[str, int], float] = {}
-    for c, items in sorted(runs.items()):
+    bands: dict[tuple[float, float], int] = {}
+    for (lo, hi), items in sorted(runs.items()):
         items.sort(key=lambda r: (r[0], r[1], r[2]))
         lanes: list[float] = []
         for r in items:
@@ -581,10 +696,10 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
             else:
                 lanes.append(r[1])
                 r[4] = len(lanes) - 1
-        lo, hi = lay.channel(c)
         n = len(lanes)
+        bands[(lo, hi)] = n
         for r in items:
-            lane_y[(r[2], r[3])] = _snap(lo + (hi - lo) * (r[4] + 1) / (n + 1), 5)
+            lane_y[(r[2], r[3])] = round(lo + (hi - lo) * (r[4] + 1) / (n + 1))
 
     for e, s_side, t_side, chans, mids in plans:
         eid = e["id"]
@@ -597,16 +712,50 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
             # The box sits under a frame title no port can avoid: come down
             # beside the title and run in under it, inside the frame.
             px, lane = xs[-1], pts[-1][1]
-            for x0, x1, fy in lay.ancestor_titles(e["target"]):
+            for (x0, x1, fy), fid in zip(lay.ancestor_titles(e["target"]),
+                                         [f for f in lay.frames_around(e["target"]) if f in lay.frame]):
                 if x0 - 10 < px < x1 + 10 and lane < fy:
                     y_in = fy + FRAME_TITLE_H + 6
-                    pts[-1:] = [(x1 + 10, lane), (x1 + 10, y_in), (px, y_in)]
+                    # Come down on the side of the title that is inside the
+                    # frame: a right-aligned title leaves no room on its right.
+                    f = lay.frame[fid]
+                    inner = [x for x in (x1 + 10, x0 - 10) if f[0] + BORDER_GAP <= x <= f[0] + f[2] - BORDER_GAP]
+                    xd = lay.clear_of_sides(min(inner or [x1 + 10], key=lambda x: abs(x - px)), lane, y_in)
+                    pts[-1:] = [(xd, lane), (xd, y_in), (px, y_in)]
                     break
         sb, tb = lay.box[e["source"]], lay.box[e["target"]]
         ports = ((xs[0] - sb[0]) / sb[2], 1 if s_side == "bottom" else 0,
                  (xs[-1] - tb[0]) / tb[2], 1 if t_side == "bottom" else 0)
         routes[eid] = {"points": pts, "ports": ports}
-    return routes
+    _space_frame_runs(ir, lay, routes, bands)
+    return routes, bands
+
+
+def _space_frame_runs(ir: dict, lay: Layout, routes: dict[str, dict],
+                      bands: dict[tuple[float, float], int]) -> None:
+    """An edge into a frame crosses the gutter above it on a run of its own;
+    keep that run LANE_GAP clear of the lanes already in the gutter, or
+    report the gutter as a band to widen."""
+    taken = [(p[1], min(p[0], q[0]), max(p[0], q[0]))
+             for r in routes.values() for p, q in zip(r["points"], r["points"][1:])
+             if abs(p[1] - q[1]) < 0.5]
+    for e in ir["edges"]:
+        r = routes.get(e["id"])
+        if e["target"] not in lay.frame or not r or len(r["points"]) != 2:
+            continue
+        (sx, y), (tx, _) = r["points"]
+        x0, x1 = min(sx, tx), max(sx, tx)
+        sb, fr = lay.box[e["source"]], lay.frame[e["target"]]
+        lo, hi = sb[1] + sb[3], fr[1]
+        near = [ty for ty, a, b in taken if a < x1 + LANE_MIN and b > x0 - LANE_MIN and lo < ty < hi]
+        free = [c for c in range(int(lo) + LANE_GAP // 2, int(hi) - LANE_GAP // 2 + 1)
+                if all(abs(c - ty) >= LANE_GAP for ty in near)]
+        if free:
+            y = min(free, key=lambda c: (abs(c - (lo + hi) / 2), c))
+        else:
+            bands[(lo, hi)] = len(near) + 1
+        r["points"] = [(sx, y), (tx, y)]
+        taken.append((y, x0, x1))
 
 
 # ------------------------------------------------------------------------ emit
@@ -682,6 +831,12 @@ def _path(lay: Layout, e: dict, r: dict) -> list[tuple[float, float]]:
     return [(sb[0] + sb[2] * ex, sb[1] + sb[3] * ey), *r["points"], (tb[0] + tb[2] * nx, tb[1] + tb[3] * ny)]
 
 
+def _straddles(box: list[float], f: list[float]) -> bool:
+    """True when a label box is cut by a frame border (half in, half out)."""
+    return _hits(box, f) and not (f[0] <= box[0] and box[0] + box[2] <= f[0] + f[2]
+                                  and f[1] <= box[1] and box[1] + box[3] <= f[1] + f[3])
+
+
 def _hits(a: list[float], b: list[float]) -> bool:
     return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
 
@@ -712,7 +867,9 @@ def place_labels(ir: dict, lay: Layout, routes: dict[str, dict]) -> dict[str, fl
         total = sum(segs)
         if total == 0:
             continue
-        w, h = text_width(label, EDGE_FONT) + 6, 16
+        lines = label.split("\n")
+        w = max(text_width(line, EDGE_FONT) for line in lines) + 6
+        h = len(lines) * EDGE_FONT * LINE_H + 3
         cands = []
         for k, (p, q) in enumerate(zip(poly, poly[1:])):
             vertical = abs(p[0] - q[0]) < 1
@@ -721,16 +878,19 @@ def place_labels(ir: dict, lay: Layout, routes: dict[str, dict]) -> dict[str, fl
             for f in (0.5, 0.3, 0.7):
                 cands.append((0 if vertical else 1, -segs[k], k, f))
         cands.sort()
-        chosen = None
-        for _, _, k, f in cands:
+        # Best candidate: clear of boxes and labels, then also clear of frame
+        # borders; ties keep the candidate order.
+        chosen, best = None, None
+        for i, (_, _, k, f) in enumerate(cands):
             p, q = poly[k], poly[k + 1]
             cx, cy = p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f
             box = [cx - w / 2, cy - h / 2, w, h]
             pos = 2 * (sum(segs[:k]) + segs[k] * f) / total - 1
-            if chosen is None:
-                chosen = (pos, box)
-            if not any(_hits(box, b) for b in boxes) and not any(_hits(box, b) for b in placed):
-                chosen = (pos, box)
+            score = (any(_hits(box, b) for b in boxes) or any(_hits(box, b) for b in placed),
+                     any(_straddles(box, fr) for fr in lay.frame.values()), i)
+            if best is None or score < best:
+                chosen, best = (pos, box), score
+            if not any(score[:2]):
                 break
         if chosen:
             out[e["id"]] = chosen[0]

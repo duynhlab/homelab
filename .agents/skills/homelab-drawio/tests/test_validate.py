@@ -101,6 +101,41 @@ class TestGates(unittest.TestCase):
                                          points=[(160, 220), (160, 320)]))
         self.assertIn("geometry.edge_through_shape", rules(f, "ERROR"))
 
+    def _loop(self, lane_y):
+        # a and b sit side by side in frame F (y 80..280); the edge loops
+        # under them at lane_y.
+        return run(frame("F", 0, 80, 400, 200), box("a", 20, 40, parent="F"), box("b", 240, 40, parent="F"),
+                   edge("e", "a", "b", points=[(80, lane_y), (300, lane_y)],
+                        ports="exitX=0.5;exitY=1;entryX=0.5;entryY=1;"))
+
+    def test_edge_inside_its_frame_passes(self):
+        f = self._loop(220)
+        self.assertNotIn("geometry.edge_leaves_frame", rules(f))
+        self.assertNotIn("geometry.edge_on_frame_border", rules(f))
+
+    def test_edge_leaves_frame(self):
+        self.assertIn("geometry.edge_leaves_frame", rules(self._loop(320), "ERROR"))
+
+    def test_edge_on_frame_border(self):
+        f = self._loop(280)
+        self.assertIn("geometry.edge_on_frame_border", rules(f, "WARN"))
+        self.assertNotIn("geometry.edge_leaves_frame", rules(f))
+
+    def _twin(self, dy):
+        # e1 and e2 share a gutter; e2's run sits dy px under e1's.
+        return run(box("a", 0, 100), box("b", 300, 100), box("c", 0, 400), box("d", 300, 400),
+                   edge("e1", "a", "c", points=[(60, 250), (60, 250)]),
+                   edge("e1h", "a", "d", points=[(30, 250), (330, 250)],
+                        ports="exitX=0.25;exitY=1;entryX=0.25;entryY=0;"),
+                   edge("e2h", "b", "c", points=[(360, 250 + dy), (90, 250 + dy)],
+                        ports="exitX=0.5;exitY=1;entryX=0.75;entryY=0;"))
+
+    def test_lanes_apart_pass(self):
+        self.assertNotIn("geometry.lanes_too_close", rules(self._twin(14)))
+
+    def test_lanes_too_close(self):
+        self.assertIn("geometry.lanes_too_close", rules(self._twin(5), "WARN"))
+
     def test_edge_crossing_warns(self):
         f = run(box("a", 0, 100), box("b", 300, 100), box("c", 0, 400), box("d", 300, 400),
                 edge("e1", "a", "d", points=[(60, 250), (360, 250)]),

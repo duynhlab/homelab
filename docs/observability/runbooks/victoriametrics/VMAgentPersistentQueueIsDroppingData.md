@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/victoriametrics/vmagent-alerts.yaml` |
 | **Metrics** | `vmagent_remotewrite_packets_dropped_total` |
-| **Status** | active · queue currently 0 bytes pending |
+| **Status** | active; query queue depth during the incident |
 | **Dashboard** | VictoriaMetrics → VMAgent |
 | **Local-stack** | present |
 
@@ -55,10 +55,17 @@ Three shapes:
 ## Mitigation
 
 1. Restore the destination. The queue drains on its own once writes succeed.
-2. Do not restart vmagent to clear it — restarting discards the queue, which
-   turns a recoverable backlog into certain loss.
+2. Do not restart vmagent merely to clear the symptom. Inspect the actual
+   queue path and volume first: disk buffering survives only while its storage
+   survives; the word “persistent” does not establish a Kubernetes PVC.
 3. If the queue's own disk is the limit, that is a sizing decision to make after
    the incident, not during it.
+
+## Recovery validation
+
+Confirm the drop counter stops increasing, successful writes resume and pending
+bytes drain. Verify new samples in the destination and record permanent gaps;
+empty queues alone do not prove all samples arrived.
 
 ## Escalation
 

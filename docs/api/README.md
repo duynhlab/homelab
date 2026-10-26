@@ -62,6 +62,16 @@ shown in [api.md](./api.md#current-east-west-call-graph).
 | 7 | [payments.md](./payments.md) or [checkout.md](./checkout.md) | Deeper state-machine, idempotency, and operational examples |
 | 8 | [_template-service.md](./_template-service.md) then diff against [checkout.md](./checkout.md) | Authoring shape for new or migrated service contracts (v2) |
 
+### Telemetry learning path
+
+| Step | Read | Result |
+|---|---|---|
+| 1 | [OTel fundamentals](../observability/opentelemetry/fundamentals.md) | Understand signals, context and one request |
+| 2 | [Platform paths](../observability/opentelemetry/README.md) | Locate Collector, stores and correlation boundaries |
+| 3 | [Implementation guide](telemetry-implementation.md) | Wire a Go service and write behavioral tests |
+| 4 | [Application contract](observability.md) and its pillars | Review the exact requirements |
+| 5 | [Kind verification](../observability/runbooks/telemetry-kind-verification.md) | Collect runtime evidence after the Compose prerequisite |
+
 ## Document Ownership
 
 Three layers — not three copies of the same fact:

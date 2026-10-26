@@ -220,8 +220,9 @@ gRPC-only service uses them without a web framework; signatures verified
 // never the service name — deployment identity already rides as service.name.
 const tracerScope = "github.com/duynhlab/<svc>-service/internal/logic/v1"
 
-// Record unexpected failures: Error status + error.type + a bounded exception event
-obsx.RecordError(ctx, err)
+// safeErr is a reviewed error class with no provider/driver payload.
+// Bounding text is not sanitization; never pass arbitrary raw errors here.
+obsx.RecordError(ctx, safeErr)
 
 // Record an expected business rejection: outcome attribute, status left unset
 obsx.RecordOutcome(ctx, "stock_unavailable")
@@ -264,6 +265,10 @@ nothing and callers do not guard at each site.
 Layer responsibilities: [Application observability § Observability responsibilities by layer](./observability.md#observability-responsibilities-by-layer).
 
 ### Errors
+
+The shared helper currently truncates error text but does not redact arbitrary
+exception messages or status descriptions. Sanitize/classify at the boundary
+before recording, and test the exported value. See [audit F02](../observability/audits/2026-10-23-telemetry-implementation.md#f02--p1-exception-values-bypass-the-log-redaction-boundary).
 
 - Record unexpected failures on the span where they become meaningful.
 - Set Error status for failed operations (`obsx.RecordError`), not for an

@@ -2,19 +2,18 @@
 
 > The **otel-collector** is the single door all application telemetry walks
 > through: one OTLP endpoint in, governed processing in the middle, fan-out to
-> seven distinct backends on the way out. This doc explains how a Collector works —
-> components, pipelines, deployment patterns — and then walks the **actual
-> deployed configuration** line by line.
+> four storage backends on the way out. This doc explains how a Collector works —
+> components, pipelines, deployment patterns — and then walks the **configured local-cluster pipelines**.
 
 | | |
 |---|---|
 | **Manifest** | `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml` (HelmRelease, ns `monitoring`) |
 | **Distribution** | `otel/opentelemetry-collector-contrib:0.161.0` |
 | **Mode** | Gateway — `deployment`, 1 replica (SPOF — single replica accepted for the homelab) |
-| **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318` |
-| **Pipelines** | `traces`, `logs`, `logs/clickhouse`, `metrics`, `metrics/spanmetrics` — see [table below](#the-deployed-pipelines) |
+| **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318`; Vector-only HTTP `:4319` |
+| **Pipelines** | `traces`, `logs`, `logs/clickhouse`, `logs/vector`, `metrics`, `metrics/spanmetrics` — see [table below](#the-deployed-pipelines) |
 | **Self-telemetry** | `:8888` (scraped) · health `:13133` · zpages `:55679` |
-| **Resources** | requests 50m/256Mi · limits 200m/**1Gi** (`memory_limiter` at 800MiB) |
+| **Resources** | requests 50m/256Mi · memory limit **1Gi**, no CPU limit; limiter soft 600MiB / hard 800MiB |
 
 ---
 
@@ -29,10 +28,10 @@ to a backend — but at platform scale it earns its place fast:
 - **Decoupling** — every service points at one endpoint; backends can be added
   or swapped (Loki → VictoriaLogs, the ClickHouse OLAP path) with zero app
   changes.
-- **Offload** — batching, retries, compression, and queueing happen here, not
-  in every application process.
+- **Offload** — the gateway supplies backend-specific queues/retries in addition to SDK
+  batching and export in each application process.
 - **Governance** — one place to normalize temporality, guard against memory
-  blowups, and (if ever needed) scrub attributes before data leaves the
+  blowups, and remove selected sensitive attributes before data leaves the
   cluster.
 
 > **Service authors:** you never talk to the Collector directly — `pkg/obsx`
@@ -46,53 +45,62 @@ three together per signal:
 
 | Component | Role | Deployed here |
 |-----------|------|---------------|
-| **Receiver** | How data gets in — push (listen on a port) or pull (scrape a target) | `otlp` (gRPC `:4317`, HTTP `:4318`) |
-| **Processor** | Transformations between receive and export; run **in the order listed** | `memory_limiter`, `deltatocumulative`, `batch` |
+| **Receiver** | How data gets in — push (listen on a port) or pull (scrape a target) | `otlp` (gRPC `:4317`, HTTP `:4318`); `otlp/vector` (HTTP `:4319`) |
+| **Processor** | Transformations between receive and export; run **in the order listed** | Limiter, privacy transforms, filtering/enrichment, `delta_to_cumulative`, batching |
 | **Exporter** | How data leaves — per backend, with its own retry/queue | **6 defined, 5 wired** (only `debug` is unwired — see below) |
 | **Extension** | Cross-cutting services outside the data path | `health_check` `:13133`, `zpages` `:55679` |
-| **Connector** | Joins the *exporter* end of one pipeline to the *receiver* end of another (e.g. deriving span metrics from traces) | none deployed |
+| **Connector** | Joins the *exporter* end of one pipeline to the *receiver* end of another (e.g. deriving span metrics from traces) | `span_metrics`: traces → derived metrics |
+
+This diagram answers where each configured input goes; the table below owns
+processor order. All nodes are inside the local cluster.
 
 ```mermaid
 flowchart LR
-    APPS["services + workers<br/>pkg/obsx"] -->|"OTLP/HTTP :4318"| RCV
-    EDGE["Envoy Gateway edge<br/>telemetry.tracing"] -->|"OTLP/gRPC :4317"| RCV
-
-    subgraph COLLECTOR["otel-collector (gateway, deployment ×1)"]
-        RCV["otlp receiver"] --> ML["memory_limiter<br/>800MiB soft limit"]
-        ML --> D2C["deltatocumulative<br/>(metrics only)"] --> BM["batch"]
-        ML --> BT["batch"]
+    subgraph Cluster["Kind cluster"]
+        APPS["Services + workers"]
+        EDGE["Envoy Gateway"]
+        VECTOR["Vector"]
+        subgraph COL["Collector gateway ×1"]
+            OTLP["OTLP :4317 / :4318"]
+            VR["Vector OTLP :4319"]
+            T["traces pipeline"]
+            L["logs: excludes edge"]
+            LC["logs/clickhouse + logs/vector"]
+            M["metrics: delta_to_cumulative"]
+            SM["span_metrics → metrics/spanmetrics"]
+            OTLP --> T & L & M
+            OTLP -->|"all OTLP logs"| LC
+            VR -->|"Vector logs"| LC
+            T --> SM
+        end
+        VMA["vmagent"]
+        VM[("VictoriaMetrics")]
+        VL[("VictoriaLogs")]
+        VT[("VictoriaTraces")]
+        CH[("ClickHouse")]
+        APPS -->|"HTTP :4318"| OTLP
+        EDGE -->|"gRPC :4317"| OTLP
+        VECTOR --> VR
+        VECTOR -->|"direct logs"| VL
+        T --> VT & CH
+        L --> VL
+        LC --> CH
+        M --> VMA --> VM
+        SM -->|"remote write"| VM
     end
-
-    BM -->|"metrics"| VMA["vmagent :8429"] --> VM[("VictoriaMetrics")]
-
-    subgraph LOGSTORES["log stores"]
-        VL[("VictoriaLogs :9428")]
-        CHL[("ClickHouse otel_logs")]
-    end
-    subgraph TRACESTORES["trace stores"]
-        VT[("VictoriaTraces :10428<br/>7d")]
-        CHT[("ClickHouse otel_traces<br/>90d")]
-    end
-    SM["span_metrics connector"]
-
-    BT -->|"logs"| VL
-    BT -->|"logs"| CHL
-    BT -->|"traces"| VT
-    BT -->|"traces"| CHT
-    BT -->|"traces"| SM
-    SM -->|"metrics"| VM
-
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
     classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
-    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class APPS service;
     class EDGE edge;
-    class RCV,ML,D2C,BM,BT,VMA,SM collector;
-    class VM metric;
-    class VL,CHL,VT,CHT data;
+    class VECTOR,OTLP,VR,T,L,LC,M,SM,VMA collector;
+    class VM,VL,VT,CH data;
 ```
+
+Legend: cyan = application; blue = edge; pale blue = collection/processing;
+green cylinders = stores. Profiles bypass this Collector for Pyroscope.
+
 
 ## Deployment patterns — and which one this platform runs
 
@@ -108,9 +116,12 @@ identity via the Downward API (`K8S_NAMESPACE_NAME`, `K8S_POD_NAME`), which
 removes the main reason to run node agents. The costs are accepted and
 documented: the collector is a SPOF for *telemetry* (not for serving traffic —
 `obsx` setup failure is non-fatal by contract), and a restart drops whatever
-sat in in-memory queues. Scaling out later = raise `replicaCount` behind the
-same Service; only tail-based sampling (not used — head sampling per
-[README.md § Sampling](README.md#sampling)) would force trace-ID-aware routing.
+sat in in-memory queues. Scaling needs a component-by-component review:
+`delta_to_cumulative` needs stable series routing for delta producers, and
+`span_metrics` owns aggregation state. Current Go metrics are cumulative;
+the connector's default `collector.instance.id` distinguishes writers, but
+consumer aggregation and reset behavior still need checking. Tail sampling is
+not configured. Adding replicas alone is not a validated scaling procedure.
 
 ## The deployed pipelines
 
@@ -119,7 +130,8 @@ same Service; only tail-based sampling (not used — head sampling per
 | `traces` | `otlp` | `memory_limiter` → `transform/privacy` → `batch` | `otlp_http/victoriatraces` · `clickhouse` · **`span_metrics`** (a *connector*, not a store — it feeds the pipeline below) |
 | `logs` | `otlp` | `memory_limiter` → `filter/drop_edge_logs` → `transform/privacy` → `k8sattributes` → `resource/cluster` → `batch` | `otlp_http/victorialogs` (the edge's access log is filtered out here — ClickHouse-only, [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) |
 | `logs/clickhouse` | `otlp` | `memory_limiter` → `transform/privacy` → `k8sattributes` → `resource/cluster` → `batch` | `clickhouse` (everything, edge included) |
-| `metrics` | `otlp` | `memory_limiter` → `deltatocumulative` → `batch` | `otlp_http/victoriametrics` |
+| `logs/vector` | `otlp/vector` | `memory_limiter` → `transform/privacy` → `resource/cluster` → `batch` | `clickhouse` (Vector supplies its own VictoriaLogs leg) |
+| `metrics` | `otlp` | `memory_limiter` → `delta_to_cumulative` → `batch` | `otlp_http/victoriametrics` |
 | `metrics/spanmetrics` | `span_metrics` | `memory_limiter` → `batch` | `prometheus_remote_write` |
 
 A `debug` exporter is **defined but wired into no pipeline** — attach it
@@ -132,7 +144,7 @@ connector**. Connectors are the only component type that changes a signal's
 `spanmetrics_calls_total` and `spanmetrics_duration_milliseconds_*` series in
 VictoriaMetrics ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)).
 Its `aggregation_temporality` defaults to cumulative, so this pipeline needs no
-`deltatocumulative` — unlike the app-metrics one. Beyond the built-in
+`delta_to_cumulative` — the app pipeline accepts delta inputs defensively, although current Go producers also emit cumulative data. Beyond the built-in
 dimensions it declares `http.route` and **both** method names: the services
 write the stable `http.request.method`, the edge still writes the older
 `http.method`, and a span carries only one of them, so no series doubles
@@ -152,12 +164,14 @@ deliberate sequence, not a set:
    `spike_limit_mib: 200`) — always **first**, so backpressure triggers
    *before* downstream processors allocate more memory. At the soft limit the
    collector starts **refusing incoming data** (clients retry) instead of
-   dying; 800 + 200 MiB sits under the 1Gi container limit so the limiter
-   trips before the OOM killer does.
-2. **`deltatocumulative`** (`max_stale: 5m`, metrics only) — defensive
+   dying. The soft limit is **800 − 200 = 600MiB** and the hard limit is
+   800MiB. The 1Gi container limit provides headroom; rapid growth can still
+   outrun periodic checks, so this is not an OOM guarantee.
+2. **`delta_to_cumulative`** (`max_stale: 5m`, metrics only) — defensive
    temporality normalization. The Go SDK exports cumulative by default
    (RFC-0017 D-7), but a delta sample that ever slipped into VictoriaMetrics
-   would silently corrupt `rate()`; this processor makes that impossible.
+   needs conversion before cumulative storage. Conversion is stateful and
+   requires suitable stream affinity if the gateway scales.
 3. **`transform/privacy`** (traces and both logs pipelines) — the ADR-071 deny
    list for every producer: deletes `client.address`, `network.peer.address`,
    `network.peer.port`, `user_agent.original` and `user.id` from spans (otelgin
@@ -165,7 +179,9 @@ deliberate sequence, not a set:
    `peer.address` and `user_agent`, and the edge access log's `client` IP and
    `user_agent`. It runs before anything is stored or turned into span metrics.
    The shared package strips logs at the source; this is the backstop for spans
-   and for the edge and Keycloak, which obsx never sees.
+   and for the edge and Keycloak, which obsx never sees. Exact-key deletion
+   does not sanitize arbitrary exception messages or span status descriptions;
+   audit F02 remains an implementation gap.
 4. **`k8sattributes`** (logs pipelines only) — adds what only the API server
    knows: `k8s.pod.uid`, `k8s.deployment.name`, `k8s.node.name` and
    `k8s.container.name`, filling the `k8s.*` columns `otel_logs`
@@ -254,9 +270,10 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 | Export errors: `context deadline exceeded` | Backend unreachable or too slow before the exporter timeout | Verify endpoint/NetworkPolicy; exporters buffer + retry with backoff, so transient blips self-heal — persistent ones need the backend fixed or `timeout` raised |
 | `tls: first record does not look like a TLS handshake` | Exporter speaks TLS to a plaintext endpoint (or vice versa) | Match the exporter `tls.insecure` setting to the backend — in-cluster hops here are plaintext |
 | Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.161.0` |
-| Collector crash-loops at startup, ClickHouse also down | Historically the `create_schema` DDL coupling (above); **not possible since RFC-0028** — if you see it, check whether `create_schema` was set back to `true` | Restore ClickHouse first; confirm `create_schema: false` in the collector values |
+| Collector crash-loops at startup, ClickHouse also down | Historically the `create_schema` DDL coupling (above); **the old DDL path is disabled in current values** — if you see it, check whether `create_schema` was set back to `true` | Restore ClickHouse first; confirm `create_schema: false` in the collector values |
 
 ## References
 
+- [Resilience](https://opentelemetry.io/docs/collector/resiliency/) · [Scaling stateful components](https://opentelemetry.io/docs/collector/scaling/)
 - [Collector docs](https://opentelemetry.io/docs/collector/) · [Configuration](https://opentelemetry.io/docs/collector/configuration/) · [Deployment patterns](https://opentelemetry.io/docs/collector/deployment/)
 - In-house: [OTel fundamentals](fundamentals.md) (incl. the [RFC-0014 migration story](fundamentals.md#how-this-platform-got-here--rfc-0014-in-pictures)) · [OpenTelemetry (platform)](README.md) · [Logging pipeline](../logging/README.md) · [ClickHouse](../clickhouse/README.md) · [ClickHouse fundamentals](../clickhouse/fundamentals.md)

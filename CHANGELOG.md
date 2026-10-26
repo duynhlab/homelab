@@ -618,6 +618,9 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Add the Go telemetry implementation guide, Linux Kind verification checklist
+  and dated code/documentation audits; connect the learning and verification paths.
+
 - **RFC-0030 Mermaid diagrams show the deployed CDC path.** The RFC
   architecture and ADR-066 decision view drop their "planned" nodes and the
   retired fixture; the CDC hub sequence shows the CDC pooler and the `s3()`
@@ -975,6 +978,9 @@ Skeleton (copy what you need):
     stale claims: one role per database, edge logs through Vector, the VM pin.
 
 #### Docs
+
+- Correct Collector pipeline/memory/sampling explanations and telemetry runbooks;
+  separate current dashboard artifact reference from historical panel material.
 
 - **Draw.io edges stay in their frames and apart.** The homelab-drawio
   generator keeps every edge inside the innermost frame around both its

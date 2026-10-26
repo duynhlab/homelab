@@ -24,7 +24,7 @@ traces tell you *where* in the request path the time went, and **profiles tell y
 *which line of code* burned the CPU or allocated the memory**. Every Go service pushes
 pprof data to a central Pyroscope backend every 15 seconds; the data is queryable as
 flame graphs in Grafana, time-travel to any point in the retention window, and is
-linked from individual trace spans.
+correlated manually with traces by service and time window.
 
 ## Purpose
 
@@ -36,8 +36,9 @@ linked from individual trace spans.
   click, see [Trace correlation](#trace-correlation-platform).
 - **Catch regressions over time.** Because profiles are continuous and labelled, you can
   diff "today vs last week" or "version A vs version B" for a service.
-- **Keep overhead negligible.** Sampling-based profiling is cheap enough to leave on
-  permanently in every service.
+- **Budget overhead.** Profiling is enabled continuously here; measure CPU and
+  memory impact against the [application budget](../../api/profiling.md#runtime-overhead)
+  before claiming it is negligible for a workload.
 
 ## Continuous Profiling (concept)
 
@@ -97,7 +98,9 @@ chart also supports a microservices mode (separate distributor / segment-writer 
 metastore / compaction-worker / query-frontend / query-backend deployments) for
 horizontal scale — overkill for this platform. Profiles are stored as **blocks**
 (Parquet tables + a TSDB index for series + a symbols table) on **object storage**; the
-local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses nothing.
+local PVC holds the v2 metastore (raft) and scratch. Persistent storage protects
+committed state across ordinary pod replacement; it does not guarantee delivery
+of every in-flight profile or survival of volume/object-store loss.
 
 ## Trace correlation (platform)
 

@@ -506,13 +506,13 @@ homelab/
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (30 Kustomization CRs declared — see kustomization.yaml; mcp commented out so 29 apply, and a cluster shows 30 incl. flux-system)
+│       └── local/                      # Kind local environment (32 Kustomization CRs declared — see kustomization.yaml; mcp commented out so 31 apply, and a cluster shows 32 incl. flux-system)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
 │           ├── secrets.yaml            # Secrets bootstrap configs
 │           ├── openbao-oidc-config.yaml # OpenBAO staff OIDC configurator (ADR-062)
-│           ├── cert-manager-config.yaml / cnpg-barman-plugin.yaml
+│           ├── cert-manager-config.yaml / cnpg-barman-plugin.yaml / pgroles-operator.yaml
 │           ├── gateway-api-crds.yaml / envoy-gateway.yaml / envoy-gateway-config.yaml
 │           ├── flux-web.yaml / keycloak.yaml
 │           ├── caching.yaml / storage.yaml
@@ -521,7 +521,7 @@ homelab/
 │           ├── databases.yaml / databases-cnpg-dr.yaml
 │           ├── monitoring.yaml / grafana-dashboards-as-code-folders.yaml / grafana-dashboards-as-code-dashboards.yaml
 │           ├── kyverno.yaml / policy-reporter.yaml / network-policies.yaml
-│           ├── mcp.yaml (commented out) / keda.yaml / temporal.yaml / temporal-config.yaml / apps.yaml
+│           ├── mcp.yaml (commented out) / keda.yaml / temporal.yaml / temporal-config.yaml / cdc.yaml / apps.yaml
 │           └── kustomization.yaml
 ├── Makefile                            # Centralized automation entrypoint
 └── scripts/                            # Implementation logic for automation tasks
@@ -566,11 +566,13 @@ homelab/
 9. `tracing-local`: OTel Collector config — the only workload left after [RFC-0027](../proposals/rfc/RFC-0027/README.md) retired Tempo and Jaeger. Depends on **`clickhouse-schema-local`** (the collector no longer creates schema, so it must not start before the schema exists — it can no longer self-heal by creating what it is missing) and **`secrets-local`** (a non-optional `secretKeyRef` on the ESO-managed `clickhouse-credentials`). `storage-local` was dropped 2026-08-24 — it dated from Tempo's RustFS buckets and nothing here reads S3 any more.
 10. `profiling-local`: Pyroscope (depends on `secrets-local`, `storage-local`).
 11. `cnpg-barman-plugin-local`: CNPG Barman Cloud Plugin + `ObjectStore` CRD (depends on `controllers-local`, `cert-manager-local`).
-12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
+11a. `pgroles-operator-local`: the pgroles operator and its `PostgresPolicy` CRD (ADR-088), ahead of the policies in `databases-local` (depends on `controllers-local`).
+12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `pgroles-operator-local`, `storage-local`, `network-policies-local`). It must apply nothing that names an app table: it has `wait: true`, and those tables exist only after `apps-local`'s migrations.
 13. `databases-cnpg-dr-local`: CNPG DR replica (depends on `databases-local`, `secrets-local`).
 13b. `keda-local`: KEDA 2.20.2 — the `temporal` scaler that sizes the versioned workers from task-queue backlog ([ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/README.md)); its own wave because the chart ships a ServiceMonitor (depends on `controllers-local`, `monitoring-local`). `temporal-local` depends on it so the controller's `scaledobjects.keda.sh` RBAC names an API group that exists, and `apps-local` depends on it so the `WorkerResourceTemplate`s can render a `ScaledObject`.
 14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`, `keda-local`). **Also ships the Temporal Worker Controller** — CRDs chart first via `dependsOn`, then the manager (ADR-054). That placement is load-bearing: `apps-local` `dependsOn: temporal-config-local`, which in turn depends on `temporal-local` — and that chain is the only thing ordering the CRDs and manager before any `WorkerDeployment` is applied. Note the `healthChecks` list names only the Temporal HelmRelease and frontend Deployment, so `wait: true` — not a health check — is what covers the manager.
-14a. `temporal-config-local`: the Temporal config half (`./configs/temporal` — server alerts + the `temporal-search-attributes` Job registering the custom Search Attributes `OrderId`/`SessionId` on namespace `mop`; the Web UI HTTPRoute lives in `configs/envoy-gateway/routes/temporal.yaml`) (depends on `temporal-local`).
+14a. `temporal-config-local`: the Temporal config half (`./configs/temporal` — server alerts + the `temporal-search-attributes` Job registering the custom Search Attributes `OrderId`/`SessionId` on namespace `mop` and `MirrorName` on namespace `peerdb`; the Web UI HTTPRoute lives in `configs/envoy-gateway/routes/temporal.yaml`) (depends on `temporal-local`).
+14b. `cdc-local`: PeerDB (upstream chart), the CDC publications on product-db (`configs/cdc/source/`) and the `peerdb-bootstrap` + `analytics-views` Jobs ([Commerce CDC](../databases/cdc/README.md)). Depends on `databases-local`, `temporal-config-local`, `secrets-local`, `storage-local`, `cert-manager-local`; health-checks the `peerdb` HelmRelease, no `wait`. It must **not** depend on `apps-local`: analytics-service's readiness reads the views this wave creates. The publications converge once the migrations have created the tables, and `peerdb-bootstrap` waits for them.
 15. `kyverno-policies-local`: Admission policies (depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
 15a. `mcp-local`: MCP servers (depends on `monitoring-local`) — **not applied**: commented out of `kustomization.yaml` since 2026-08-21. See [mcp-servers.md](mcp-servers.md).
 15b. `policy-reporter-local`: Policy Reporter UI for Kyverno's PolicyReports (depends on `kyverno-policies-local`).

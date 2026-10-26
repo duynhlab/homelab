@@ -1,5 +1,6 @@
 # Publications PeerDB reads (RFC-0030 / ADR-067): exact tables, exact columns
-# — the allowlist in local-stack/analytics/allowlist.json plus each database's
+# — the allowlist (../bootstrap/allowlist.json, kept equal to the local-stack
+# copy) plus each database's
 # heartbeat table (ADR-068). Retained when the CR goes away: dropping a
 # publication under a live slot breaks the mirror.
 ---

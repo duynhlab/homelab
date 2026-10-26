@@ -261,9 +261,10 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-    # PeerDB CDC (RFC-0030 / ADR-066). Platform tier, not app tier: its ingress
-    # fence is network-policies/peerdb.yaml. The label hands it the shared
-    # RustFS key for the analytics-service-cdc staging bucket (U5 gap).
+    # PeerDB CDC (RFC-0030 / ADR-066). Platform tier, not app tier, and no
+    # ingress NetworkPolicy of its own yet; the fences are on the destinations
+    # (product-db-pooler-cdc, platform.yaml catalog allow). The label hands it
+    # the shared RustFS key for the analytics-service-cdc staging bucket (U5 gap).
     platform.duynhlab/s3-peerdb: "true"
   name: peerdb
 ---

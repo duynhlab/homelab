@@ -265,7 +265,10 @@ local execution and verification procedure.
 
 ## Release gate
 
-RFC-0030 has a separate, opt-in [commerce CDC qualification stack](../docs/proposals/rfc/RFC-0030/phase0.md).
+The default stack runs analytics-service against a fixture, not CDC:
+`analytics-fixture` seeds the `analytics` tables in PeerDB's shape and
+`analytics-heartbeat` writes the three source heartbeats; rows A25, B11 and C23
+read them. RFC-0030 also has a separate, opt-in [commerce CDC qualification stack](../docs/proposals/rfc/RFC-0030/phase0.md) (historical).
 Its fixed disposable Compose project and `make e2e-analytics GATE=compose` gate
 do not replace the release audit below or qualify CNPG deployment.
 

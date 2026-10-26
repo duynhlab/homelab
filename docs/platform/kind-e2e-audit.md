@@ -295,7 +295,7 @@ the tag exists; running it earlier audits the previous release.
     .items[] | select(.status.conditions[]? | select(.type=="Ready" and .status!="True"))
     | "\(.metadata.name): \(.status.conditions[] | select(.type=="Ready") | .message)"'
   ```
-  At the time of writing that is **21 declared + `flux-system` = 22**, matching
+  On 2026-10-26 that is **31 applied + `flux-system` = 32**, matching
   [`platform/README.md`](README.md) and `AGENTS.md`. First reconcile takes 5–10
   minutes; `temporal-local` is the long pole at a 20m timeout.
   **FAIL:** any name printed by the last command, or a Ready count below
@@ -536,9 +536,9 @@ cannot be derived from a single file — they get their own row (K2.3).
   ```
   **FAIL:** an `auth` namespace, Deployment, or database exists.
 
-- [ ] **K2.5** All seven ResourceSets that `apps-local` health-checks are Ready:
+- [ ] **K2.5** All eight ResourceSets that `apps-local` health-checks are Ready:
   `rs-identity`, `rs-catalog`, `rs-checkout`, `rs-fulfillment`, `rs-comms`,
-  `rs-frontend`, `rs-backoffice`.
+  `rs-frontend`, `rs-backoffice`, `rs-analytics`.
   `kubectl get resourcesets -A`
   **FAIL:** any not Ready —
   [`application-delivery.md`](application-delivery.md) has the recurring template
@@ -780,8 +780,34 @@ cannot be derived from a single file — they get their own row (K2.3).
   scripts/analytics-reader-sweep.sh
   ```
   **FAIL:** any `FAIL` line. A raw table that reads means the grant list
-  widened; a view that refuses means the fixture (or, later, the mirrors) did
-  not create it.
+  widened; a view that refuses means the `analytics-views` Job did not create
+  it (read its log, then K3.13).
+
+- [ ] **K3.13** The CDC path came up with no manual step (RFC-0030, ADR-066).
+  ```bash
+  kubectl -n flux-system get kustomization cdc-local          # Ready
+  kubectl -n peerdb get helmrelease peerdb                    # Ready
+  kubectl -n peerdb get job peerdb-bootstrap                  # Complete
+  kubectl -n monitoring get job analytics-views               # Complete
+  kubectl -n product get publications.postgresql.cnpg.io      # 3, applied=true
+  scripts/analytics/cdc-source-check.sh                       # G3.1–G3.4 PASS
+  scripts/analytics/cdc-target-check.sh                       # G6.2 PASS
+  ```
+  On a cold bring-up `peerdb-bootstrap` waits up to one bootstrap CronJob period
+  (10 min) after the publications apply, for the SELECT grants.
+  **FAIL:** any line not as commented; a mirror not `STATUS_RUNNING` or a slot
+  not `active`.
+
+- [ ] **K3.14** The CDC slots survive a promotion (ADR-066, #1376). On the
+  primary every `peerflow_slot_*` has `failover = t`; on each standby the same
+  three exist with `synced = t`:
+  ```bash
+  kubectl -n product exec <pod> -c postgres -- psql -Atc \
+    "SELECT slot_name, failover, synced FROM pg_replication_slots WHERE slot_type='logical'"
+  ```
+  **FAIL:** a slot with `failover = f`, or a standby missing a synced copy. A
+  standby holding a NON-synced copy is the post-switchover state of #1377: run
+  the guarded drop in the [CDC hub](../databases/cdc/README.md#operations).
 
 ## K4 — The real edge and identity
 
@@ -1106,9 +1132,11 @@ breaks a command copied from the Compose audit:
 - [ ] **K4.14** The Admin page shows the server's verdict (RFC-0030 phase 9).
   In the browser, `duyne` reaches `/analytics` from the eighth navigation item
   and sees the freshness region with three source lags, formatted money, the
-  trend and the funnel; with the heartbeat Deployment scaled to 0 the banner
-  reads **Delayed data** after ~2.5 min and the **unavailable** state with
-  Retry after ~5.5 min, fresh again within a minute of scaling it back;
+  trend and the funnel; with the three pg_cron heartbeat jobs paused
+  (`UPDATE cron.job SET active = false …`, as
+  `GATE=kind scripts/analytics-freshness-drill.sh` does) the banner reads
+  **Delayed data** after ~2.5 min and the **unavailable** state with Retry
+  after ~5.5 min, fresh again within a minute of resuming them;
   `duyne-viewer` lands on `/forbidden`. Same shape as compose B11, against
   `https://backoffice.duynh.me`.
   **FAIL:** a figure shown while the API answers 503, or a rendered page for
@@ -1522,8 +1550,8 @@ Preconditions: Compose gate <link/date> · tags pinned · previous cluster torn 
 |---|---|---|---|
 | K0 machine | 8 | | tools present; ports free; N/N route hostnames resolve; multi-arch legs |
 | K1 bring-up | 8 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8; worker version Current |
-| K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 7/7 ResourceSets Ready |
-| K3 admission/secrets | 10 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.4 84/84; K3.7 guard 2/2; K3.8–K3.9 db-authz 10/10 |
+| K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 8/8 ResourceSets Ready |
+| K3 admission/secrets | 14 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.4 84/84; K3.7 guard 2/2; K3.8–K3.9 db-authz 10/10; K3.13 CDC path up; K3.14 slots failover/synced |
 | K4 edge/identity | 13 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
 | K5 signals | 11 | | traces rooted at edge; both log legs; 33/33 dashboards resolve; N VERIFY-AT-KIND markers closed |
 | K6 wrap | 3 | | `make down` removes cluster **and** registry |
@@ -1553,6 +1581,24 @@ Rows not run: <list, with why> — outstanding, not passed.
 ---
 
 ## Previous runs
+
+### 2026-10-23/24 — the CDC half on a cold bring-up (RFC-0030 phases 1–7)
+
+Rows K3.13 and K3.14 were written from this run; the rest of the audit was not
+repeated. Two cold `make down && make up` runs from main: the first, on
+`55f64dfd`, found the `databases-local` deadlock (CDC grants and publications
+naming app tables); the second, on the fix branch merged as #1378, needed no
+manual step.
+
+| Check | Result |
+|---|---|
+| Kustomizations | all Ready, none stuck; `databases-local` Ready once the service pgroles policies named no app table |
+| CDC (K3.13) | publications applied after the migrations; `peerdb-bootstrap` created the three mirrors after the bootstrap CronJob's grants and admitted all three; `analytics-views` Complete; `cdc-source-check` and `cdc-target-check` PASS, cron 30/30 |
+| Slots (K3.14) | `failover = t` from creation, 3/3 synced on both standbys |
+| analytics-service | Ready (its `/ready` reads a serving view) |
+| Drills (CDC hub) | G7.1–G7.8 PASS on the warm cluster before it |
+
+Evidence: [#1378](https://github.com/duynhlab/homelab/pull/1378#issuecomment-6369732869).
 
 ### 2026-10-23 — analytics dark launch, edge route and Admin page (RFC-0030 phases 8–9)
 

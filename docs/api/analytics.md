@@ -11,7 +11,7 @@ bounded-eventual and never handles commands.
 | Consumer | [Backoffice portal](./admin.md) `/analytics` (eighth navigation item) |
 | Storage access | Native ClickHouse, restricted `analytics_reader`, reviewed `analytics.*_live` views only |
 | Design | [RFC-0030](../proposals/rfc/RFC-0030/), [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) |
-| Verification | compose rows A25 / B11 / C23 ([runbook](../../local-stack/docs/e2e-audit.md)); Kind rows K3.12, K4.12–K4.14, K5.11 ([run 2026-10-23](../platform/kind-e2e-audit.md#2026-10-23--analytics-dark-launch-edge-route-and-admin-page-rfc-0030-phases-89)) |
+| Verification | compose rows A25 / B11 / C23 ([runbook](../../local-stack/docs/e2e-audit.md)); Kind rows K3.12, K4.12–K4.14, K5.11 ([run 2026-10-23](../platform/kind-e2e-audit.md#2026-10-23--analytics-dark-launch-edge-route-and-admin-page-rfc-0030-phases-89), fixture era); on real CDC: the G7 drills and a cold bring-up on Kind ([Commerce CDC](../databases/cdc/README.md#operations)) and the compose release audit of 2026-10-24 |
 
 There is no gRPC API, migration runner, source-database access or write endpoint
 for this service. The Envoy route and the Admin navigation exist; the data behind
@@ -143,7 +143,7 @@ verifies the endpoint certificate.
 ## Verification and rollout
 
 Linux runtime qualification on **2026-10-22/23** (main `8e4667fb`, compose and
-Kind, fixture-backed serving layer): the ClickHouse integration suite runs in CI
+Kind, before CDC fed Kind — a fixture-backed serving layer): the ClickHouse integration suite runs in CI
 against ClickHouse 26.9; compose A25 asserts the guard chain and the contract
 (25 checks), the freshness drill meets the 120 s / 300 s / ≤60 s clocks and the
 failure drill fails closed in under a second; B11 shows the page's live, delayed,

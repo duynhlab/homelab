@@ -1,5 +1,10 @@
 # Commerce CDC qualification
 
+> **Historical — the Compose qualification prototype.** The cluster
+> implementation followed on 2026-10-23 with the pooled source path, verified
+> TLS and the gates below; see [Commerce CDC](../../../databases/cdc/README.md)
+> for the system as built. The State row below records this page's last run.
+
 Phase 0 tests the accepted [RFC-0030](./README.md) architecture before any
 cluster rollout. A working Compose pipeline is not CNPG qualification.
 

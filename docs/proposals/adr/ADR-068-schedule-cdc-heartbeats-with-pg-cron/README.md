@@ -67,7 +67,10 @@ available on standbys, restored clusters, and the DR cluster.
 ## Decision
 
 We will package `postgresql-18-cron` in a digest-pinned custom system image
-derived from the deployed PostgreSQL 18.1 system image. The compatible image
+derived from the deployed PostgreSQL 18.1 system image. *(As built: the
+operand is `ghcr.io/duynhlab/images/postgresql-cron:1.0.0`, built on the CNPG
+PostgreSQL 18.6 system image and selected through an `ImageCatalog`, because
+CNPG reads the major version from the image tag.)* The compatible image
 will be proven on `product-db-replica`, restore, and every primary/standby before
 `pg_cron` is added to CNPG's dedicated `shared_preload_libraries` field.
 

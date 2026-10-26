@@ -4,13 +4,13 @@
 |--------|-------|----------|---------|--------------|
 | Accepted | platform-wide | [./research.md](./research.md) — PeerDB + `pg_cron` direction audited 2026-09-08 | 2026-09-07 | 2026-10-23 |
 
-> **Accepted target architecture; consumer half deployed on a fixture.**
+> **Deployed on Kind (2026-10-23).** The CDC half — the session-mode PgBouncer
+> CDC pooler, PeerDB, three mirrors and `pg_cron` heartbeats (phases 1–7) —
+> feeds the ClickHouse `analytics` database, and the consumer half —
 > `analytics-service`, the `api-analytics-protected` route and the Backoffice
-> `/analytics` page (phases 8–10) run in local-stack and on Kind against a
-> fixture-backed serving layer (ADR-069 Adoption Partial). The CDC half —
-> pooled source access, PeerDB, mirrors and `pg_cron` heartbeats (phases 1–7)
-> — is **planned** and not deployed; PeerDB has only an opt-in Compose
-> prototype. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
+> `/analytics` page (phases 8–10) — reads it. local-stack keeps a fixture in
+> place of CDC. Operations: [Commerce CDC](../../../databases/cdc/README.md).
+> PostgreSQL stays authoritative; ClickHouse is a rebuildable,
 > bounded-eventual read model.
 
 Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
@@ -27,11 +27,11 @@ Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
       source heartbeat; its artifact, preload, activation, restore, and
       failover lifecycle is now an independent resulting decision.
 - [x] The owner accepted RFC-0030 and ADR-066 through ADR-069 on 2026-09-09.
-- [ ] Phase 0 implementation must close the release/chart, licence, freshness,
+- [x] Phase 0 closed the release/chart, licence, freshness,
       column-publication, schema-evolution, restore, and CNPG failover gates
-      before any component rollout.
-- [x] Acceptance installed no component. Since 2026-10-23 ADR-069 is at
-      Adoption `Partial`; ADR-066 through ADR-068 remain `Not started`.
+      (Compose 2026-10-22, Kind 2026-10-23; evidence on #1266).
+- [x] Acceptance installed no component; implementation followed in phases
+      1–10 (see Implementation history).
 
 ## Summary
 
@@ -165,8 +165,8 @@ that the acceptance prototype must verify.
 
 Resources use the `analytics-service` workload name; commerce remains the
 business domain and API route. The `analytics` database and `analytics_reader`
-are deployed (the database seeded by the fixture); the CDC names describe the
-planned cluster contract and the opt-in Compose implementation.
+are deployed; on Kind PeerDB writes the database, in local-stack a fixture
+seeds it. The names below are the deployed cluster contract.
 
 | Resource | Name |
 |---|---|
@@ -351,14 +351,13 @@ Both metadata/snapshot SQL and the replication connection use this access
 contract. Migration and native CNPG replication exceptions do not grant PeerDB
 a direct-access exception.
 
-**Not yet qualified:** product, version, endpoint and concrete settings for the
-CDC profile. Preserve both PgDog and PgBouncer in the platform. PgBouncer is a
-qualification candidate with upstream replication-connection support; PgDog
-must separately prove external-client replication forwarding. Neither product's
-ordinary runtime profile is automatically approved for CDC. Start qualification
-with session affinity for snapshot SQL and a dedicated backend for each
-replication connection; do not multiplex an active WAL stream. A session-mode
-setting alone does not prove replication-protocol compatibility.
+**Qualified (2026-10-23):** the CDC profile is `product-db-pooler-cdc`, a CNPG
+PgBouncer Pooler in session mode, client TLS required, verify-full to the
+primary, and its own NetworkPolicy from the `peerdb` namespace. Replication
+through it passed G3.1–G3.6 (U1). PgDog stays the runtime pooler; it was not
+qualified for replication forwarding. The rules that drove the qualification
+stand: session affinity for snapshot SQL, a dedicated backend per replication
+connection, no multiplexed WAL stream.
 
 The profile must be primary-only, preserve snapshot/transaction state and startup
 parameters, isolate CDC connection capacity from runtime traffic, and keep
@@ -484,7 +483,7 @@ visible UTC/freshness labels, and accessible table equivalents for charts.
 - Inspect ClickHouse raw columns and staged objects for forbidden data before
   enabling any API route.
 - PeerDB core is AGPL-3.0; the official enterprise chart repository uses ELv2.
-  License and chart use require an explicit pre-acceptance review.
+  The owner accepted both for internal self-hosting (2026-10-23, ADR-066).
 
 ## Observability and SLO
 

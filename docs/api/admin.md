@@ -33,7 +33,7 @@ Known gaps: [three platform gaps](../frontend/admin-portal/README.md#known-gaps)
 | **Database** | None |
 | **Cache** | None authoritative; TanStack Query holds disposable browser state only |
 | **Sensitive data** | Staff access token, held in browser memory only and sent as `Authorization: Bearer` |
-| **Design records** | [RFC-0023](../proposals/rfc/RFC-0023/) · [ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/) · [ADR-048](../proposals/adr/ADR-048-admin-portal-no-bff/) · [ADR-049](../proposals/adr/ADR-049-admin-portal-tanstack-spa/) · [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/) |
+| **Design records** | [RFC-0023](../proposals/rfc/RFC-0023/) · [ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/) · [ADR-048](../proposals/adr/ADR-048-admin-portal-no-bff/) · [ADR-049](../proposals/adr/ADR-049-admin-portal-tanstack-spa/) · [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/) · [RFC-0030](../proposals/rfc/RFC-0030/) · [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) (Analytics page) |
 
 ## The fan-out
 

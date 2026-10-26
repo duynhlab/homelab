@@ -5,7 +5,7 @@ day-2 platform patterns for the duynhlab homelab.
 
 | | |
 |---|---|
-| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (30 declared Flux Kustomizations; `mcp-local` commented out, so 29 apply) |
+| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (32 declared Flux Kustomizations; `mcp-local` commented out, so 31 apply) |
 | **Applications** | 10 Go microservices + React frontend + back-office portal + Temporal workers (`order-worker`, `checkout-worker`) + `mockpay` |
 | **GitOps** | Flux Operator + OCI artifacts + Kustomize — [`setup.md`](setup.md) |
 | **App onboarding** | Domain ResourceSets + InputProviders — [`application-delivery.md`](application-delivery.md) |
@@ -84,7 +84,7 @@ flowchart TD
     keda --> apps
 ```
 
-This diagram is a summary — the full numbered graph of all 30 Kustomization CRs
+This diagram is a summary — the full numbered graph of all 32 Kustomization CRs
 lives in [`setup.md`](setup.md#project-architecture).
 
 `make flux-sync` (inside `make sync`) reconciles only a **subset** of Kustomizations

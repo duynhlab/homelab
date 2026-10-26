@@ -74,8 +74,9 @@ before the 1 GB cap. Move PeerDB to its own Temporal only if CDC and the sagas
 start to contend for the frontend or the history shards.
 
 ClickHouse acquired PeerDB; its managed form is ClickHouse Cloud's ClickPipes
-for Postgres. This platform runs the open core itself under its ELv2 licence
-(owner decision, 2026-10-23, on the ADR-066 tracker).
+for Postgres. This platform runs it itself: the PeerDB core is AGPL-3.0 and the
+upstream Helm chart (`peerdb-enterprise`) is ELv2; the owner accepted both for
+internal self-hosting (2026-10-23, on the ADR-066 tracker).
 
 ## How it compares
 
@@ -224,8 +225,9 @@ ADR-068) and the OpenBAO bootstrap seeds (write them through a staff OIDC token,
 [runbook](../../secrets/runbooks/add-secret-live-cluster.md)).
 
 **Adding a column or a table** is a contract change: update the allowlist (both
-copies), regenerate the publication and `views.sql`, grant the new table in the
-pgroles policy, then resync the mirror so the snapshot carries the column.
+copies), regenerate `configs/cdc/source/publications.yaml` and `views.sql`,
+then resync the mirror so the snapshot carries the column. The SELECT grant
+follows the publication on the next `product-db-cdc-bootstrap` run (10 min).
 
 **A mirror that stopped** (`wal_status = lost`, a failed workflow, a dropped
 target table): terminate it and let `peerdb-bootstrap` recreate it with a fresh
@@ -253,7 +255,7 @@ psql "dbname=<db> replication=database" -c \
   "ALTER_REPLICATION_SLOT peerflow_slot_analytics_service_<db> (FAILOVER true)"
 ```
 
-**After every switchover, check the old primary.** A primary demoted cleanly
+**After every switchover, check the old primary** ([#1377](https://github.com/duynhlab/homelab/issues/1377)). A primary demoted cleanly
 (a switchover, which also ends every rolling update) keeps its own copies of
 the PeerDB slots. They are not synced, and the slot-sync worker then stops with
 `same name slot "…" already exists on the standby`, so that standby has no

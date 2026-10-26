@@ -84,8 +84,9 @@ failure reasons, existing API/lifecycle regressions, build/vet/lint, and
 integration compilation. Shared obsx tests and Weaver registry
 check/generation/diff/lockstep are separate checks.
 
-The candidate alert rules are tested as rules, not as a live notification
-pipeline. Dashboard JSON can be imported, but rendering and real labels are
+The alert rules are deployed (`analytics-alerts.yaml`) and were seen firing
+and resolving on Kind; a live notification pipeline is still not part of this
+audit. Dashboard JSON can be imported, but rendering and real labels are
 still Linux gates. CI must execute the disposable ClickHouse SQL suite and
 publish integration coverage; total coverage must not be confused with Sonar's
 new-code coverage. No release tag, rollout, G8/G10 pass or Adoption completion

@@ -313,20 +313,20 @@ and [analytics recovery](../analytics/README.md#investigation-and-recovery) runb
 The older `CNPGInactiveSlotRetainingWAL` cannot cover these slots: it waits for
 1 GiB, and `max_slot_wal_keep_size` invalidates them at 1 GB.
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| CDCReplicationSlotInactive | warning | `cnpg_pg_replication_slots_active` = 0 on a `peerflow_slot_analytics_service_*` slot | No consumer; WAL piles up. Mirrors still report RUNNING | 5m |
-| CDCReplicationSlotRetentionHigh | warning | `cnpg_pg_replication_slots_pg_wal_lsn_diff` > 512 MiB | Half-way to slot invalidation | 5m |
-| CDCReplicationSlotNearInvalidation | critical | same > 900 MiB | The next step is a full resync | 1m |
-| CDCReplicationSlotMissing | warning | fewer than 3 CDC slots on product-db | A mirror was terminated or never created | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| CDCReplicationSlotInactive | warning | `cnpg_pg_replication_slots_active` = 0 on a `peerflow_slot_analytics_service_*` slot | No consumer; WAL piles up. Mirrors still report RUNNING | 5m | [CDC operations](../../databases/cdc/README.md#operations) |
+| CDCReplicationSlotRetentionHigh | warning | `cnpg_pg_replication_slots_pg_wal_lsn_diff` > 512 MiB | Half-way to slot invalidation | 5m | [CDC operations](../../databases/cdc/README.md#operations) |
+| CDCReplicationSlotNearInvalidation | critical | same > 900 MiB | The next step is a full resync | 1m | [CDC operations](../../databases/cdc/README.md#operations) |
+| CDCReplicationSlotMissing | warning | fewer than 3 CDC slots on product-db | A mirror was terminated or never created | 15m | [CDC operations](../../databases/cdc/README.md#operations) |
 | CDCStandbySlotsNotSynced | warning | a product-db standby holds fewer than 3 synced `peerflow_slot_*` copies (`cnpg_cdc_standby_slots_synced`, custom query) | A promotion of it would lose the mirrors; after a switchover the demoted primary keeps non-synced copies (#1377) | 15m | [CDC operations](../../databases/cdc/README.md#operations) |
-| PeerDBMirrorNotRunning | warning | `peerdb_flow_status{flowStatus!="STATUS_RUNNING"}` | Mirror paused, resyncing or failed | 10m |
-| PeerDBMetricsMissing | warning | `absent_over_time(peerdb_instance_status[10m])` | flow-worker or its export is down; mirror alerts blind | 5m |
-| AnalyticsSourceStale | warning | `analytics_source_state_ratio{analytics_source_state="stale"}` | A source heartbeat is 120–300 s old | 1m |
-| AnalyticsSourceUnavailable | critical | same, `unavailable` | Heartbeat > 300 s; the API answers 503 | 1m |
-| AnalyticsFreshnessUnknown | warning | same, `unknown` | The sampler cannot certify freshness | 1m |
-| AnalyticsSamplerMissing | warning | runtime series without sampler series | The sampler stopped inside a live pod | 1m |
-| AnalyticsServiceMissing | critical | `absent_over_time(go_goroutine_count{service_name="analytics"}[2m])` | analytics-service or its telemetry is gone | 1m |
+| PeerDBMirrorNotRunning | warning | `peerdb_flow_status{flowStatus!="STATUS_RUNNING"}` | Mirror paused, resyncing or failed | 10m | [CDC operations](../../databases/cdc/README.md#operations) |
+| PeerDBMetricsMissing | warning | `absent_over_time(peerdb_instance_status[10m])` | flow-worker or its export is down; mirror alerts blind | 5m | [CDC operations](../../databases/cdc/README.md#operations) |
+| AnalyticsSourceStale | warning | `analytics_source_state_ratio{analytics_source_state="stale"}` | A source heartbeat is 120–300 s old | 1m | [Analytics recovery](../analytics/README.md#investigation-and-recovery) |
+| AnalyticsSourceUnavailable | critical | same, `unavailable` | Heartbeat > 300 s; the API answers 503 | 1m | [Analytics recovery](../analytics/README.md#investigation-and-recovery) |
+| AnalyticsFreshnessUnknown | warning | same, `unknown` | The sampler cannot certify freshness | 1m | [Analytics recovery](../analytics/README.md#investigation-and-recovery) |
+| AnalyticsSamplerMissing | warning | runtime series without sampler series | The sampler stopped inside a live pod | 1m | [Analytics recovery](../analytics/README.md#investigation-and-recovery) |
+| AnalyticsServiceMissing | critical | `absent_over_time(go_goroutine_count{service_name="analytics"}[2m])` | analytics-service or its telemetry is gone | 1m | [Analytics recovery](../analytics/README.md#investigation-and-recovery) |
 
 ## 5. Kubernetes
 

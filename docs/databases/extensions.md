@@ -47,7 +47,9 @@ be treated as synonyms.
 
 ## Current cluster preload
 
-Both operational clusters declare the dedicated CNPG list field:
+Both operational clusters declare the dedicated CNPG list field. `product-db`
+adds `pg_cron` at the end of the list (ADR-068, the CDC heartbeats) and runs
+the `postgresql-cron` operand through an `ImageCatalog`:
 
 ```yaml
 spec:
@@ -95,6 +97,10 @@ Entries omit `ensure`, so the documented default `present` applies.
 | `platform-db` | `user` | `pgaudit`, `pg_stat_statements`, `pg_stat_ch` |
 | `platform-db` | `notification`, `shipping`, `review`, `keycloak` | `pgaudit`, `pg_stat_statements` |
 | `platform-db` | `temporal`, `temporal_visibility` | `pg_stat_statements` |
+
+`pg_cron` is not in this table: it is not a `Database` resource extension. CNPG's
+`postInitSQL` creates it once in product-db's `postgres` database, with the
+`analytics_heartbeat` role and its grants ([Commerce CDC](./cdc/README.md)).
 
 `pg_stat_ch` is activated in one database per cluster on purpose: its hooks
 capture every database from the preload, and its SQL surface

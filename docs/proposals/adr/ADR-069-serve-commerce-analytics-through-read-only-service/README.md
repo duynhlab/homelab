@@ -70,7 +70,7 @@ span per query, using shared DB buckets and bounded query summaries.
 remains the sole owner of access logs and HTTP metrics; its 503 record links to
 the operation span by trace ID. Cancellation is distinguished from timeout;
 raw driver errors, SQL and parameters are never attached. See the
-[telemetry contract, candidates and Linux gates](../../../observability/analytics/)
+[telemetry contract, alerts and Linux gates](../../../observability/analytics/)
 for exact boundaries, cardinality budget, alert recovery and sampler lifecycle.
 T1 (transport flag separation / ClickHouse TLS) remains a separate follow-up.
 
@@ -113,9 +113,8 @@ The [contract](../../../api/analytics.md) selects USD-only v1, decimal integer
 JSON strings for money, ledger event-date totals, and checkout-created cohorts
 with current observed stages. The service (`v0.1.0`), the
 `api-analytics-protected` route under `jwt-edge-staff`, and the Backoffice
-`/analytics` page are deployed in local-stack and on Kind on a **fixture-backed
-serving layer** (PeerDB's table shape, CDC not yet deployed); the Linux
-evidence is on [#1332](https://github.com/duynhlab/homelab/issues/1332),
+`/analytics` page are deployed in local-stack (on a fixture) and on Kind (on
+the PeerDB CDC mirrors since 2026-10-23); the Linux evidence is on [#1332](https://github.com/duynhlab/homelab/issues/1332),
 [#1334](https://github.com/duynhlab/homelab/issues/1334) and
 [#1335](https://github.com/duynhlab/homelab/issues/1335). The first
 one-million-fact run failed the performance bar because the serving views
@@ -124,9 +123,8 @@ keys. The views now read `FINAL` over `ReplacingMergeTree(_peerdb_version)`
 ([homelab#1366](https://github.com/duynhlab/homelab/pull/1366)) and the reader
 joins on typed keys
 ([analytics-service#5](https://github.com/duynhlab/analytics-service/pull/5)).
-Adoption stays **Partial**: the serving data is a fixture, and the 90-day
-funnel query (0.55 s median) remains over the 500 ms bar, which the owner
-accepted as a known limit on 2026-10-23
+The 90-day funnel query (0.55 s median) remains over the 500 ms bar, which
+the owner accepted as a known limit on 2026-10-23
 ([analytics-service#4](https://github.com/duynhlab/analytics-service/issues/4)).
 
 ### Decision rules

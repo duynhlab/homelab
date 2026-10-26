@@ -77,7 +77,10 @@ throughput guarantee. See [poolers](./poolers.md) for connection ownership.
 
 All three clusters declare `max_wal_size=8GB` on 10Gi data volumes. That value
 is a checkpoint target, **not a hard cap**. Failed archiving, lagging slots and
-recovery requirements can retain more WAL. Tables, indexes, temporary files and
+recovery requirements can retain more WAL. On `product-db` the CDC logical slots
+are the exception: `max_slot_wal_keep_size: 1GB` caps what they retain, and the
+`CDCReplicationSlot*` alerts warn at 512 MiB and 900 MiB
+([Commerce CDC](./cdc/README.md)). Tables, indexes, temporary files and
 maintenance also occupy the same filesystem.
 
 Measure free bytes and growth rate, not just percent used. Investigate the

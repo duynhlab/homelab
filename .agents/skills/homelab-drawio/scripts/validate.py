@@ -644,6 +644,37 @@ def gate_products(d: "Diagram") -> list[dict]:
     return out
 
 
+def _named_products(line: str, names: dict[str, str]) -> set[str]:
+    """Catalogued products a label line names: an item (split on '·', '+',
+    ',' and parentheses) that is a product name, or starts with one followed
+    by a space, ':' or '×' ('RustFS bucket', 'Valkey :6379', 'PgDog ×3')."""
+    found = set()
+    for item in re.split(r"[·+,()]", line):
+        item = item.strip().lower()
+        for name, key in names.items():
+            if item == name or re.match(re.escape(name) + r"[\s:×]", item):
+                found.add(key)
+    return found
+
+
+def gate_missing_logo(ir: dict) -> list[dict]:
+    """A generated box whose first label line names exactly one catalogued
+    product carries that product's logo (icons.md), unless the IR says
+    `icon: none`: the box names a product without being it."""
+    names, _ = _catalogue()
+    out = []
+    for n in ir.get("nodes", []):
+        if n.get("icon"):
+            continue
+        named = _named_products(n["label"].split("\n")[0], names)
+        if len(named) == 1:
+            key = next(iter(named))
+            out.append(finding("WARN", "house.missing_logo", [n["id"]],
+                               f"box names {key} but carries no logo",
+                               f"set `icon: {key}` in the IR, or `icon: none` when the box only names it"))
+    return out
+
+
 def gate_house(path: str) -> list[dict]:
     errors, warnings = validate_house.check_file(path)
     out = []
@@ -670,7 +701,7 @@ def validate(path: str, ir_path: str | None = None) -> list[dict]:
     geo, routes = gate_geometry(d, ir)
     out += geo + gate_typography(d, routes)
     if ir is not None and not any(f["rule_id"].startswith("ir.") for f in out):
-        out += gate_architecture(ir)
+        out += gate_architecture(ir) + gate_missing_logo(ir)
     return sorted(out, key=lambda f: (SEV_ORDER[f["severity"]], f["rule_id"], f["objects"]))
 
 

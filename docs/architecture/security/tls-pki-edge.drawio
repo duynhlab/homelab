@@ -115,13 +115,13 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="c_baoleaf" value="openbao-idp-trust&#10;(ca.crt only)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.88;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="issuer" target="bao">
+        <mxCell id="c_baoleaf" value="openbao-idp-trust&#10;(ca.crt only)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="issuer" target="bao">
           <mxGeometry relative="1" as="geometry" x="0.06">
             <Array as="points">
               <mxPoint x="460" y="619" />
               <mxPoint x="190" y="619" />
               <mxPoint x="190" y="902" />
-              <mxPoint x="235.43" y="902" />
+              <mxPoint x="145" y="902" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -162,10 +162,10 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="r_bao" value="TLS verified · live CA&#10;OIDC discovery hairpin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.94;exitY=0;exitDx=0;exitDy=0;entryX=0.17;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bao" target="eg">
-          <mxGeometry relative="1" as="geometry" x="-0.42">
+        <mxCell id="r_bao" value="TLS verified · live CA&#10;OIDC discovery hairpin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.65;exitY=0;exitDx=0;exitDy=0;entryX=0.17;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bao" target="eg">
+          <mxGeometry relative="1" as="geometry" x="-0.35">
             <Array as="points">
-              <mxPoint x="245.43" y="918" />
+              <mxPoint x="195" y="918" />
               <mxPoint x="390" y="918" />
               <mxPoint x="390" y="633" />
               <mxPoint x="920" y="633" />

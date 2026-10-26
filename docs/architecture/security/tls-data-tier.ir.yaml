@@ -60,22 +60,21 @@ boundaries:
 nodes:
   - {id: issuer, label: "ClusterIssuer homelab-ca\n7 leaves + 14 ca.crt anchors\n90d · renew 15d", role: platform, layer: pki, parent: f_pki, icon: cert-manager}
   - {id: opca, label: "CNPG client CA\noperator-managed, not homelab-ca", role: platform, layer: pki, parent: f_pki, icon: cloudnativepg}
-  - {id: peerdb, label: "PeerDB (peerdb)\nflow-worker · snapshot-worker · flow-api", role: worker, layer: apps, parent: f_apps}
+  - {id: peerdb, label: "PeerDB (peerdb)\nflow-worker · snapshot-worker · flow-api", role: worker, layer: apps, parent: f_apps, icon: peerdb}
   - {id: otel, label: "OTel Collector\n:4317 · :4318", role: collector, layer: apps, parent: f_apps, icon: opentelemetry}
   - {id: temporal, label: "Temporal server", role: platform, layer: apps, parent: f_apps, icon: temporal}
   - {id: bao, label: "OpenBao HA Raft\n:8200 tls_disable = 1", role: platform, layer: apps, parent: f_apps, icon: openbao}
   - {id: kc, label: "Keycloak", role: service, layer: apps, parent: f_apps, icon: keycloak}
   - {id: svc, label: "11 Go services + 2 workers\nmigrate · seed · authz Jobs", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: pgroles, label: "pgroles operator\nin-database grants", role: platform, layer: apps, parent: f_apps}
-  - {id: pgb, label: "CNPG PgBouncer :5432\nplatform-db pooler · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data}
-  - {id: valkey, label: "Valkey :6379\nauth disabled", role: data, layer: pooling, parent: f_data, shape: datastore}
-  - {id: cdcpool, label: "CDC PgBouncer :5432\nproduct-db-pooler-cdc · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data}
+  - {id: pgb, label: "CNPG PgBouncer :5432\nplatform-db pooler · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data, icon: pgbouncer}
+  - {id: valkey, label: "Valkey :6379\nauth disabled", role: data, layer: pooling, parent: f_data, shape: datastore, icon: valkey}
+  - {id: cdcpool, label: "CDC PgBouncer :5432\nproduct-db-pooler-cdc · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data, icon: pgbouncer}
   - {id: pgdog, label: "PgDog ×3 :6432\nproduct-db pooler · TLS required\nhomelab-ca leaf", role: data, layer: pooling, parent: f_data, icon: pgdog}
   - {id: obsdb, label: "Telemetry stores\nVictoriaMetrics · Logs · Traces\nClickHouse :9000 · Pyroscope", role: data, layer: data, parent: f_data, shape: datastore}
   - {id: platdb, label: "platform-db\nCNPG · homelab-ca server cert", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
   - {id: proddb, label: "product-db (+ DR replica)\nCNPG · homelab-ca server cert", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
-  - {id: rustfs, label: "RustFS S3\n:9000 HTTP", role: data, layer: objects, parent: f_data, shape: datastore}
-
+  - {id: rustfs, label: "RustFS S3\n:9000 HTTP", role: data, layer: objects, parent: f_data, shape: datastore, icon: rustfs}
 edges:
   - {id: c_poolcert, source: issuer, target: pgdog, type: control, label: "issues pooler leaves\n(PgDog + 2 PgBouncer)"}
   - {id: c_srvcert, source: issuer, target: proddb, type: control, label: "issues <cluster>-server-tls\n(both clusters + DR)"}
@@ -84,7 +83,7 @@ edges:
   - {id: d_migrate, source: svc, target: proddb, type: data, label: "TLS verified · migrate,\nseeds, authz → both -rw"}
   - {id: d_valkey, source: svc, target: valkey, type: data, label: "PLAINTEXT · no auth"}
   - {id: d_pgdogup, source: pgdog, target: proddb, type: data, label: "TLS verified\nverify_full", label_pos: -0.7}
-  - {id: d_pgbup, source: pgb, target: platdb, type: data, label: "TLS verified · verify-full\n+ auth_query client cert", label_pos: -0.9}
+  - {id: d_pgbup, source: pgb, target: platdb, type: data, label: "TLS verified · verify-full\n+ auth_query client cert", label_pos: -0.6}
   - {id: d_cdc, source: peerdb, target: cdcpool, type: data, label: "TLS verified\nrequireTls + rootCa"}
   - {id: d_cdcup, source: cdcpool, target: proddb, type: data, label: "TLS verified\nverify-full"}
   - {id: d_catalog, source: peerdb, target: platdb, type: data, label: "TLS verified · catalog\nverify-full"}
@@ -93,7 +92,7 @@ edges:
   - {id: c_dbengine, source: bao, target: platdb, type: control, label: "TLS unverified · DB engine\nrequire (both clusters)"}
   - {id: c_pgroles, source: pgroles, target: proddb, type: control, label: "TLS unverified\nrequire (both)"}
   - {id: c_opca, source: opca, target: proddb, type: control, label: "client certs: replication\n+ auth_query (both)"}
-  - {id: m_stores, source: otel, target: obsdb, type: telemetry, label: "PLAINTEXT · HTTP + native\n(Grafana reads the same)"}
+  - {id: m_stores, source: otel, target: obsdb, type: telemetry, label: "PLAINTEXT · HTTP + native\n(Grafana reads the same)", label_pos: -0.4}
   - {id: r_backup, source: proddb, target: rustfs, type: replication, label: "PLAINTEXT · S3 WAL +\nbackups · DR restore"}
   - {id: d_cold, source: obsdb, target: rustfs, type: data, label: "PLAINTEXT · S3\ncold tier · profiles"}
 

@@ -44,7 +44,7 @@ nodes:
   - {id: pgch, label: "product-db · platform-db\npg_stat_ch extension", role: data, layer: producers, parent: f_src, icon: postgresql}
   - {id: targets, label: "Scrape targets\nkube-state-metrics · cAdvisor\nCNPG · Temporal · OpenBao", role: platform, layer: producers, parent: f_src}
   - {id: svc, label: "Go services ×11 · 2 workers · mockpay\ntraces · metrics · logs", role: service, layer: producers, parent: f_src, icon: go}
-  - {id: peerdb, label: "PeerDB (peerdb)\nflow-api · flow-worker · snapshot-worker\nmetrics only · peerdb_ prefix", role: worker, layer: producers, parent: f_src}
+  - {id: peerdb, label: "PeerDB (peerdb)\nflow-api · flow-worker · snapshot-worker\nmetrics only · peerdb_ prefix", role: worker, layer: producers, parent: f_src, icon: peerdb}
   - {id: vector, label: "Vector DaemonSet\nother pods' stdout · OpenBao audit", role: collector, layer: producers, parent: f_src, icon: vector}
   - {id: pyrosdk, label: "Same Go processes\nPyroscope SDK", role: service, layer: producers, parent: f_src, icon: go}
   - {id: edge, label: "Envoy Gateway\nedge spans · access logs", role: edge, layer: producers, parent: f_src, icon: envoy}
@@ -68,8 +68,7 @@ nodes:
   - {id: vt, label: "VictoriaTraces\n7 d", role: trace, layer: stores, parent: f_store, icon: victoriametrics}
   - {id: pyro, label: "Pyroscope\n7 d (168 h)", role: profile, layer: stores, parent: f_store, icon: pyroscope}
 
-  - {id: rustfs, label: "RustFS buckets\nclickhouse-otel · pyroscope-profiles", role: data, layer: cold, parent: f_rustfs, shape: datastore}
-
+  - {id: rustfs, label: "RustFS buckets\nclickhouse-otel · pyroscope-profiles", role: data, layer: cold, parent: f_rustfs, shape: datastore, icon: rustfs}
   - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_cluster, icon: grafana}
 
 edges:

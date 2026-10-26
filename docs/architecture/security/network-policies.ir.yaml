@@ -43,7 +43,7 @@ nodes:
   # pin_order: each layer reads left to right in this order. 2026-10-19: all 720
   # orders of the open tier measured (pinned and unpinned, both tier orders): 19
   # crossings is the floor with pgroles and the second rotation edge added.
-  - {id: peerdb, label: "peerdb\nPeerDB (CDC)", role: worker, layer: open, parent: f_open}
+  - {id: peerdb, label: "peerdb\nPeerDB (CDC)", role: worker, layer: open, parent: f_open, icon: peerdb}
   - {id: cnpg, label: "cloudnative-pg\nCNPG operator", role: platform, layer: open, parent: f_open, icon: cloudnativepg}
   - {id: envoy, label: "envoy-gateway\nEnvoy Gateway proxies", role: edge, layer: open, parent: f_open, icon: envoy}
   - {id: pgroles, label: "pgroles-system\npgroles operator", role: platform, layer: open, parent: f_open}

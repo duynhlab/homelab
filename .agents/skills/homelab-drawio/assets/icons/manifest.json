@@ -258,6 +258,22 @@
       "label": "Sloth",
       "source": "https://github.com/slok/sloth/blob/main/docs/img/logo.png",
       "license": "Sloth project logo (Apache-2.0 repository); identification use only"
+    },
+    "pgbouncer": {
+      "file": "pgbouncer.png",
+      "bytes": 2432,
+      "sha256": "807f0d6e6629cf7864149bbd417dc2ae5fd33d2df4e6d8a92e2277cf0d5be333",
+      "label": "PgBouncer",
+      "source": "https://www.pgbouncer.org/images/pgbouncer-logo.svg",
+      "license": "PgBouncer project brand mark (pgbouncer.org); identification use only. SVG rasterised to 64px."
+    },
+    "peerdb": {
+      "file": "peerdb.png",
+      "bytes": 5451,
+      "sha256": "017228b6622df6d568732d3b03526b67eddad8f621ea40be02cd956d8884ae38",
+      "label": "PeerDB",
+      "source": "https://github.com/PeerDB-io.png",
+      "license": "PeerDB (PeerDB-io) brand mark from the GitHub organisation avatar, logomark separated from its dark tile; identification use only."
     }
   },
   "none": {},

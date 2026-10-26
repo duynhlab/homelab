@@ -16,6 +16,14 @@
   "httpHeaders": [
     {
       "urls": [
+        "https://www.uber.com/"
+      ],
+      "headers": {
+        "Accept": "text/html"
+      }
+    },
+    {
+      "urls": [
         "https://github.com/",
         "https://docs.github.com/"
       ],

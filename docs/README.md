@@ -25,7 +25,7 @@ docs/
 │   ├── checkout.md               # P1-P5 checkout subsystem; P6 planned
 │   ├── payments.md               # Payment contract, ledger, reconciliation
 │   ├── inventory.md              # Inventory gRPC contract — the sole stock authority
-│   ├── analytics.md              # Staff commerce overview from ClickHouse serving views (fixture-backed)
+│   ├── analytics.md              # Staff commerce overview from ClickHouse serving views (fed by PeerDB CDC)
 │   ├── graceful-shutdown.md      # Cross-service shutdown contract (drain, timeouts)
 │   ├── caching.md                # Cache-Aside app contract: keys, TTLs, invalidation
 │   ├── pkg.md                     # Which shared Go modules exist and how they layer
@@ -104,7 +104,7 @@ docs/
 │   │   └── README.md             # Platform pipeline (VictoriaLogs + Vector)
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
-│   ├── analytics/                # analytics-service sampler signals, alert/dashboard candidates, audit
+│   ├── analytics/                # analytics-service sampler signals, alerts, dashboard candidate, audit
 │   ├── clickhouse/               # ClickHouse OTel logs+traces OLAP (deployed)
 │   │   ├── README.md             # Platform hub, architecture, and Grafana
 │   │   ├── internals/            # Engine learning path + chapter authoring contract
@@ -223,14 +223,14 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | Checkout | [checkout-service](https://github.com/duynhlab/checkout-service) | [checkout.md](./api/checkout.md) | `ghcr.io/duynhlab/checkout-service/checkout-service` | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) |
 | Payment | [payment-service](https://github.com/duynhlab/payment-service) | [payments.md](./api/payments.md) | `ghcr.io/duynhlab/payment-service/payment-service` | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) |
 | Frontend | [frontend](https://github.com/duynhlab/frontend) | [frontend/](./frontend/README.md) — platform view; no API contract of its own | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
-| Commerce analytics | [analytics-service](https://github.com/duynhlab/analytics-service) | [analytics.md](./api/analytics.md) — staff-only ClickHouse read model; fixture-backed serving layer until the CDC mirrors (**planned**) land | `ghcr.io/duynhlab/analytics-service/analytics-service` | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
+| Commerce analytics | [analytics-service](https://github.com/duynhlab/analytics-service) | [analytics.md](./api/analytics.md) — staff-only ClickHouse read model, fed by PeerDB CDC from product-db ([Commerce CDC](./databases/cdc/README.md)) | `ghcr.io/duynhlab/analytics-service/analytics-service` | [![CI](https://github.com/duynhlab/analytics-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/analytics-service/actions) |
 | Backoffice portal | [admin-service](https://github.com/duynhlab/admin-service) | [frontend/admin-portal/](./frontend/admin-portal/README.md) — operator SPA; the reads it calls are in each service's contract | `ghcr.io/duynhlab/admin-service/admin-service` | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
 
 Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Observability
 
-- [Analytics telemetry and audit](./observability/analytics/) — RFC-0030 sampler, metrics and the Linux runtime qualification; alert and dashboard candidates still planned.
+- [Analytics telemetry and audit](./observability/analytics/) — RFC-0030 sampler, metrics, alerts and the Linux runtime qualification; the dashboard is still a candidate.
 
 Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./observability/audits/2026-09-16-telemetry-standards.md)** - logs, traces, metrics, profiling and the ClickHouse consumers.
 
@@ -437,7 +437,8 @@ here is how an index starts disagreeing with the records it points at.
 - [**RFC index**](./proposals/rfc/README.md) — all **32** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
 - [Proposals hub](./proposals/) — templates and how to open a new record.
-- [Commerce CDC Phase 0](./proposals/rfc/RFC-0030/phase0.md) — opt-in PeerDB prototype, run commands and Linux qualification gates.
+- [Commerce CDC](./databases/cdc/README.md) — PeerDB on Kind: components, operations, drills and alerts.
+- [Commerce CDC Phase 0](./proposals/rfc/RFC-0030/phase0.md) — the historical Compose qualification prototype.
 - [Mini-PC homelab migration](./proposals/rfc/RFC-0011/) — hardware qualification, recovery gates and reviewed design questions; [private administration and web access](./proposals/adr/ADR-087-homelab-private-and-web-access/) records the proposed access boundary. [Four Draw.io previews](./architecture/platform/README.md#rfc-0011-previews) show physical connectivity, the layered stack, access and OSI network roles.
 
 **Start here** — a reading path, *not* an index. These eight decisions shape

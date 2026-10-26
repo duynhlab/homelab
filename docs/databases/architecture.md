@@ -130,6 +130,11 @@ replication lag. That is why every other read stays on the primary.
 | `product-db` | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` |
 | `product-db-replica` | Physical recovery copy of `product-db` |
 
+`order`, `checkout` and `payment` on product-db also feed analytics: PeerDB
+reads column-listed publications through its own session-mode PgBouncer,
+`product-db-pooler-cdc`, and pg_cron writes a heartbeat row in each every 30 s
+([Commerce CDC](./cdc/README.md)).
+
 Each service has two Secret projections (runtime and migrator), a runtime
 `DatabaseRole`, and a `Database` owned by `<svc>_owner`; the owner and migrator
 roles come from the cluster's role catalog Job
@@ -148,6 +153,7 @@ services, not by the infrastructure manifests.
 - [Backup policy](./backup-policy.md)
 - [Disaster recovery](./disaster-recovery.md)
 - [Database runbooks](./runbooks/README.md)
+- [Commerce CDC (PeerDB)](./cdc/README.md)
 
 ## Manifest evidence
 

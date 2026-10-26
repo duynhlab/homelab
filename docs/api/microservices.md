@@ -90,7 +90,7 @@ availability vocabulary used by service At-a-glance tables.
 | Unpersisted destination and demo quote math | shipping | Migration debt and accepted limitations | [shipping known gaps](./shipping.md#known-gaps) |
 | Direct DB connection, reconciliation limits, and single-replica constraint | payment | Migration and scaling constraints | [payment known gaps](./payments.md#known-gaps) |
 | Bounded review feed and write-once reviews | review | Accepted design limits | [review known gaps](./review.md#known-gaps) |
-| Fixture-backed serving data (CDC planned), plaintext ClickHouse hop and the 90-day funnel over the 500 ms bar | analytics | Accepted known limit (funnel); CDC and TLS planned | [analytics verification and rollout](./analytics.md#verification-and-rollout) |
+| Plaintext ClickHouse hop and the 90-day funnel over the 500 ms bar | analytics | Accepted known limit (funnel); TLS planned (ADR-069 T1) | [analytics verification and rollout](./analytics.md#verification-and-rollout) |
 | Backoffice availability and static-delivery hardening | Backoffice | Current platform gaps | [Backoffice known gaps](../frontend/admin-portal/README.md#known-gaps) |
 
 Resolved migrations and retired surfaces stay in their RFCs, ADRs, and archived

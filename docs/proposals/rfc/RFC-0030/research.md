@@ -8,9 +8,11 @@
 | **Created** | 2026-09-06 |
 | **Last updated** | 2026-09-08 |
 
-> **Research only.** PeerDB, `pg_cron`, commerce objects, and analytics workloads
-> describe the accepted target, **planned — not deployed**. See
-> [Phase 0 qualification](./phase0.md) for current prototype evidence.
+> **Historical — research as of 2026-09-08.** Where this page says "planned —
+> not deployed", that was true then. Everything it planned was deployed on Kind
+> on 2026-10-23; for the system as built read
+> [Commerce CDC](../../../databases/cdc/README.md) and
+> [the analytics contract](../../../api/analytics.md).
 
 Repository baseline checked on 2026-10-13: manifests now select PostgreSQL 18.6,
 ClickHouse 26.9 and Kind 1.35.8. This refresh is repository evidence, not a

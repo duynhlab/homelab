@@ -123,18 +123,18 @@ Skeleton (copy what you need):
   `peerdb_catalog` on platform-db over verify-full, the platform Temporal in a
   `peerdb` namespace with the `MirrorName` search attribute, staging bucket
   `analytics-service-cdc` through the shared RustFS key (recorded gap, #1315).
-  No mirror is created yet.
+  The mirrors followed in phases 5–6 (above).
 - **analytics-service runs on Kind, dark-launched then routed** (#1360,
   RFC-0030 phases 8–9 / ADR-069). The `analytics` namespace (app tier), its
   domain ResourceSet (no DB, no migrate, no gRPC; ClickHouse reader from an ESO
   Secret; staff JWKS pair; probes, resources, SLO), the `analytics_reader` CHI
   user with SELECT on the ten reviewed `analytics.*_live` views under a
   `readonly=2` profile, the OpenBAO seed and `ClusterExternalSecret`, and
-  `duyne-viewer` in the staff realm. The serving layer is **fixture-backed**
-  (`scripts/analytics/serving-fixture.sh`, PeerDB's table shape, outside Flux)
-  until the CDC mirrors land; `scripts/analytics-reader-sweep.sh` is row K3.12.
-  Pinned to `sha-8e4667f`: the one-million-fact performance bar fails
-  (analytics-service#4) and holds the first tag.
+  `duyne-viewer` in the staff realm. The serving layer started fixture-backed
+  (PeerDB's table shape) and is now fed by the CDC mirrors (above);
+  `scripts/analytics-reader-sweep.sh` is row K3.12. The first tag waited on the
+  read path until the owner accepted the funnel limit (analytics-service#4);
+  `v0.1.0` is released.
 - **Service Deployments select on the chart's own labels only.** The `app`
   label kept from `mop` (`extraSelectorLabels`) is dropped from the five domain
   ResourceSets, `rs-frontend`, `rs-backoffice` and `mockpay`; the selector is
@@ -194,7 +194,7 @@ Skeleton (copy what you need):
   prefix. The five analytics freshness rules move from a docs candidate to
   `analytics-alerts.yaml`.
 
-- **RFC-0030 telemetry qualification:** document the planned idle freshness sampler, standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
+- **RFC-0030 telemetry qualification:** document the idle freshness sampler (now deployed), standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
 
 - **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`
   and `PgDogPoolBanned` on PgDog's own metrics (`pgdog_cl_waiting`,
@@ -300,7 +300,8 @@ Skeleton (copy what you need):
   `Publication`s `analytics_order|checkout|payment` hold exactly the ADR-067
   tables and columns plus each database's `analytics_cdc_heartbeat`; the
   `peerdb_<db>` roles are CNPG `DatabaseRole`s (REPLICATION is
-  superuser-only) with exact-table SELECT declared in the pgroles policies; a
+  superuser-only) with exact-table SELECT on the published tables (granted by
+  the bootstrap below since #1378, not pgroles); a
   bootstrap Job (CronJob every 10 min) creates the heartbeat tables as each
   owner and schedules three 30-second pg_cron jobs plus a daily history
   cleanup as `analytics_heartbeat`. PeerDB's only path in is
@@ -654,7 +655,7 @@ Skeleton (copy what you need):
   linked from the databases hub, extensions (pg_cron) and poolers (CDC pooler).
 
 - **The analytics contract is as-built.** `docs/api/analytics.md` moves from
-  *Planned* to live on a fixture-backed serving layer with the compose and Kind
+  *Planned* to live (first on a fixture-backed serving layer, now CDC-fed) with the compose and Kind
   evidence rows and the open read-path finding (analytics-service#4); the API
   index, the Backoffice consumer map (seventh service, `analytics` module,
   eighth screen), the repositories table and the observability index follow;
@@ -735,7 +736,7 @@ Skeleton (copy what you need):
   deployed on a fixture-backed serving layer and pass their compose and Kind
   rows; the performance bar (G8.5) fails on one million facts and holds the
   first tag (analytics-service#4). Phases 1–7 (pooled CDC, PeerDB, mirrors)
-  remain unstarted.
+  followed on 2026-10-23 (above).
 - **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
   allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
   Keep the accepted architecture separate from pending cluster qualification.
@@ -936,12 +937,44 @@ Skeleton (copy what you need):
   observes the new Secret revision; repository state alone does not claim that
   live revocation has happened.
 
+#### Services
+
+- **A PgDog roll no longer fails requests with `57P01`** (#1338,
+  duynhlab/pkg#124). dbx v0.39.0 checks each pooled connection before handing
+  it out and replaces one the pooler has already closed. Measured on Kind
+  (2 orders/s for 180 s through the edge, `rollout restart deploy/pgdog-product`):
+  0 `57P01` (was 5), 39 connections replaced. The roll still costs about 21
+  requests (24 5xx against 3 at baseline): checkout queries time out when each
+  old PgDog pod receives SIGINT (#1350).
+
+- **mockpay runs without a CPU limit** (was 50m), as the rest of the platform.
+
 #### Local-stack
 
 - Match RFC-0030 snapshot Avro objects using the renamed `analytics_service_*`
   mirrors so both PII gates check column allowlists across all ten tables.
 
+- **The compose gate checks what the cluster does.**
+  - Edge access logs are ClickHouse-only, as on the cluster (ADR-061). C13 now
+    reads `otel.otel_logs` and asserts VictoriaLogs holds none.
+  - Service healthchecks probe `/ready` instead of `/health`.
+  - payment heals reconciliation discrepancies (`RECON_HEAL_ENABLED`).
+  - checkout and the edge wait for inventory.
+  - PostgreSQL runs on Debian trixie and is initialised with locale `C`, like
+    the CNPG clusters, so text ordering matches. It used to be `en_US.utf8` on
+    Alpine.
+  - The README states the remaining divergences (no database TLS) and drops
+    stale claims: one role per database, edge logs through Vector, the VM pin.
+
 #### Docs
+
+- **RFC-0030 docs describe what is deployed.** A review against the manifests
+  removed "planned" and "fixture-backed" claims for the CDC path across the
+  RFC, ADR-066/068/069, the API, observability, databases and platform docs;
+  corrected the PeerDB licence (core AGPL-3.0, chart ELv2), the pgroles-grant
+  instruction, the product-db slot cap, the Flux chain (`cdc-local`,
+  `pgroles-operator-local`; 32 Kustomizations), the Kind audit rows (K3.13 CDC
+  path, K3.14 failover slots) and a wrong NetworkPolicy reference for `peerdb`.
 
 - **Analytics go-live docs describe what is deployed.** `analytics-service`,
   its edge route and the Backoffice page are current in RFC-0030 (status,
@@ -966,34 +999,6 @@ Skeleton (copy what you need):
 - Align RFC-0030 resource names with analytics-service across the CDC prototype,
   SQL access contract, RFC and ADRs. Require fresh disposable qualification
   state; historical evidence remains tied to its original commits.
-
-#### Services
-
-- **A PgDog roll no longer fails requests with `57P01`** (#1338,
-  duynhlab/pkg#124). dbx v0.39.0 checks each pooled connection before handing
-  it out and replaces one the pooler has already closed. Measured on Kind
-  (2 orders/s for 180 s through the edge, `rollout restart deploy/pgdog-product`):
-  0 `57P01` (was 5), 39 connections replaced. The roll still costs about 21
-  requests (24 5xx against 3 at baseline): checkout queries time out when each
-  old PgDog pod receives SIGINT (#1350).
-
-- **mockpay runs without a CPU limit** (was 50m), as the rest of the platform.
-
-#### Local-stack
-
-- **The compose gate checks what the cluster does.**
-  - Edge access logs are ClickHouse-only, as on the cluster (ADR-061). C13 now
-    reads `otel.otel_logs` and asserts VictoriaLogs holds none.
-  - Service healthchecks probe `/ready` instead of `/health`.
-  - payment heals reconciliation discrepancies (`RECON_HEAL_ENABLED`).
-  - checkout and the edge wait for inventory.
-  - PostgreSQL runs on Debian trixie and is initialised with locale `C`, like
-    the CNPG clusters, so text ordering matches. It used to be `en_US.utf8` on
-    Alpine.
-  - The README states the remaining divergences (no database TLS) and drops
-    stale claims: one role per database, edge logs through Vector, the VM pin.
-
-#### Docs
 
 - Standardize issue title prefixes and native types in the issue forms and
   contribution guidance; align RFC-0030 tracking without changing its gates.

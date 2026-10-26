@@ -75,6 +75,11 @@ existing Temporal, RustFS, and `platform-db` capabilities only through a
 dedicated `peerdb` namespace, `analytics-service-cdc` bucket and identity, and catalog
 database and role. PeerDB control APIs and UI stay cluster-internal.
 
+> **As built (2026-10-23):** the qualified profile is `product-db-pooler-cdc`
+> (CNPG PgBouncer, session mode, client TLS required, verify-full to the
+> primary); replication through it passed G3.1–G3.6. Operations:
+> [Commerce CDC](../../../databases/cdc/README.md).
+
 Resource names follow [RFC-0030](../../rfc/RFC-0030/README.md#resource-naming):
 the destination peer is `analytics_service`, the ClickHouse database is
 `analytics`, and the ingest identity is `analytics_ingest`. The bucket identity
@@ -149,7 +154,8 @@ to platform-owned code.
 - PeerDB, its catalog, workflows, staging, and upgrades become day-2 platform work.
 - Consumer lag retains WAL and can force a destructive resync after the safety cap.
 - Initial snapshots consume source, network, staging, and ClickHouse capacity.
-- AGPL-3.0 core and the ELv2 chart require explicit approval before acceptance.
+- AGPL-3.0 core and the ELv2 chart require explicit approval before acceptance
+  (granted for internal self-hosting on 2026-10-23, see History).
 - Schema evolution remains conservative until the pinned build proves exact behavior.
 
 ### Neutral consequences

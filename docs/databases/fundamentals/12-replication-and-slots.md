@@ -88,8 +88,10 @@ absent — which is exactly when it becomes expensive.
   promotion gate, and it is not enabled here. (Upstream invariant + Repository
   fact — [CloudNativePG failover quorum](https://cloudnative-pg.io/docs/1.30/failover/).)
 - A slot pins WAL from its `restart_lsn` forward until the consumer advances
-  it; only `max_slot_wal_keep_size` bounds that retention, and it is not set
-  here, so retention is unbounded. (Upstream invariant + Repository fact.)
+  it; only `max_slot_wal_keep_size` bounds that retention. `product-db` sets it
+  to 1GB because it carries the CDC logical slots (past the cap PostgreSQL
+  invalidates the slot); `platform-db` and the DR replica leave it unset, so
+  their retention is unbounded. (Upstream invariant + Repository fact.)
 
 ### Lifecycle or sequence
 

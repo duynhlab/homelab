@@ -96,7 +96,10 @@ promote is named explicitly. `switchover` returns
 `Error: unknown command "switchover"`, found by
 [drill DR-2026-08-B](../../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record).
 
-Then confirm PgDog still routes and the app reconnects cleanly (service owner).
+Then confirm PgDog still routes and the app reconnects cleanly (service owner),
+and that CDC followed the primary: the three `peerflow_slot_*` slots are active
+on the new primary, and the demoted instance holds no non-synced copy
+([after every switchover](../cdc/README.md#operations), #1377).
 Record the observed cut-over time against the **≤ 1 min** SLO. Measure it with a
 write probe rather than the cluster `phase`: on the recorded run the phase
 reported `healthy` at +30.5 s while writes had already recovered at +12.2 s.

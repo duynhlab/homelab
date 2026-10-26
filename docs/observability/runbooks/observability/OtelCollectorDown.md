@@ -4,16 +4,19 @@
 |---|---|
 | **Severity** | critical |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/otel-collector-alerts.yaml` |
+| **Source** | [Rule manifest](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/observability/otel-collector-alerts.yaml) |
 | **Metrics** | `up{job=~".*otel-collector.*"} == 0` |
-| **Status** | active |
+| **Status** | active in repository configuration |
+| **Validation** | Static comparison to rule and Collector values, 2026-10-23; no new runtime test |
 | **Dashboard** | Observability → OTel Collector |
 | **Local-stack** | present — the compose stack runs the same collector |
 
 ## Meaning
 
-The OpenTelemetry Collector is not being scraped. It is a **single deployment**
-on this platform, so there is no redundancy: it is down or it is not.
+The independent Collector scrape returns `up == 0` for five minutes. This
+can mean an unavailable process, an unreachable metrics endpoint or a scrape
+configuration fault. A missing target produces no `up` series and is not covered
+by this expression. The configured gateway has one replica.
 
 ## Impact
 
@@ -50,8 +53,8 @@ otelcol_exporter_queue_size
 otelcol_exporter_queue_capacity
 ```
 
-A collector that OOMs is nearly always a collector whose exporter queue filled
-first, because a backend stopped accepting. Check which exporter.
+For OOMs, compare exporter queues, input volume, stateful aggregation and
+container memory before assigning a cause. Queue pressure is one possibility.
 
 ## Mitigation
 
@@ -59,10 +62,17 @@ first, because a backend stopped accepting. Check which exporter.
    usually the backend, not the collector's memory.
 2. **Config error** → it is a HelmRelease; see
    [FluxHelmReleaseNotReady](../gitops/FluxHelmReleaseNotReady.md).
-3. **Running but unscraped** → a monitoring failure, not an outage. The telemetry
-   pipeline is fine.
-4. Record the outage window. The edge access log for that period is gone and
-   cannot be recovered.
+3. **Running but unscraped** → investigate the scrape path, then separately
+   verify OTLP ingestion and backend freshness. Running is not delivery proof.
+4. Record the outage window and observed delivery gap. SDK/edge queues and
+   retries may absorb some interruptions; quantify what was lost rather than
+   assuming the entire window is missing.
+
+## Recovery validation
+
+Confirm the target is scraped for two evaluation intervals, the Collector accepts
+OTLP, exporter queues drain and a known request reaches the intended stores.
+Record remaining gaps and check that the alert clears.
 
 ## Escalation
 

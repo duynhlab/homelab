@@ -14,6 +14,19 @@ GitOps (Flux).
 
 - [Analytics telemetry](analytics/) — RFC-0030 signals as deployed (sampler gauges, DB histogram, ClickHouse client spans), the Linux qualification, and the deployed alerts; the dashboard is still a candidate.
 
+## Choose a reading path
+
+| Your task | Read in order |
+|---|---|
+| Learn the system | [Fundamentals](opentelemetry/fundamentals.md) → [OTel platform](opentelemetry/README.md) → architecture below |
+| Implement a Go service | [Implementation guide](../api/telemetry-implementation.md) → [contract and pillars](../api/observability.md) → release checks |
+| Operate or investigate | [Collector](opentelemetry/collector.md) → [runbooks](runbooks/README.md) → the relevant backend guide |
+| Verify on Linux | [Kind telemetry checklist](runbooks/telemetry-kind-verification.md) → canonical K0–K6 gate |
+| Review known gaps | [Code audit](audits/2026-10-23-telemetry-implementation.md) · [Documentation review](audits/2026-10-23-telemetry-documentation.md) |
+
+Current configuration, historical measurements and planned changes are different
+claims. Read the evidence beside each claim; a diagram is not runtime proof.
+
 ## Architecture
 
 Since RFC-0014 the 10 Go services plus order-worker and checkout-worker
@@ -37,7 +50,8 @@ flowchart TB
 
         subgraph collectorNode["OpenTelemetry Collector"]
             Receiver[/"OTLP receiver<br/>HTTP :4318 · gRPC :4317"/]
-            Processors[/"memory_limiter<br/>deltatocumulative · batch"/]
+            Processors[/"memory_limiter<br/>delta_to_cumulative · batch"/]
+            VectorReceiver[/"Vector OTLP :4319<br/>logs/vector pipeline"/]
             Receiver --> Processors
         end
 
@@ -73,6 +87,8 @@ flowchart TB
     Processors -->|"all logs + traces"| CH
     Processors -->|"traces"| VT
     Vector -->|"JSON line ingest"| VLogs
+    Vector -->|"OTLP/HTTP :4319"| VectorReceiver
+    VectorReceiver -->|"privacy + cluster + batch"| CH
     VMAgent -->|"remote write"| VMSingle
     VMAlert -->|"PromQL"| VMSingle
 
@@ -95,7 +111,7 @@ flowchart TB
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Services service;
     class Workers worker;
-    class Receiver,Processors collector;
+    class Receiver,VectorReceiver,Processors collector;
     class VMAgent,VMSingle metric;
     class Vector,VLogs log;
     class VT trace;
@@ -500,6 +516,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ## Related Documentation
 
+- [Telemetry implementation audit (2026-10-23)](audits/2026-10-23-telemetry-implementation.md) — code/config review, isolated reproductions, release gaps and documentation proposal; Vietnamese findings table included
 - [Telemetry standards audit (2026-09-16)](audits/2026-09-16-telemetry-standards.md) -- static logs, traces, metrics, and ClickHouse conformance review
 
 - [OpenTelemetry (platform)](opentelemetry/README.md) -- Collector topology, sampling, operations (app policy → [api/observability.md](../api/observability.md))

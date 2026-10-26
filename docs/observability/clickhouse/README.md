@@ -2,7 +2,7 @@
 
 Open-source columnar OLAP giving the platform **long-retention SQL over
 OpenTelemetry logs and traces** — the cross-day analytics the 7-day,
-LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
+LogsQL / Jaeger-compatible API ops primaries can't, plus the `otel_logs`↔`otel_traces`
 `trace_id` JOIN in one store (**RFC-0019 Phase B**).
 
 | | |

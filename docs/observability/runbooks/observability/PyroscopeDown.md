@@ -4,41 +4,39 @@
 |---|---|
 | **Severity** | warning |
 | **Category** | observability |
-| **Source** | `.../prometheusrules/observability/pyroscope-alerts.yaml` |
-| **Metrics** | `up{job=~".*pyroscope.*"} == 0` — 2 targets (pyroscope + its alloy) |
-| **Status** | active |
+| **Source** | [Rule manifest](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/observability/pyroscope-alerts.yaml) |
+| **Metrics** | `up{job=~".*pyroscope.*"} == 0` |
+| **Status** | active in repository configuration |
+| **Validation** | Static comparison to rule and HelmRelease, 2026-10-23; no new runtime test |
 | **Dashboard** | Observability → Profiling |
-| **Local-stack** | not present |
+| **Local-stack** | Pyroscope is present; inspect Compose targets independently |
 
 ## Meaning
 
-Continuous profiling is not being ingested or is not queryable. Two targets are
-in scope: `pyroscope` itself and `pyroscope-alloy`, the agent that collects
-profiles.
-
-Which one is down matters: alloy down means profiles are not **collected**;
-pyroscope down means they are not **stored or served**.
+A matching scrape target has returned `up == 0` for five minutes. Identify the
+actual target before diagnosing ingestion: Go services push profiles directly
+via their SDK; an Alloy scrape failure does not by itself prove those pushes
+stopped. Missing targets are not detected by this expression.
 
 ## Impact
 
-Deliberately the mildest alert in the observability set. Profiling is a debugging
-aid, not a production signal — nothing user-facing depends on it, and no other
-alert reads from it.
+Profiling supports debugging and performance analysis. Application request
+handling does not depend on it; losing profiles reduces the evidence available
+for a performance investigation.
 
-What is lost is retrospective: profiles for the outage window will not exist when
-someone later asks why a service was slow then.
+A delivery outage can leave gaps needed for later performance investigation.
+Measure backend freshness and client export failures to establish its extent.
 
 ## Diagnosis
 
 ```bash
-kubectl get pods -n profiling 2>/dev/null || kubectl get pods -A | grep -i pyroscope
-kubectl logs -n profiling pyroscope-0 --tail=80
-kubectl logs -n profiling pyroscope-alloy-0 --tail=50
+kubectl -n monitoring get pods -l app.kubernetes.io/name=pyroscope
+kubectl -n monitoring logs -l app.kubernetes.io/name=pyroscope --tail=80
 ```
 
 ```promql
 up{job=~".*pyroscope.*"}
-count(up{job=~".*pyroscope.*"})       # 2 when healthy
+count(up{job=~".*pyroscope.*"})       # compare with actual scrape targets
 ```
 
 Pyroscope is a StatefulSet with a PVC on `standard` — the same local-path story
@@ -46,11 +44,18 @@ as everything else, so disk pressure on its node is a plausible cause.
 
 ## Mitigation
 
-1. **OOM or disk** → profiling retention is the lever; it is the least valuable
-   data on the platform to shorten.
+1. **OOM or disk** → inspect memory, metastore PVC and object-store access.
+   Do not shorten retention or delete state before establishing the cause.
 2. **Config or chart failure** → it is a HelmRelease;
    [FluxHelmReleaseNotReady](../gitops/FluxHelmReleaseNotReady.md).
-3. Low urgency by design. Do not displace real work for it.
+3. Restore the failed path through its owning GitOps configuration. During a
+   performance incident, loss of profiles may need immediate attention.
+
+## Recovery validation
+
+Confirm scrape recovery for two evaluation intervals and recent profiles for a
+known active service. Test reading both the new window and retained data; a
+healthy metrics endpoint alone does not prove ingest or query recovery.
 
 ## Escalation
 

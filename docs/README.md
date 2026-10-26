@@ -234,6 +234,14 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./observability/audits/2026-09-16-telemetry-standards.md)** - logs, traces, metrics, profiling and the ClickHouse consumers.
 
+Telemetry learning: [fundamentals](./observability/opentelemetry/fundamentals.md) → [Go implementation guide](./api/telemetry-implementation.md) → [application contract](./api/observability.md) → [Linux Kind verification](./observability/runbooks/telemetry-kind-verification.md).
+
+Dashboard lookup: [current artifact](./observability/grafana/dashboard-reference.md) · [historical panel reference](./observability/grafana/dashboard-reference-legacy.md).
+
+Documentation quality: [Telemetry documentation review](./observability/audits/2026-10-23-telemetry-documentation.md).
+
+Implementation evidence: **[Telemetry implementation audit (2026-10-23)](./observability/audits/2026-10-23-telemetry-implementation.md)** — Go code paths, shared packages, configured releases and pipeline controls; includes a Vietnamese findings table.
+
 #### Metrics
 
 1. **[Metrics Guide](./observability/metrics/README.md)** - Complete metrics documentation

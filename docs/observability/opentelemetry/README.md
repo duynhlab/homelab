@@ -10,13 +10,13 @@ how this platform uses it today (Collector topology, sampling, operations).
 
 | Item | Value |
 |------|-------|
-| SDK | OpenTelemetry Go **v1.44.0**, wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
+| SDK | OpenTelemetry Go (version owned by the consumed `pkg/obsx/go.mod`), wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
 | Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate `obsx` release |
 | Collector | `otel-collector` (contrib distribution, `monitoring` namespace) |
-| Signals | Traces ✅ (10 services, 2 workers, and the edge) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4) |
+| Signals | Traces ✅ (10 services, 2 workers, and the edge) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (slogx/otelslog → OTLP, fleet-wide since RFC-0014 P4) |
 | Protocol | Services and workers use OTLP/HTTP protobuf on `:4318`; the cluster Collector also accepts OTLP/gRPC on `:4317`, which the edge's tracing provider uses |
 | Propagation | W3C Trace Context (`traceparent`); the edge propagates it natively (Envoy Gateway `telemetry.tracing`, no plugin config) |
-| Sampling | `ParentBased(TraceIDRatioBased)` head sampling. **The edge is the root and decides**: 50% in the cluster baseline, 100% on Kind. Services carry `OTEL_SAMPLE_RATE=0.1`, which only applies where a service is itself the root (see [Sampling](#sampling)) |
+| Sampling | `ParentBased(TraceIDRatioBased)` head sampling. Kind and Compose use 100%. The base 50% edge setting is planned and overridden in deployed local configuration. ParentBased respects incoming decisions; service ratios apply to new roots (see [Sampling](#sampling)) |
 | Trace backends | **Two sinks** — VictoriaTraces (7d, fast path) + ClickHouse `otel_traces` (90d SQL). Tempo and Jaeger retired under [RFC-0027](../../proposals/rfc/RFC-0027/README.md) |
 | Service identity | `OTEL_SERVICE_NAME` + Downward API envs, injected by the app ResourceSets |
 
@@ -29,6 +29,7 @@ original RFC, which remains the historical decision and rollout record.
 |------|------------|
 | Build the mental model from zero (API vs SDK, signals, OTLP, propagation, the old-vs-new migration story) | [OTel fundamentals](fundamentals.md) |
 | Understand the Collector (components, patterns, deployed pipelines) | [Collector](collector.md) |
+| Implement a Go service step by step | [Implementation guide](../../api/telemetry-implementation.md) |
 | Review rules for service code and PRs | [Application observability](../../api/observability.md) |
 | Understand the deployed signal paths | [How it works in this platform](#how-it-works-in-this-platform) |
 | Operate or troubleshoot export | [Operations](#operations) |
@@ -67,7 +68,7 @@ in shared code without forcing a telemetry runtime on anyone:
 | **API** | `go.opentelemetry.io/otel`, `otel/trace`, `otel/metric`, `otel/log` (bridge API) | Library/shared code: `pkg/obsx`, `pkg/grpcx`, middleware |
 | **SDK** | `otel/sdk`, `otel/sdk/metric`, `otel/sdk/log`, `otel/sdk/resource` | **Only `pkg/obsx.SetupObservability`** — services never wire the SDK directly |
 | **Exporters** (SDK plugins) | `otlptracehttp`, `otlpmetrichttp`, `otlploghttp` | `pkg/obsx` only |
-| **Contrib** | `otelgin`, `otelgrpc` (+`filters`), `instrumentation/runtime`, `bridges/otelzap` | Router middleware; the rest via `pkg/obsx`/`pkg/grpcx` |
+| **Contrib** | `otelgin`, `otelgrpc` (+`filters`), `instrumentation/runtime`, `bridges/otelslog` | `pkg/httpmw` owns HTTP, `pkg/grpcx` gRPC, `pkg/logger/slogx` the bridge, `pkg/obsx` runtime setup |
 
 Other concepts, in one line each:
 
@@ -100,7 +101,7 @@ about and keeps backend changes out of service code.
 
 | Responsibility | This platform uses | OTel role |
 |----------------|--------------------|-----------|
-| Instrumentation API and SDK | `pkg/obsx`, `otelgin`, `otelgrpc`, `otelzap` | Defines and emits signals |
+| Instrumentation API and SDK | `pkg/obsx`, `otelgin`, `otelgrpc`, `otelslog` | Defines and emits signals |
 | Wire protocol | OTLP/HTTP protobuf | Standard transport |
 | Processing and routing | OpenTelemetry Collector | Receives, batches, normalizes, and fans out |
 | Storage and query | VictoriaMetrics, VictoriaLogs, ClickHouse, VictoriaTraces | Not an OTel responsibility |
@@ -116,76 +117,24 @@ Rationale and rollout history: [RFC-0014](../../proposals/rfc/RFC-0014/README.md
 
 ## How it works in this platform
 
-The signals in flight — all three live fleet-wide since the RFC-0014 P3/P4
-cutovers (the metrics path is detailed in the next diagram):
+Use the [Collector routing diagram](collector.md#component-model) for the exact
+input-to-store topology and the [pipeline table](collector.md#the-deployed-pipelines)
+for processor order. This lookup answers which path to inspect for a missing signal:
 
-```mermaid
-flowchart LR
-    subgraph Producers
-        SVC["10 Go services + 2 workers<br/>obsx SetupObservability<br/>traces + logs via OTLP (metrics → next diagram)"]
-        EDGE["Envoy Gateway edge<br/>telemetry.tracing"]
-    end
-    subgraph Collector["otel-collector (monitoring)"]
-        TP["traces pipeline<br/>memory_limiter → batch"]
-        LP["logs pipeline<br/>memory_limiter → batch"]
-    end
-    SVC -->|"OTLP/HTTP :4318"| TP
-    EDGE -->|"OTLP/gRPC :4317 spans"| TP
-    TP --> VT["VictoriaTraces (7d)"]
-    TP --> CH[("ClickHouse otel_traces (90d)")]
-    TP --> SM["span_metrics connector"]
-    SM --> VMS0[("VictoriaMetrics<br/>spanmetrics_*")]
-    LP --> VL["VictoriaLogs"]
-    LP --> CH2[("ClickHouse otel_logs")]
+| Producer / signal | Current configured route | Important boundary |
+|---|---|---|
+| Services/workers: traces | OTLP/HTTP :4318 → Collector → VictoriaTraces + ClickHouse | Sampled; manual span semantics remain the service's responsibility |
+| Services/workers: metrics | OTLP/HTTP :4318 → Collector → vmagent → VictoriaMetrics | SDK RED feeds SLOs independently of trace sampling |
+| Services/workers: logs | OTLP/HTTP :4318 → Collector → VictoriaLogs + ClickHouse | slogx redacts before stdout and OTLP |
+| Edge spans | OTLP/gRPC :4317 → Collector → trace stores | ParentBased honors incoming sampling decisions |
+| Edge access logs | OTLP/gRPC :4317 → Collector → ClickHouse | Filtered from VictoriaLogs; stdout remains available |
+| Non-SDK pod logs | Vector → VictoriaLogs; Vector :4319 → Collector → ClickHouse | Dedicated receiver prevents duplicate VictoriaLogs ingest |
+| Derived span metrics | traces → span_metrics → remote write → VictoriaMetrics | Exploration of sampled spans, not the SLO numerator |
+| Profiles | Go SDK → Pyroscope | Bypasses Collector; manual trace/profile pivot |
 
-    classDef app fill:#cffafe,color:#164e63,stroke:#0891b2;
-    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
-    classDef otc fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
-    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class SVC app;
-    class EDGE edge;
-    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    class TP,LP,SM otc;
-    class VT trace;
-    class VL log;
-    class CH,CH2 data;
-    class VMS0 metric;
-```
-
-Since [ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/) the edge
-has **two** access-log sinks: `OpenTelemetry` to the collector, so its lines join
-the same `logs` pipeline as application logs and reach both stores, and `File` to
-stdout, so `kubectl logs` on the edge pod still works. Vector no longer tails
-those pods — the `platform.duynhlab.dev/otlp-logs=true` label on them is what
-stops it, and without that label VictoriaLogs would hold every edge line twice
-(see [../logging/README.md](../logging/README.md)).
-
-The metrics path in full (live per RFC-0014 P1–P4):
-
-```mermaid
-flowchart LR
-    SVC2["10 Go services + 2 workers<br/>OTLP: traces + metrics + logs"] --> COL2["otel-collector<br/>+ metrics pipeline<br/>(memory_limiter → deltatocumulative → batch)"]
-    COL2 -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>-opentelemetry.usePrometheusNaming<br/>+ resource-attr allowlist + relabel"]
-    VMA --> VMS[("VMSingle")]
-    COL2 -->|"VL-Stream-Fields:<br/>service.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
-    COL2 --> T3["VictoriaTraces"]
-    COL2 -->|"logs + traces"| CH3[("ClickHouse")]
-
-    classDef app fill:#cffafe,color:#164e63,stroke:#0891b2;
-    classDef otc fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
-    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class SVC2 app;
-    class COL2 otc;
-    class VMA,VMS metric;
-    class VLX log;
-    class T3 trace;
-    class CH3 data;
-```
+Vector skips application and edge pods labelled for OTLP logs. Check the
+[logging pipeline](../logging/README.md) before changing that selection: adding
+another path can duplicate records instead of fixing missing data.
 
 > Historical note: at the RFC-0014 P3 cutover, checkout-service had not yet
 > been deployed to the cluster, so the planned `legacy-checkout` scrape fence
@@ -201,10 +150,9 @@ flowchart LR
   removed at the P3 cutover. Exemplars are not available on this path
   (VictoriaMetrics won't-fix, D-14). Details, mapping tables and the consumer
   checklist: [RFC-0014](../../proposals/rfc/RFC-0014/README.md).
-- **Logs** — service and worker zap records tee through the level-gated
-  otelzap bridge to VictoriaLogs, where `TraceId` becomes a **queryable `trace_id` field** (this
-  is what repairs the traces↔logs correlation). Vector remains for
-  non-instrumented pods forever.
+- **Logs** — service and worker slogx records pass through the level-gated
+  otelslog bridge to VictoriaLogs, where `TraceId` becomes a **queryable `trace_id` field** (this
+  is what repairs the traces↔logs correlation). Vector handles the configured non-SDK pod log path.
 
 ### Cluster and local-stack differences
 
@@ -214,8 +162,8 @@ matters when a local query returns a series that does not exist in the cluster.
 
 | Concern | Kubernetes | Local-stack |
 |---------|------------|-------------|
-| Producer sampling | **50% at the edge** (`samplingRate: 50`, **planned** — every environment that runs this CR overrides it) and `0.1` at services, which the edge's decision overrides for anything it roots | 100% at the edge (`samplingRate: 100`) and `1.0` at services |
-| Collector receivers | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (gRPC receiver enabled for the edge's tracing provider) | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (same reason) |
+| Producer sampling | Kind: 100%; the base 50% edge value is **planned**, overridden by the local overlay. Inspect rendered service env for root sampling | 100% at the edge (`samplingRate: 100`) and `1.0` at services |
+| Collector receivers | OTLP/HTTP `:4318`, OTLP/gRPC `:4317`, and Vector-only OTLP/HTTP `:4319` | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (same reason) |
 | Trace fan-out | VictoriaTraces **and ClickHouse** | VictoriaTraces **and ClickHouse** — the two now match |
 | RED metrics | Application SDK metrics **plus** the `span_metrics` connector ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)) | Application SDK metrics plus a spanmetrics compatibility connector |
 | Infrastructure logs | Vector DaemonSet | Container logging path used by the local stack |
@@ -228,8 +176,8 @@ emitted directly by `otelgin` and `otelgrpc`.
 
 Keeping every production trace is expensive, so the platform samples — but this
 is a platform built to be studied, and a trace that was never sampled is a
-question nobody can answer later. The cluster baseline therefore keeps **half**
-of edge-rooted traffic (`samplingRate: 50`), raised from an inherited 10 that
+question nobody can answer later. The planned cluster baseline therefore selects **half**
+of new edge-rooted traffic (`samplingRate: 50`), raised from an inherited 10 that
 RFC-0024 had copied from Kong without reasoning about it. Local-stack and Kind
 set the rate to full so a learner can inspect every demo request.
 
@@ -245,12 +193,14 @@ rules read the SDK's own `http_server_request_duration_seconds` /
 disagreeing by a factor that just changed is arithmetic, not a regression.
 
 Two knobs, and they are not the same knob. The edge's `samplingRate` (a percent,
-0–100) decides for every request it proxies. A service's `OTEL_SAMPLE_RATE` (a
-ratio, 0.0–1.0, currently `0.1`) is wrapped in `ParentBased`, so it applies
+0–100) selects new roots; ParentBased respects an incoming parent decision.
+Untrusted sampled parents can therefore bypass an assumed ratio cap. Choose
+the ingress trust policy before using sampling as a cost bound. A service's `OTEL_SAMPLE_RATE` (a
+ratio, 0.0–1.0, set by the environment) is wrapped in `ParentBased`, so it applies
 **only** where that service is itself the root — background work, scheduled
-workflows, anything not entering through the gateway. Measured on the live
-cluster: every worker span sat inside an edge-rooted trace, so today that `0.1`
-governs nothing.
+workflows, anything not entering through the gateway. Earlier observation
+of edge-parented worker spans does not prove all future background work has a
+parent; verify both parented and root work in the candidate environment.
 
 The subtlety is *who decides*. The design: the edge (root) decides once,
 everyone downstream honours it — that is what the `ParentBased` wrapper does

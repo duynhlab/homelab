@@ -1,5 +1,7 @@
 # Operational Runbooks
 
+For a planned Linux verification session, use the [telemetry Kind checklist](telemetry-kind-verification.md). Incident runbooks below serve a different task: diagnosing and recovering an alert.
+
 Runbooks for investigating, troubleshooting, and resolving incidents in the observability stack.
 One folder per alert domain, one file per alert name; every alert that has a
 runbook links it via its `runbook_url` annotation.

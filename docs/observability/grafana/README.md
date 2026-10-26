@@ -205,3 +205,7 @@ kubernetes/infra/configs/observability/grafana/
 - [Variables](variables.md) -- dashboard variable configuration
 - [Alerting Strategy](../alerting/README.md) -- 2-layer alerting approach
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
+
+For the application board, use the [current artifact reference](dashboard-reference.md).
+The [historical panel reference](dashboard-reference-legacy.md) preserves earlier
+query explanations and removed-panel evidence.

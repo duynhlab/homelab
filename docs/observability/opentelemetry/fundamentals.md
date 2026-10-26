@@ -2,8 +2,8 @@
 
 > Plain-English primer on **what OpenTelemetry actually is** — the API/SDK
 > split, signals and when to use each, the OTLP wire protocol, context
-> propagation — plus **how this platform got here**: the RFC-0014 old-vs-new
-> migration story, told in diagrams. Start here if the stack is new to you.
+> propagation and a request through the current system. Migration history
+> follows the current model as optional background. Start here if the stack is new to you.
 > Platform wiring lives in [README.md](README.md); the day-to-day rules
 > service authors follow are in
 > [`docs/api/observability.md`](../../api/observability.md).
@@ -154,7 +154,161 @@ span and die with its sampling decision — use span events for
 trace-local milestones (`payment.authorized`), log events for
 machine-queryable facts that must survive independently of sampling.
 
+## OTLP: the wire protocol
+
+OTLP is OTel's native protocol — the same protobuf payload over two
+transports:
+
+| | OTLP/gRPC | OTLP/HTTP |
+|---|-----------|-----------|
+| Default port | `4317` | `4318` |
+| Encoding | protobuf over HTTP/2 | protobuf **or** JSON, paths `/v1/traces` · `/v1/metrics` · `/v1/logs` |
+| Strengths | Connection reuse/multiplexing at very high volume | Works through anything (LBs, proxies, firewalls), trivially debuggable, browser-capable |
+| Watch out | Some proxies/LBs can't speak HTTP/2; more dependencies | Slightly more per-request overhead at extreme volume |
+
+Two practical notes that cut through most gRPC-vs-HTTP debates:
+
+- OTLP export is a **unary request/response** (`Export`) — gRPC streaming is
+  not part of it, so "gRPC has streaming" is not an argument here.
+- Both transports compress with gzip and both carry protobuf; at this
+  platform's volume the difference is operational, not performance.
+
+**Platform decision:** every Go process exports **OTLP/HTTP + protobuf +
+gzip to `:4318`** (`pkg/obsx`, all three signals, one code path). The
+collector also listens on gRPC `:4317`, which the edge's tracing provider uses
+(Envoy's tracing speaks gRPC only) — the application path never uses it.
+Switching transports would be an exporter-config change in `pkg/obsx`, not a
+service change.
+
+## Context propagation and baggage on the wire
+
+Two W3C headers carry the cross-service context:
+
+- **`traceparent`** (+ optional `tracestate`) — trace ID, parent span ID, and
+  the sampling flag. The edge propagates it **natively**
+  (Envoy Gateway `telemetry.tracing`, no plugin config), so even header-less
+  browser requests join one trace.
+- **`baggage`** — application key-value pairs that propagate on every hop.
+  The composite propagator `obsx` installs handles both automatically.
+
+The `traceparent` thread in motion: a request enters at the edge, which starts
+the root span and propagates the header. Every hop (HTTP via `otelgin`, gRPC
+via `otelgrpc`) reads it, continues the same trace, and propagates it onward.
+The SDK uses **ParentBased** with the configured root ratio. Children follow
+the sampling decision; instrumentation gaps, export loss or missing propagation
+can still leave an incomplete trace. Kind and Compose use full sampling.
+
+```mermaid
+flowchart LR
+    edge["Envoy Gateway edge<br/>root span + traceparent"] -->|"HTTP + traceparent"| a["service A<br/>(otelgin)"]
+    a -->|"gRPC + traceparent"| b["service B<br/>(otelgrpc)"]
+    a -->|"OTLP"| col[/"OTel Collector"/]
+    b -->|"OTLP"| col
+    col --> vt[(VictoriaTraces)]
+    col --> ch[(ClickHouse otel_traces)]
+    classDef otc fill:#e0f2fe,stroke:#1971c2,color:#0c4a6e;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    class col otc;
+    class vt,ch trace;
+```
+
+Baggage is powerful and dangerous in equal measure — it rides *every*
+outbound call including third-party ones, and backends don't store it. The
+application contract (default: no baggage without review, never PII/secrets)
+is in [`docs/api/tracing.md § Baggage`](../../api/tracing.md#baggage).
+
+## One request, end to end
+
+This sequence shows the instrumented service boundaries of product details;
+[the API call graph](../../api/api.md#current-east-west-call-graph) owns the full
+topology, including repository/cache work omitted here.
+Spans and in-context logs share one `trace_id`; metrics align through the same
+service identity and time window because this platform has no exemplars.
+
+```mermaid
+sequenceDiagram
+    participant U as Browser
+    participant K as Envoy Gateway (edge)
+    participant A as product (otelgin)
+    participant I as inventory (otelgrpc)
+    participant R as review (otelgrpc)
+    participant C as OTel Collector
+    participant B as VM · VLogs · VictoriaTraces · ClickHouse
+    U->>K: GET /product/v1/public/products/1/details
+    K->>A: HTTP + traceparent (root span)
+    A->>A: otelgin span + HTTP RED metric + slogx log (trace_id)
+    A->>I: gRPC BatchGetAvailability + traceparent
+    I-->>A: Availability (or bounded degraded outcome)
+    A->>R: gRPC GetProductReviews + traceparent
+    R->>R: otelgrpc span + rpc_server_* metric + access-log (trace_id)
+    A-->>C: OTLP traces + metrics + logs
+    R-->>C: OTLP traces + metrics + logs
+    I-->>C: OTLP traces + metrics + logs
+    C->>B: fan out per signal
+    Note over C,B: trace_id joins spans/logs<br/>service + time align metrics
+```
+
+In Grafana you land on a metric spike, pivot to the trace by time+service,
+open the trace and use **traces→logs** to filter VictoriaLogs by `trace_id`.
+For profiles, pivot manually to Pyroscope by service and time; the current
+VictoriaTraces datasource does not provide Tempo's one-click profile link.
+
+## Correlation — the fields that stitch signals
+
+Correlation starts with the **same resource identity** on every signal. Spans
+and logs emitted inside an active span also carry the same `trace_id`; metrics
+do not carry it because this platform has no exemplars. Resource attributes
+come from the SDK Resource (semconv v1.41); `trace_id` comes from the active
+span. Both are wired centrally in `obsx`.
+
+| Field | Set by | Joins |
+|---|---|---|
+| `trace_id` | active span (W3C) | trace ↔ in-context logs in VictoriaLogs |
+| `service.name` | `OTEL_SERVICE_NAME` | all signals by producer; metrics correlate to traces by service + time |
+| `k8s.namespace.name` / `k8s.pod.name` | Downward API env | which pod; log/metric/trace all agree |
+| `deployment.environment.name` | `DEPLOYMENT_ENVIRONMENT` | local vs production separation |
+| `pyroscope.profile.id` | `otel-profiling-go` span attr | span ↔ its CPU flame graph |
+
+Grafana wires the pivots on the VictoriaTraces datasource: `tracesToLogsV2` (tag
+`trace_id`) and `tracesToMetrics`. `tracesToProfiles` is **not** available — it is
+a Tempo-datasource-only option, so span→profile is a manual pivot since
+[RFC-0027](../../proposals/rfc/RFC-0027/README.md); see
+[profiling](../profiling/README.md#trace-correlation-platform).
+Exemplars are **not** used because VictoriaMetrics does not support them —
+trace-to-log navigation is exact by `trace_id`; metric-to-trace navigation is
+a scoped search by service and time (D-14). Normative correlation fields:
+[`docs/api/observability.md § Correlation fields`](../../api/observability.md#correlation-fields).
+
+## Semantic conventions
+
+Semconv is the shared vocabulary: `http.request.method`, `http.route`,
+`db.system`, `service.name` mean the same thing from every language and
+library. That's what makes one Grafana dashboard work for every service,
+and why the platform pins **semconv v1.41** in `pkg/obsx` and treats
+SDK/semconv bumps as a deliberate `obsx` release —
+never set `OTEL_SEMCONV_STABILITY_OPT_IN`
+([`docs/api/observability.md`](../../api/observability.md#platform-instrumentation-policy-rfc-0014--normative)).
+
+## What this maps to in this platform
+
+| Concept | Realized by |
+|---------|-------------|
+| SDK setup + providers | `pkg/obsx.SetupObservability` (one call per process) |
+| Auto-instrumentation | `otelgin` (HTTP), `otelgrpc` via `pkg/grpcx`, `otelpgx` via `pkg/dbx`, `runtime` metrics |
+| Log bridge | `slogx` → `otelslog` + stdout, after shared redaction — [`docs/api/logs.md`](../../api/logs.md) |
+| Collector | [collector.md](collector.md) — pipelines, processors, fan-out |
+| Metrics ingest | **vmagent** `:8429` — translates OTLP names to Prometheus style, relabels, remote-writes to VictoriaMetrics; also scrapes infra exporters |
+| Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, PG plans, frontend); skips app pods **and the edge** ([ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)) |
+| Backends | VictoriaMetrics (PromQL) · VictoriaLogs (LogsQL, `trace_id` first-class) · VictoriaTraces · ClickHouse OLAP · Pyroscope |
+| UI | **Grafana** — one pane over all backends; pivots between signals via `trace_id` |
+| Sampling | `ParentBased(TraceIDRatioBased)`, `OTEL_SAMPLE_RATE` — [README.md § Sampling](README.md#sampling) |
+| Views | Pinned histogram buckets — [histograms.md](../metrics/histograms.md) |
+
 ## How this platform got here — RFC-0014 in pictures
+
+**Historical migration:** the following sections describe the RFC-0014 cutover,
+including the retired zap/otelzap bridge. Current implementation uses slogx;
+return to [the current mapping](#what-this-maps-to-in-this-platform) when writing code.
 
 The concepts above land harder against the world this platform migrated away
 from. **Before RFC-0014**, each Go service hand-wrote Prometheus metrics with
@@ -389,148 +543,6 @@ exemplars never gave us on VictoriaMetrics (unsupported; accepted as D-14).
 **Golden rule:** instrument once, in `pkg/obsx.SetupObservability`. A service
 never imports the OTel SDK or a metrics library directly — that's what killed
 the drift the old three-style world suffered from.
-
-## OTLP: the wire protocol
-
-OTLP is OTel's native protocol — the same protobuf payload over two
-transports:
-
-| | OTLP/gRPC | OTLP/HTTP |
-|---|-----------|-----------|
-| Default port | `4317` | `4318` |
-| Encoding | protobuf over HTTP/2 | protobuf **or** JSON, paths `/v1/traces` · `/v1/metrics` · `/v1/logs` |
-| Strengths | Connection reuse/multiplexing at very high volume | Works through anything (LBs, proxies, firewalls), trivially debuggable, browser-capable |
-| Watch out | Some proxies/LBs can't speak HTTP/2; more dependencies | Slightly more per-request overhead at extreme volume |
-
-Two practical notes that cut through most gRPC-vs-HTTP debates:
-
-- OTLP export is a **unary request/response** (`Export`) — gRPC streaming is
-  not part of it, so "gRPC has streaming" is not an argument here.
-- Both transports compress with gzip and both carry protobuf; at this
-  platform's volume the difference is operational, not performance.
-
-**Platform decision:** every Go process exports **OTLP/HTTP + protobuf +
-gzip to `:4318`** (`pkg/obsx`, all three signals, one code path). The
-collector also listens on gRPC `:4317`, which the edge's tracing provider uses
-(Envoy's tracing speaks gRPC only) — the application path never uses it.
-Switching transports would be an exporter-config change in `pkg/obsx`, not a
-service change.
-
-## Context propagation and baggage on the wire
-
-Two W3C headers carry the cross-service context:
-
-- **`traceparent`** (+ optional `tracestate`) — trace ID, parent span ID, and
-  the sampling flag. The edge propagates it **natively**
-  (Envoy Gateway `telemetry.tracing`, no plugin config), so even header-less
-  browser requests join one trace.
-- **`baggage`** — application key-value pairs that propagate on every hop.
-  The composite propagator `obsx` installs handles both automatically.
-
-The `traceparent` thread in motion: a request enters at the edge, which starts
-the root span and propagates the header. Every hop (HTTP via `otelgin`, gRPC
-via `otelgrpc`) reads it, continues the same trace, and propagates it onward.
-The SDK samples with **ParentBased(10%)** — if the parent was sampled, the
-child is too, so a trace is never half-captured.
-
-```mermaid
-flowchart LR
-    edge["Envoy Gateway edge<br/>root span + traceparent"] -->|"HTTP + traceparent"| a["service A<br/>(otelgin)"]
-    a -->|"gRPC + traceparent"| b["service B<br/>(otelgrpc)"]
-    a -->|"OTLP"| col[/"OTel Collector"/]
-    b -->|"OTLP"| col
-    col --> vt[(VictoriaTraces)]
-    col --> ch[(ClickHouse otel_traces)]
-    classDef otc fill:#e0f2fe,stroke:#1971c2,color:#0c4a6e;
-    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
-    class col otc;
-    class vt,ch trace;
-```
-
-Baggage is powerful and dangerous in equal measure — it rides *every*
-outbound call including third-party ones, and backends don't store it. The
-application contract (default: no baggage without review, never PII/secrets)
-is in [`docs/api/tracing.md § Baggage`](../../api/tracing.md#baggage).
-
-## One request, end to end
-
-Putting it together — a single browser request, and where each signal goes.
-Spans and in-context logs share one `trace_id`; metrics align through the same
-service identity and time window because this platform has no exemplars.
-
-```mermaid
-sequenceDiagram
-    participant U as Browser
-    participant K as Envoy Gateway (edge)
-    participant A as product (otelgin)
-    participant R as review (otelgrpc)
-    participant C as OTel Collector
-    participant B as VM · VLogs · VictoriaTraces
-    U->>K: GET /product/v1/public/products/1/details
-    K->>A: HTTP + traceparent (root span)
-    A->>A: otelgin span + http_server_* metric + zap log (trace_id)
-    A->>R: gRPC GetProductReviews + traceparent
-    R->>R: otelgrpc span + rpc_server_* metric + access-log (trace_id)
-    A-->>C: OTLP traces + metrics + logs
-    R-->>C: OTLP traces + metrics + logs
-    C->>B: fan out per signal
-    Note right of B: trace_id joins spans and logs while service identity and time align metrics
-```
-
-In Grafana you land on a metric spike, pivot to the trace by time+service,
-open the trace, click **traces→logs** (filters VictoriaLogs by `trace_id`),
-and **traces→profiles** (Pyroscope, via the per-span `pyroscope.profile.id`).
-
-## Correlation — the fields that stitch signals
-
-Correlation starts with the **same resource identity** on every signal. Spans
-and logs emitted inside an active span also carry the same `trace_id`; metrics
-do not carry it because this platform has no exemplars. Resource attributes
-come from the SDK Resource (semconv v1.41); `trace_id` comes from the active
-span. Both are wired centrally in `obsx`.
-
-| Field | Set by | Joins |
-|---|---|---|
-| `trace_id` | active span (W3C) | trace ↔ in-context logs in VictoriaLogs |
-| `service.name` | `OTEL_SERVICE_NAME` | all signals by producer; metrics correlate to traces by service + time |
-| `k8s.namespace.name` / `k8s.pod.name` | Downward API env | which pod; log/metric/trace all agree |
-| `deployment.environment.name` | `DEPLOYMENT_ENVIRONMENT` | local vs production separation |
-| `pyroscope.profile.id` | `otel-profiling-go` span attr | span ↔ its CPU flame graph |
-
-Grafana wires the pivots on the VictoriaTraces datasource: `tracesToLogsV2` (tag
-`trace_id`) and `tracesToMetrics`. `tracesToProfiles` is **not** available — it is
-a Tempo-datasource-only option, so span→profile is a manual pivot since
-[RFC-0027](../../proposals/rfc/RFC-0027/README.md); see
-[profiling](../profiling/README.md#trace-correlation-platform).
-Exemplars are **not** used because VictoriaMetrics does not support them —
-trace-to-log navigation is exact by `trace_id`; metric-to-trace navigation is
-a scoped search by service and time (D-14). Normative correlation fields:
-[`docs/api/observability.md § Correlation fields`](../../api/observability.md#correlation-fields).
-
-## Semantic conventions
-
-Semconv is the shared vocabulary: `http.request.method`, `http.route`,
-`db.system`, `service.name` mean the same thing from every language and
-library. That's what makes one Grafana dashboard work for every service,
-and why the platform pins **semconv v1.41** in `pkg/obsx` and treats
-SDK/semconv bumps as a deliberate `obsx` release —
-never set `OTEL_SEMCONV_STABILITY_OPT_IN`
-([`docs/api/observability.md`](../../api/observability.md#platform-instrumentation-policy-rfc-0014--normative)).
-
-## What this maps to in this platform
-
-| Concept | Realized by |
-|---------|-------------|
-| SDK setup + providers | `pkg/obsx.SetupObservability` (one call per process) |
-| Auto-instrumentation | `otelgin` (HTTP), `otelgrpc` via `pkg/grpcx`, `otelpgx` via `pkg/dbx`, `runtime` metrics |
-| Log bridge | otelzap tee (`obs.ZapCore`) — [`docs/api/logs.md`](../../api/logs.md) |
-| Collector | [collector.md](collector.md) — pipelines, processors, fan-out |
-| Metrics ingest | **vmagent** `:8429` — translates OTLP names to Prometheus style, relabels, remote-writes to VictoriaMetrics; also scrapes infra exporters |
-| Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, PG plans, frontend); skips app pods **and the edge** ([ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)) |
-| Backends | VictoriaMetrics (PromQL) · VictoriaLogs (LogsQL, `trace_id` first-class) · VictoriaTraces · ClickHouse OLAP · Pyroscope |
-| UI | **Grafana** — one pane over all backends; pivots between signals via `trace_id` |
-| Sampling | `ParentBased(TraceIDRatioBased)`, `OTEL_SAMPLE_RATE` — [README.md § Sampling](README.md#sampling) |
-| Views | Pinned histogram buckets — [histograms.md](../metrics/histograms.md) |
 
 ## References
 

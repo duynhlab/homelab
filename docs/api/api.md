@@ -87,6 +87,7 @@ flowchart TB
         end
 
         Temporal["Temporal"]
+        PeerDB["PeerDB CDC<br/>namespace peerdb"]
     end
 
     %% Edge -> domain entry points
@@ -101,7 +102,7 @@ flowchart TB
     Edge -->|"HTTP :8080"| Payment
     Edge -->|"HTTP :8080"| Notification
     Edge -->|"protected HTTP :8080"| Inventory
-    Edge -->|"protected HTTP"| Analytics
+    Edge -->|"protected HTTP :8080"| Analytics
 
     %% Async / workflow layer
     Checkout -->|"start abandonment workflow"| Temporal
@@ -139,6 +140,9 @@ flowchart TB
     Payment --> ProductDB
     CheckoutWorker -.->|"expire sessions"| ProductDB
     Analytics -->|"native :9000 · analytics_reader"| ClickHouse
+    PeerDB -->|"reads CDC via product-db-pooler-cdc"| ProductDB
+    PeerDB -->|"raw tables :9000"| ClickHouse
+    PeerDB -->|"namespace peerdb"| Temporal
 
     classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
@@ -149,7 +153,7 @@ flowchart TB
     class Storefront,Backoffice,Edge edge;
     class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification,Analytics,MockPay service;
     class CheckoutWorker,OrderWorker worker;
-    class Keycloak,Temporal platform;
+    class Keycloak,Temporal,PeerDB platform;
     class PlatformDB,ProductDB,Valkey,ClickHouse data;
     class Internet external;
 ```

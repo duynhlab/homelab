@@ -93,22 +93,25 @@ is separate from the API reader and from the platform backup/cold-tier identitie
 
 ### Decision view
 
+As built on Kind (2026-10-23); the decision itself is unchanged.
+
 ```mermaid
 flowchart LR
-    O[("order DB")] -.->|"planned primary-only"| CP["CDC pooler profile<br/>planned — not qualified"]
-    C[("checkout DB")] -.->|"planned primary-only"| CP
-    M[("payment DB")] -.->|"planned primary-only"| CP
-    CP -.->|"planned snapshot + WAL<br/>verify-full both hops"| P["PeerDB<br/>self-hosted — planned"]
-    P -->|"staging"| R[("RustFS — Analytics CDC files<br/>analytics-service-cdc")]
-    P -->|"raw versions + tombstones"| CH[("ClickHouse<br/>analytics raw tables")]
-    P -.->|"isolated workflow/catalog"| D["Temporal + platform-db"]
+    O[("order DB")] -->|"primary only"| CP[("product-db-pooler-cdc<br/>PgBouncer · session")]
+    C[("checkout DB")] -->|"primary only"| CP
+    M[("payment DB")] -->|"primary only"| CP
+    CP -->|"snapshot + WAL<br/>verify-full both hops"| P["PeerDB v0.37.5<br/>self-hosted, namespace peerdb"]
+    P -->|"Avro staging"| R[("RustFS<br/>analytics-service-cdc")]
+    R -->|"read by s3()"| CH[("ClickHouse<br/>analytics raw tables")]
+    P -->|"raw versions + tombstones"| CH
+    P -->|"isolated namespace / catalog"| D["Temporal ns peerdb<br/>+ platform-db peerdb_catalog"]
 
-    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-    class CP planned;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class O,C,M,R,CH data;
-    class P,D platform;
+    class O,C,M,CP,R,CH data;
+    class P worker;
+    class D platform;
 ```
 
 ## Alternatives considered

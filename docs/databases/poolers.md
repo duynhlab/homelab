@@ -41,12 +41,20 @@ flowchart LR
         PlatformClients["user / notification<br/>shipping / review"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgBouncer["PgBouncer :5432"]
         PgBouncer -->|"TLS, verify-full"| PlatformRW["platform-db-rw :5432"]
         Direct["Temporal / Keycloak"] -->|"direct"| PlatformRW
+
+        PeerDB["PeerDB (peerdb namespace)"] -->|"client TLS required<br/>replication + snapshot SQL"| CDCPool["product-db-pooler-cdc :5432<br/>PgBouncer · session"]
+        CDCPool -->|"TLS, verify-full"| ProductRW
+        PeerDB -->|"direct · verify-full<br/>peerdb_catalog"| PlatformRW
     end
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
-    class ProductClients,PlatformClients,Direct service;
-    class PgDog,PgBouncer,ProductRW,PlatformRW,ProductR platform;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    class ProductClients,PlatformClients service;
+    class Direct platform;
+    class PeerDB worker;
+    class PgDog,PgBouncer,CDCPool,ProductRW,PlatformRW,ProductR data;
 ```
 
 The diagram answers which clients use each deployed connection path. ADR-089

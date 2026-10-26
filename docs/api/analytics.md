@@ -13,6 +13,38 @@ bounded-eventual and never handles commands.
 | Design | [RFC-0030](../proposals/rfc/RFC-0030/), [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) |
 | Verification | compose rows A25 / B11 / C23 ([runbook](../../local-stack/docs/e2e-audit.md)); Kind rows K3.12, K4.12–K4.14, K5.11 ([run 2026-10-23](../platform/kind-e2e-audit.md#2026-10-23--analytics-dark-launch-edge-route-and-admin-page-rfc-0030-phases-89)) |
 
+This diagram answers one question: **which path does a staff read take, and
+where does each check happen?** Where the data comes from is a separate
+question, owned by [Commerce CDC](../databases/cdc/README.md).
+
+```mermaid
+flowchart LR
+  Staff["Staff browser<br/>Backoffice /analytics"]
+
+  subgraph K8S["Kind cluster · homelab"]
+    Edge["Envoy Gateway · gateway.duynh.me<br/>route api-analytics-protected<br/>jwt-edge-staff (staff realm JWT)"]
+    Svc["analytics-service :8080<br/>backoffice_admin role check"]
+    Views[("ClickHouse analytics.*_live<br/>FINAL views")]
+    CDC["PeerDB CDC<br/>(writes the raw tables)"]
+  end
+
+  Staff -->|"HTTPS · Bearer token"| Edge
+  Edge -->|"HTTP :8080 · /analytics/v1/protected"| Svc
+  Svc -->|"native :9000 · analytics_reader · plaintext"| Views
+  CDC -.->|"source of the data, see databases/cdc"| Views
+
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+  class Staff external;
+  class Edge edge;
+  class Svc service;
+  class CDC worker;
+  class Views data;
+```
+
 There is no gRPC API, migration runner, source-database access or write endpoint
 for this service. The Envoy route and the Admin navigation exist; the data behind
 the views is real CDC on Kind and a fixture in local-stack, and every gate row that

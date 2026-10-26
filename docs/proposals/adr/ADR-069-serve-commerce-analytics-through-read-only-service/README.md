@@ -150,14 +150,15 @@ flowchart LR
     A["Admin Portal<br/>staff token"] -->|"bounded protected GET"| E["Envoy Gateway"]
     E --> S["analytics-service<br/>read only"]
     S -->|"serving queries"| CH[("ClickHouse<br/>analytics serving views")]
-    A -->|"commands remain direct"| OWN["Owning services"]
+    A -->|"commands go to the owners"| E
+    E -->|"protected routes"| OWN["Owning services"]
     S -.->|"must not proxy writes"| OWN
 
     classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class A,E edge;
-    class S,OWN service;
+    class E edge;
+    class A,S,OWN service;
     class CH data;
 ```
 

@@ -618,6 +618,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **RFC-0030 Mermaid diagrams show the deployed CDC path.** The RFC
+  architecture and ADR-066 decision view drop their "planned" nodes and the
+  retired fixture; the CDC hub sequence shows the CDC pooler and the `s3()`
+  read; PeerDB joins the platform API topology, the pooler map, the database
+  architecture and the ClickHouse signal map; `docs/api/analytics.md` gains a
+  request-path diagram; RFC/ADR-068/069 diagrams use the right classes. Every
+  changed block was rendered with `mmdc`.
+
 - **Architecture diagrams show the CDC path** (RFC-0030). `databases/topology`
   adds PeerDB, the CDC pooler and the CDC bootstrap Job; `tls-data-tier` adds
   PeerDB's three verified PostgreSQL hops (the plaintext ClickHouse, RustFS and

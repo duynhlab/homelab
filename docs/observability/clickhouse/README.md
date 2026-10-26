@@ -130,13 +130,18 @@ flowchart LR
   Col -->|"logs + traces (RFC-0019)"| CH[("ClickHouse<br/>otel_logs / otel_traces")]
   CH --> Graf["Grafana<br/>clickhouse datasource"]
   CH -->|"analytics.*_live views<br/>analytics_reader · :9000"| Ana["analytics-service<br/>staff overview"]
+  PeerDB["PeerDB CDC<br/>flow-worker"] -->|"analytics raw tables<br/>analytics_ingest · :9000"| CH
+  PeerDB -->|"Avro staging"| S3[("RustFS<br/>analytics-service-cdc")]
+  S3 -->|"read by s3()"| CH
 
   classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
   class Apps,Pods,Ana service;
+  class PeerDB worker;
   class Col,Vec collector;
-  class VM,VL,VT,CH data;
+  class VM,VL,VT,CH,S3 data;
 ```
 
 **Logs-first analytics.** Traces are head-sampled at the edge (50% cluster baseline / 100% local), so

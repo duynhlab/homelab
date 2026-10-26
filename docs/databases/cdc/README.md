@@ -110,14 +110,17 @@ A row's path through one mirror:
 sequenceDiagram
     participant App as order-service
     participant PG as product-db (order)
+    participant PB as product-db-pooler-cdc
     participant W as flow-worker
     participant S3 as RustFS staging
     participant CH as ClickHouse analytics
     participant API as analytics-service
     App->>PG: INSERT / UPDATE orders
-    PG-->>W: pgoutput change (published columns only)
+    PG-->>PB: pgoutput change (published columns only)
+    PB-->>W: same stream, TLS to PeerDB
     W->>S3: Avro batch
     W->>CH: load batch into _peerdb_raw_analytics_service_order
+    CH->>S3: s3() reads the Avro
     W->>CH: normalize into order_orders (_peerdb_version)
     API->>CH: SELECT … FROM order_orders_live (FINAL, no tombstones)
 ```

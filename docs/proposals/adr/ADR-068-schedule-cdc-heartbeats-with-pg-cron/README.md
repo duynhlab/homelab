@@ -104,15 +104,17 @@ flowchart LR
     CRON -->|"30 s"| C[("checkout heartbeat")]
     CRON -->|"30 s"| P[("payment heartbeat")]
     O & C & P -->|"WAL + PeerDB"| CH[("ClickHouse<br/>normalized heartbeats")]
-    CH -->|"oldest emitted_at"| F["data_through"]
+    CH -->|"oldest emitted_at"| F["data_through<br/>(analytics-service)"]
     CRON -.->|"job status is diagnostic only"| OPS["Alerts and runbook"]
 
     classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     class CRON worker;
     class O,C,P,CH data;
-    class F,OPS platform;
+    class F service;
+    class OPS platform;
 ```
 
 ## Alternatives considered

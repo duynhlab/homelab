@@ -168,6 +168,8 @@ both PeerDB and ClickHouse must reach the staging endpoint.
 This diagram answers one question: **how do three database-local streams reach
 the serving model?** Every CDC-specific object is planned and not deployed.
 
+*Historical (research, 2026-09-08): the shapes explored then; `argMax` was later replaced by `FINAL` (#1366). The deployed path is in [Commerce CDC](../../../databases/cdc/README.md).*
+
 ```mermaid
 flowchart LR
   subgraph CLUSTER["Homelab cluster — planned CDC topology"]

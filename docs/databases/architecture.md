@@ -33,10 +33,12 @@ flowchart TB
 
         subgraph ProductClients["Product database clients"]
             ProductApps["product / cart / order / checkout<br/>inventory / payment + 2 workers"]
+            PeerDB["PeerDB CDC<br/>order · checkout · payment"]
         end
 
         PgBouncer["CNPG PgBouncer<br/>platform-db-pooler-rw :5432"]
         PgDog["PgDog<br/>pgdog-product :6432"]
+        CDCPool["CNPG PgBouncer · session<br/>product-db-pooler-cdc :5432"]
         Platform[("platform-db<br/>3 instances")]
         Product[("product-db<br/>3 instances")]
         DR[("product-db-replica<br/>1 instance")]
@@ -49,6 +51,8 @@ flowchart TB
     PlatformApps -->|"client TLS · verify-full"| PgBouncer -->|"TLS · verify-full"| Platform
     DirectPlatform -->|"direct · pg_hba host (#1296)"| Platform
     ProductApps -->|"client TLS · verify-full"| PgDog -->|"TLS · verify-full"| Product
+    PeerDB -->|"client TLS · replication"| CDCPool -->|"TLS · verify-full"| Product
+    PeerDB -->|"peerdb_catalog · verify-full"| Platform
     Platform -->|"base backups + WAL"| Store
     Product -->|"base backups + WAL"| Store
     Store -->|"continuous recovery"| DR
@@ -56,8 +60,10 @@ flowchart TB
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class CNPG,PgBouncer,PgDog platform;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    class CNPG,PgBouncer,PgDog,CDCPool platform;
     class PlatformApps,DirectPlatform,ProductApps service;
+    class PeerDB worker;
     class Platform,Product,DR,Store data;
 ```
 

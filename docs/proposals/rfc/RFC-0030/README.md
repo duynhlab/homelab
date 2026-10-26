@@ -197,76 +197,78 @@ for the fresh-project requirement and historical-evidence boundary.
 
 ## Architecture
 
-This diagram answers one question: **what is the trust and data path, and
-which part of it is deployed?** The staff page, edge route, `analytics-service`
-and the ClickHouse `analytics` tables and serving views are current; a fixture
-seeds the tables today. Every PeerDB, CDC, commerce-publication and
-`pg_cron` heartbeat object is planned and not installed.
+This diagram answers one question: **what is the trust and data path?** Every
+node is deployed on Kind (2026-10-23); local-stack replaces the product-db →
+ClickHouse half with a fixture. Day-2 detail lives in
+[Commerce CDC](../../../databases/cdc/README.md).
 
 ```mermaid
 flowchart LR
   STAFF["Staff browser"]
-  EDGE["Envoy Gateway<br/>jwt-edge-staff"]
 
-  subgraph PG["product-db — deployed CNPG"]
-    CRON["pg_cron scheduler<br/>planned — primary only"]
-    ORD[("order DB<br/>publication + heartbeat<br/>planned")]
-    CHECK[("checkout DB<br/>publication + heartbeat<br/>planned")]
-    PAY[("payment DB<br/>publication + heartbeat<br/>planned")]
+  subgraph K8S["Kind cluster · homelab"]
+    EDGE["Envoy Gateway<br/>jwt-edge-staff"]
+
+    subgraph PG["product namespace"]
+      CRON["pg_cron (in product-db)<br/>30 s heartbeat UPSERT"]
+      SRC[("product-db primary<br/>order · checkout · payment<br/>publications analytics_&lt;db&gt;")]
+      CDCPOOL["product-db-pooler-cdc<br/>PgBouncer · session"]
+    end
+
+    subgraph PDB["peerdb namespace"]
+      FLOW["flow-worker<br/>snapshot copy + CDC"]
+      SNAP["flow-snapshot-worker<br/>slot + exported snapshot"]
+      APICTL["flow-api<br/>peers · mirrors"]
+    end
+
+    CAT[("platform-db<br/>peerdb_catalog")]
+    TEMP["Temporal<br/>namespace peerdb"]
+    STAGE[("RustFS<br/>analytics-service-cdc")]
+
+    subgraph CH["ClickHouse · database analytics"]
+      RAW[("raw &lt;db&gt;_&lt;table&gt;<br/>ReplicatedReplacingMergeTree")]
+      SERVE[("*_live views<br/>FINAL + tombstone filter")]
+    end
+
+    ANA["analytics-service<br/>read only"]
+    PAGE["Backoffice /analytics"]
   end
 
-  subgraph PDB["PeerDB — planned, not installed"]
-    FLOW["flow workers<br/>three mirrors"]
-    SNAP["snapshot worker"]
-    APICTL["flow API / control"]
-    CAT[("catalog on platform-db")]
-    TEMP["Temporal namespace peerdb"]
-    STAGE[("RustFS — Analytics CDC files<br/>analytics-service-cdc")]
-  end
-
-  subgraph CH["ClickHouse — deployed engine"]
-    RAW[("analytics raw tables<br/>ReplacingMergeTree")]
-    SERVE[("analytics *_live views<br/>FINAL + tombstone filter")]
-  end
-
-  FIX["serving fixture + heartbeat<br/>current — replaced by mirrors"]
-  ANA["analytics-service<br/>read only"]
-  PAGE["Backoffice /analytics"]
-
-  CRON -.->|"planned 30-second UPSERT"| ORD & CHECK & PAY
-  CDCPOOL["CDC pooler profile<br/>planned — not qualified"]
-  ORD & CHECK & PAY -.->|"planned verified TLS / primary only"| CDCPOOL
-  CDCPOOL -.->|"planned snapshot + WAL / verified TLS"| FLOW
-  SNAP --- FLOW
-  FLOW --- APICTL & CAT & TEMP
-  FLOW -.->|"planned staged load"| STAGE
-  STAGE -.->|"planned object read"| RAW
-  FIX -.->|"fixture (current) seed + 30 s heartbeat"| RAW
+  CRON -->|"UPSERT heartbeat"| SRC
+  SRC -->|"pgoutput · verify-full"| CDCPOOL
+  CDCPOOL -->|"replication + SELECT · TLS"| FLOW
+  CDCPOOL -->|"slot + export · TLS"| SNAP
+  FLOW -->|"Avro batches"| STAGE
+  STAGE -->|"read by s3()"| RAW
+  FLOW -->|"load + normalize :9000"| RAW
+  FLOW -->|"polls workflows"| TEMP
+  SNAP -->|"polls workflows"| TEMP
+  APICTL -->|"peers · mirror state · verify-full"| CAT
   RAW -->|"FINAL"| SERVE
   SERVE -->|"analytics_reader · native :9000"| ANA
-  STAFF --> PAGE
+  STAFF -->|"HTTPS"| PAGE
   PAGE -->|"staff Bearer request"| EDGE
   EDGE -->|"api-analytics-protected"| ANA
 
   classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
   classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
-  classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-  class CDCPOOL planned;
   class STAFF external;
   class EDGE edge;
-  class ANA,PAGE service;
-  class FIX worker;
-  class PG,CH,RAW,SERVE data;
-  class CRON,ORD,CHECK,PAY,FLOW,SNAP,APICTL,CAT,TEMP,STAGE planned;
+  class ANA,PAGE,APICTL service;
+  class FLOW,SNAP,CRON worker;
+  class TEMP platform;
+  class SRC,CDCPOOL,CAT,STAGE,RAW,SERVE data;
+  style K8S fill:#f8fafc,stroke:#64748b,stroke-width:2px,color:#1e293b
 ```
 
-**Legend** — grey: human client · blue: deployed edge · cyan: deployed service
-or page · green: deployed data · amber: the fixture that stands in for CDC today
-(dotted edge, labelled) · dashed border/dotted edge with `planned`: not
-installed.
+**Legend** — grey: off-platform client · blue: edge · cyan: service, page or
+PeerDB control plane · amber: workers and the scheduled heartbeat · violet:
+platform dependency · green: database, pooler, bucket or table. Every edge is a
+current path.
 
 ### Bounded-eventual response states
 
@@ -292,9 +294,7 @@ flowchart TD
   classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
   classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
-  class READ,KNOWN,AGE worker;
-  class FRESH service;
-  class STALE,DOWN external;
+  class READ,KNOWN,AGE,FRESH,STALE,DOWN service;
 ```
 
 | Condition | HTTP | Contract |

@@ -11,25 +11,25 @@
           <mxGeometry x="40" y="54" width="1170" height="36" as="geometry" />
         </mxCell>
         <mxCell id="f_cluster" value="Kind cluster · homelab" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#1E293B;fontFamily=Helvetica;fontSize=14;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="100" width="1170" height="930" as="geometry" />
+          <mxGeometry x="40" y="100" width="1170" height="1050" as="geometry" />
         </mxCell>
         <mxCell id="f_api" value="Workflow starters (API pods)" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
           <mxGeometry x="410" y="40" width="610" height="140" as="geometry" />
         </mxCell>
         <mxCell id="f_temporal" value="temporal namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="290" y="230" width="550" height="310" as="geometry" />
+          <mxGeometry x="290" y="240" width="550" height="360" as="geometry" />
         </mxCell>
         <mxCell id="f_keda" value="keda namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="850" y="410" width="250" height="130" as="geometry" />
+          <mxGeometry x="850" y="470" width="250" height="130" as="geometry" />
         </mxCell>
         <mxCell id="f_workers" value="Workers" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="370" y="570" width="560" height="160" as="geometry" />
+          <mxGeometry x="370" y="670" width="560" height="160" as="geometry" />
         </mxCell>
         <mxCell id="f_platform" value="platform namespace" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="20" y="220" width="260" height="160" as="geometry" />
+          <mxGeometry x="20" y="230" width="260" height="160" as="geometry" />
         </mxCell>
         <mxCell id="f_targets" value="Activity targets" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="90" y="760" width="840" height="160" as="geometry" />
+          <mxGeometry x="90" y="880" width="840" height="160" as="geometry" />
         </mxCell>
         <mxCell id="checkout_api" value="&lt;b&gt;checkout-service API (checkout)&lt;/b&gt;&lt;br&gt;session mutations" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAAFRUlEQVR4nO2YfWhVZRzHP79z7jbzhZRcrczE6bx3vizDl8JIpSx0BLbdbWH7I9IUpBhGof0hJBgEBaVQoVGamGB3u9tCcxVsmjqVUJPGtnu3ge+ZZG3iYm675zz9MUfb7jn3Zd71Rz2f/87v5Xue3+8853mec0Cj0Wg0Go1Go9FoNBqNRqPR/J+Qf+UuSgnBtrkY1nPYLMFQU1CSBXQBN4BTCDVEvAcpEStp/WBLNliLEaaiZDIoEyUdGHIBW9Xi9zYgopxSR7YBW5TBnJZiUJuB2XHjRTVh8zZFuQfixgYaszA9ZaBKgUfiCLeB/Q4Nvv1sEXuQJ+6NhksgNBWTr4EFw8j+FMtb5jgbdp5OY+LYrcAGICNJ3RNgF+Gfea3fMDINqAqvwFb7gAl3obIbv2/1IEuwaQoYAWDhXeheRYxnKZzRDCPRgPLmpRjyHck/nWgUayjy7QLuTHmzHsi+a11oJaPncZ7Pa09tAyqbZqOM48C9KVK8gYdsui2FaRwFeSxFuiDsotC3JroBfe9YAMhLUOosfl8xhw97+PPBU8A8lzgFqhqbHYwyztIVsTE8TyD2qyAFLjmtIKUo+2VEXnMvRjVhG3sxrIOkR67Sk5YJshzFRmCSS1YvGD5PlHlS+li6jU9ckjIQe/TgssyTALRnbcC9+JtglOKf8e0Q+yHgEBWh9QgfA9eBOoRaIlYtJbMuUd68CEPWu+hGUGyhwffekNW9HWihsnkfSmpwXojTUPaq1LwCgcZ0TPMikOXgvQ32k/hnno2p8U3DA6yccz3KHgzVAMudk2Qtfu/nMXWDrQ+DFQLGRKfzg1AR2o5QFlPEDVuWUeytJRh+EdR+xxjFRop8HwyyVbbdj7LHxtVXZCL2CcBwcFbhzy1MaJzB8E5Q6xw8v3mw2YZpbE9IaCCGZeP3Xei7sPNdNpQu7LTPBlkqW3JRkXNAetx7xJyf5rbEBgoo+wgiTg2Y4KHEdz5mciA8CVOit7Rez1//XMhcl+yTlEy7OWQ0m0ik+NhcoTDnWBLxnS52O3oRHEh5+CkM9SOo6GdhUg30r97THfOFXwddV7dNxoq8FGew8RGa3M72zvGS6+L5I3YDir3HGPj+7T4/isxb9wDw+7iuAZGJfcBEet9AJC2h2FgoxiWXIMvAoV9CU+wGDOWVqbeB2w6eHsd4xfxB14ZcQFHuMJLxoJ5NYiQLqDo/noKpHXEjK0LzXbWVOpKabTAYqgcWOfoMyafAW+Oaq5RQGQ4ARUnd02l3GUqgNRPTqgdyHLwW2NMctpdh8ZOrx1ZfUBH2OfoOtWZQGfoS9+LPuOoK71IRznf1V4YfxbTqcC4eYD/+mRdTMwOqmudhy+kYEZ3AR2BXg6cDiYxGmYtBvYn7x80lPL0LiaQ1Ave5xFgIe1DGHjz2zxidFj2j88AsvbPvu+02HZiePF6Yfjl1H0OVocMolqZIrRdhOYW+OoKhzcDWFOlC32pYgt9XAY4nrGESsdYCt1KgpEDWUOirA8Cy3kdxLgW6fdpK3uovHlLZgJJZbShVivMukSgRkNfxe/cO0O3BtlYCsQ9s8ekBtZoi74cDjSP1Q6QcmJhk5mVgFX5fvaO376PmK2DJMEb1C4aspcAbtVinbgb0U5x7BMvyotgB9CaQcQ3YRJc527V4AH/OFRq8T4Mqo69ZCSCNiKzjRud8p+JhpP8KHwhPpFsVI2oxSDZ9s6IdoQNUPajjjEo7Sn5Od1K6fT9tVqB4BmEB8BAwBsU1kIugTgHf4/eeSerIrNFoNBqNRqPRaDQajUaj0Wj+8/wNFEGuOHMUyrcAAAAASUVORK5CYII=;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#CFFAFE;strokeColor=#0891B2;strokeWidth=1.5;fontColor=#164E63;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_api">
           <mxGeometry x="25" y="75" width="230" height="50" as="geometry" />
@@ -50,7 +50,7 @@
           <mxGeometry x="10" y="27" width="24" height="24" as="geometry" />
         </mxCell>
         <mxCell id="controller" value="&lt;b&gt;temporal-worker-controller&lt;/b&gt;&lt;br&gt;owns builds, not replicas" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;image=data:image/png,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;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_temporal">
-          <mxGeometry x="190" y="245" width="200" height="50" as="geometry" />
+          <mxGeometry x="190" y="295" width="200" height="50" as="geometry" />
         </mxCell>
         <mxCell id="wd_checkout" value="&lt;b&gt;checkout-abandon (checkout)&lt;/b&gt;&lt;br&gt;checkout-service worker&lt;br&gt;Pinned · 1–3 pods per live build" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAAFRUlEQVR4nO2YfWhVZRzHP79z7jbzhZRcrczE6bx3vizDl8JIpSx0BLbdbWH7I9IUpBhGof0hJBgEBaVQoVGamGB3u9tCcxVsmjqVUJPGtnu3ge+ZZG3iYm675zz9MUfb7jn3Zd71Rz2f/87v5Xue3+8853mec0Cj0Wg0Go1Go9FoNBqNRqPR/J+Qf+UuSgnBtrkY1nPYLMFQU1CSBXQBN4BTCDVEvAcpEStp/WBLNliLEaaiZDIoEyUdGHIBW9Xi9zYgopxSR7YBW5TBnJZiUJuB2XHjRTVh8zZFuQfixgYaszA9ZaBKgUfiCLeB/Q4Nvv1sEXuQJ+6NhksgNBWTr4EFw8j+FMtb5jgbdp5OY+LYrcAGICNJ3RNgF+Gfea3fMDINqAqvwFb7gAl3obIbv2/1IEuwaQoYAWDhXeheRYxnKZzRDCPRgPLmpRjyHck/nWgUayjy7QLuTHmzHsi+a11oJaPncZ7Pa09tAyqbZqOM48C9KVK8gYdsui2FaRwFeSxFuiDsotC3JroBfe9YAMhLUOosfl8xhw97+PPBU8A8lzgFqhqbHYwyztIVsTE8TyD2qyAFLjmtIKUo+2VEXnMvRjVhG3sxrIOkR67Sk5YJshzFRmCSS1YvGD5PlHlS+li6jU9ckjIQe/TgssyTALRnbcC9+JtglOKf8e0Q+yHgEBWh9QgfA9eBOoRaIlYtJbMuUd68CEPWu+hGUGyhwffekNW9HWihsnkfSmpwXojTUPaq1LwCgcZ0TPMikOXgvQ32k/hnno2p8U3DA6yccz3KHgzVAMudk2Qtfu/nMXWDrQ+DFQLGRKfzg1AR2o5QFlPEDVuWUeytJRh+EdR+xxjFRop8HwyyVbbdj7LHxtVXZCL2CcBwcFbhzy1MaJzB8E5Q6xw8v3mw2YZpbE9IaCCGZeP3Xei7sPNdNpQu7LTPBlkqW3JRkXNAetx7xJyf5rbEBgoo+wgiTg2Y4KHEdz5mciA8CVOit7Rez1//XMhcl+yTlEy7OWQ0m0ik+NhcoTDnWBLxnS52O3oRHEh5+CkM9SOo6GdhUg30r97THfOFXwddV7dNxoq8FGew8RGa3M72zvGS6+L5I3YDir3HGPj+7T4/isxb9wDw+7iuAZGJfcBEet9AJC2h2FgoxiWXIMvAoV9CU+wGDOWVqbeB2w6eHsd4xfxB14ZcQFHuMJLxoJ5NYiQLqDo/noKpHXEjK0LzXbWVOpKabTAYqgcWOfoMyafAW+Oaq5RQGQ4ARUnd02l3GUqgNRPTqgdyHLwW2NMctpdh8ZOrx1ZfUBH2OfoOtWZQGfoS9+LPuOoK71IRznf1V4YfxbTqcC4eYD/+mRdTMwOqmudhy+kYEZ3AR2BXg6cDiYxGmYtBvYn7x80lPL0LiaQ1Ave5xFgIe1DGHjz2zxidFj2j88AsvbPvu+02HZiePF6Yfjl1H0OVocMolqZIrRdhOYW+OoKhzcDWFOlC32pYgt9XAY4nrGESsdYCt1KgpEDWUOirA8Cy3kdxLgW6fdpK3uovHlLZgJJZbShVivMukSgRkNfxe/cO0O3BtlYCsQ9s8ekBtZoi74cDjSP1Q6QcmJhk5mVgFX5fvaO376PmK2DJMEb1C4aspcAbtVinbgb0U5x7BMvyotgB9CaQcQ3YRJc527V4AH/OFRq8T4Mqo69ZCSCNiKzjRud8p+JhpP8KHwhPpFsVI2oxSDZ9s6IdoQNUPajjjEo7Sn5Od1K6fT9tVqB4BmEB8BAwBsU1kIugTgHf4/eeSerIrNFoNBqNRqPRaDQajUaj0Wj+8/wNFEGuOHMUyrcAAAAASUVORK5CYII=;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#FEF3C7;strokeColor=#D97706;strokeWidth=1.5;fontColor=#78350F;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_workers">
           <mxGeometry x="320" y="65" width="220" height="70" as="geometry" />
@@ -79,16 +79,16 @@
         <mxCell id="s_order" value="start OrderFulfillment · Cancellation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.63;exitY=1;exitDx=0;exitDy=0;entryX=0.36;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="order_api" target="server">
           <mxGeometry relative="1" as="geometry" x="0.86">
             <Array as="points">
-              <mxPoint x="965" y="300" />
-              <mxPoint x="680" y="300" />
+              <mxPoint x="965" y="305" />
+              <mxPoint x="680" y="305" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="s_checkout" value="Signal-With-Start AbandonedCheckout" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.18;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="checkout_api" target="server">
-          <mxGeometry relative="1" as="geometry" x="0.22">
+          <mxGeometry relative="1" as="geometry" x="0.44">
             <Array as="points">
-              <mxPoint x="590" y="300" />
-              <mxPoint x="630" y="300" />
+              <mxPoint x="590" y="305" />
+              <mxPoint x="630" y="305" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -96,54 +96,54 @@
           <mxGeometry relative="1" as="geometry" x="-0.4" />
         </mxCell>
         <mxCell id="p_db" value="direct :5432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.16;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="db">
-          <mxGeometry relative="1" as="geometry" x="-0.95">
+          <mxGeometry relative="1" as="geometry" x="-0.93">
             <Array as="points">
-              <mxPoint x="625" y="490" />
-              <mxPoint x="190" y="490" />
+              <mxPoint x="625" y="515" />
+              <mxPoint x="190" y="515" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="q_order" value="polls order-fulfillment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1;endArrow=block;endFill=0;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.66;exitY=0;exitDx=0;exitDy=0;entryX=0.84;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="server">
-          <mxGeometry relative="1" as="geometry" x="0.15">
+          <mxGeometry relative="1" as="geometry" x="-0.96">
             <Array as="points">
-              <mxPoint x="585" y="660" />
-              <mxPoint x="1180" y="660" />
-              <mxPoint x="1180" y="505" />
-              <mxPoint x="815" y="505" />
+              <mxPoint x="585" y="743" />
+              <mxPoint x="1180" y="743" />
+              <mxPoint x="1180" y="545" />
+              <mxPoint x="815" y="545" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="q_checkout" value="polls checkout" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1;endArrow=block;endFill=0;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.48;exitY=0;exitDx=0;exitDy=0;entryX=0.66;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_checkout" target="server">
-          <mxGeometry relative="1" as="geometry" x="-0.03">
+          <mxGeometry relative="1" as="geometry" x="-0.94">
             <Array as="points">
-              <mxPoint x="835" y="650" />
-              <mxPoint x="1170" y="650" />
-              <mxPoint x="1170" y="495" />
-              <mxPoint x="765" y="495" />
+              <mxPoint x="835" y="727" />
+              <mxPoint x="1170" y="727" />
+              <mxPoint x="1170" y="530" />
+              <mxPoint x="765" y="530" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_server" value="sets Ramping 10 → 50 % · Current" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.34;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="controller" target="server">
-          <mxGeometry relative="1" as="geometry" x="-0.74">
+          <mxGeometry relative="1" as="geometry" x="-0.73">
             <Array as="points">
-              <mxPoint x="620" y="495" />
-              <mxPoint x="675" y="495" />
+              <mxPoint x="620" y="530" />
+              <mxPoint x="675" y="530" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_order" value="one Deployment per build" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.33;exitY=1;exitDx=0;exitDy=0;entryX=0.34;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="controller" target="wd_order">
-          <mxGeometry relative="1" as="geometry" x="0.34">
+          <mxGeometry relative="1" as="geometry" x="0.31">
             <Array as="points">
-              <mxPoint x="585" y="650" />
-              <mxPoint x="515" y="650" />
+              <mxPoint x="585" y="727" />
+              <mxPoint x="515" y="727" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_checkout" value="one Deployment per build" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.23;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="controller" target="wd_checkout">
-          <mxGeometry relative="1" as="geometry" x="0.49">
+          <mxGeometry relative="1" as="geometry" x="0.45">
             <Array as="points">
-              <mxPoint x="655" y="650" />
-              <mxPoint x="780" y="650" />
+              <mxPoint x="655" y="727" />
+              <mxPoint x="780" y="727" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -151,61 +151,61 @@
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
         <mxCell id="k_backlog" value="backlog per build · 15 s" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1;endArrow=open;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="keda" target="server">
-          <mxGeometry relative="1" as="geometry" x="-0.86">
+          <mxGeometry relative="1" as="geometry" x="-0.83">
             <Array as="points">
-              <mxPoint x="960" y="490" />
-              <mxPoint x="720" y="490" />
+              <mxPoint x="960" y="515" />
+              <mxPoint x="720" y="515" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="k_workers" value="HPA per build · 1–3 pods · ceil(backlog / 5)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="keda" target="f_workers">
-          <mxGeometry relative="1" as="geometry" x="-0.85">
+          <mxGeometry relative="1" as="geometry" x="0.62">
             <Array as="points">
-              <mxPoint x="1010" y="650" />
-              <mxPoint x="885" y="650" />
+              <mxPoint x="1010" y="713" />
+              <mxPoint x="885" y="713" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="a_grpc" value="activities" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="grpc_targets">
-          <mxGeometry relative="1" as="geometry" x="0.03">
+          <mxGeometry relative="1" as="geometry" x="0.33">
             <Array as="points">
-              <mxPoint x="550" y="845" />
-              <mxPoint x="550" y="845" />
+              <mxPoint x="550" y="955" />
+              <mxPoint x="550" y="955" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="a_cart" value="ClearCart" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="cart">
-          <mxGeometry relative="1" as="geometry" x="0.64">
+          <mxGeometry relative="1" as="geometry" x="0.73">
             <Array as="points">
-              <mxPoint x="495" y="845" />
-              <mxPoint x="275.43" y="845" />
+              <mxPoint x="495" y="955" />
+              <mxPoint x="275.43" y="955" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="a_odb" value="order rows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.18;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="appdb">
-          <mxGeometry relative="1" as="geometry" x="0.61">
+          <mxGeometry relative="1" as="geometry" x="0.7">
             <Array as="points">
-              <mxPoint x="605" y="845" />
-              <mxPoint x="770" y="845" />
+              <mxPoint x="605" y="955" />
+              <mxPoint x="770" y="955" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="a_cdb" value="expire session" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.27;exitY=1;exitDx=0;exitDy=0;entryX=0.39;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_checkout" target="appdb">
-          <mxGeometry relative="1" as="geometry" x="0.45">
+          <mxGeometry relative="1" as="geometry" x="0.67">
             <Array as="points">
-              <mxPoint x="790" y="845" />
-              <mxPoint x="815" y="845" />
+              <mxPoint x="790" y="955" />
+              <mxPoint x="815" y="955" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="note_scale" value="&lt;b&gt;Who owns what&lt;/b&gt;&lt;br&gt;The controller owns builds: it derives a build ID from the pod template, creates one Deployment per build, ramps new workflows onto it through the Temporal API and deletes it once drained. KEDA owns replicas: spec.replicas is absent from both WorkerDeployments, and each build's ScaledObject (rendered from order-fulfillment-scaler / checkout-abandon-scaler) sets 1–3 pods from that build's own backlog. The only replica write the controller keeps is the sunset: drained + 1 h → 0, then delete." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1060" width="1170" height="70" as="geometry" />
+          <mxGeometry x="40" y="1180" width="1170" height="70" as="geometry" />
         </mxCell>
         <mxCell id="note_scope" value="&lt;b&gt;Out of this picture&lt;/b&gt;&lt;br&gt;The order worker also runs the start-outbox dispatcher, which retries a workflow start the API could not make inline (docs/api/temporal.md § How the Saga Gets Started). Both workers and the server export telemetry: worker SDK metrics go OTLP to the collector and on to vmagent; the server's ServiceMonitors are scraped by vmagent. The KEDA board (Grafana uid keda) graphs backlog, desired vs current replicas per build. The same server also runs PeerDB's CDC workflows (RFC-0030): namespace peerdb, task queue homelab, served by flow-worker and flow-snapshot-worker in the peerdb namespace, with a MirrorName search attribute. They are a fixed Helm deployment, outside both the Worker Controller and KEDA (databases/cdc)." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1142" width="1170" height="80" as="geometry" />
+          <mxGeometry x="40" y="1262" width="1170" height="80" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1252" width="1170" height="88" as="geometry" />
+          <mxGeometry x="40" y="1372" width="1170" height="88" as="geometry" />
         </mxCell>
         <mxCell id="legend-role-service" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;fillColor=#CFFAFE;strokeColor=#0891B2;strokeWidth=1.5;" vertex="1" parent="legend">
           <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />

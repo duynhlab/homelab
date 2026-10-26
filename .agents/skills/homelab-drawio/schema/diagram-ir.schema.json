@@ -190,7 +190,7 @@
           },
           "icon": {
             "type": "string",
-            "description": "Catalogue name in assets/icons/manifest.json"
+            "description": "Catalogue name in assets/icons/manifest.json, or 'none' for a box that names a product without being it"
           },
           "shape": {
             "enum": [

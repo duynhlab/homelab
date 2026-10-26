@@ -56,20 +56,17 @@ nodes:
   - {id: cron, label: "pg_cron (inside product-db)\nheartbeat upsert every 30 s\nper database", role: worker, layer: source, parent: f_product}
   - {id: productdb, label: "product-db primary\norder · checkout · payment\npublications analytics_<db>", role: data, layer: source, parent: f_product, shape: datastore, icon: postgresql}
 
-  - {id: pooler, label: "product-db-pooler-cdc\nPgBouncer · session mode\nclient TLS required", role: data, layer: pooling, parent: f_product}
-
-  - {id: snapshot, label: "flow-snapshot-worker\nslot + exported snapshot", role: worker, layer: cdc, parent: f_peerdb}
-  - {id: server, label: "peerdb-server\ncatalog migrations", role: service, layer: cdc, parent: f_peerdb}
-  - {id: api, label: "flow-api :8113\npeers · mirrors", role: service, layer: cdc, parent: f_peerdb}
-  - {id: worker, label: "flow-worker\nCDC: one mirror per database", role: worker, layer: cdc, parent: f_peerdb}
-
+  - {id: pooler, label: "product-db-pooler-cdc\nPgBouncer · session mode\nclient TLS required", role: data, layer: pooling, parent: f_product, icon: pgbouncer}
+  - {id: snapshot, label: "flow-snapshot-worker\nslot + exported snapshot", role: worker, layer: cdc, parent: f_peerdb, icon: peerdb}
+  - {id: server, label: "peerdb-server\ncatalog migrations", role: service, layer: cdc, parent: f_peerdb, icon: peerdb}
+  - {id: api, label: "flow-api :8113\npeers · mirrors", role: service, layer: cdc, parent: f_peerdb, icon: peerdb}
+  - {id: worker, label: "flow-worker\nCDC: one mirror per database", role: worker, layer: cdc, parent: f_peerdb, icon: peerdb}
   - {id: rustfs, label: "RustFS bucket\nanalytics-service-cdc\nAvro staging", role: data, layer: stores, parent: f_rustfs, shape: datastore, icon: rustfs}
   - {id: temporal, label: "Temporal server\nnamespace peerdb", role: platform, layer: stores, parent: f_temporal, icon: temporal}
   - {id: catalog, label: "platform-db\npeerdb_catalog", role: data, layer: stores, parent: f_platform, shape: datastore, icon: postgresql}
 
   - {id: raw, label: "ClickHouse raw tables\nanalytics.<db>_<table>\nReplicatedReplacingMergeTree", role: data, layer: warehouse, parent: f_ch, shape: datastore, icon: clickhouse}
-  - {id: views, label: "ClickHouse serving views\nanalytics.<db>_<table>_live\nFINAL · no tombstones", role: data, layer: warehouse, parent: f_ch}
-
+  - {id: views, label: "ClickHouse serving views\nanalytics.<db>_<table>_live\nFINAL · no tombstones", role: data, layer: warehouse, parent: f_ch, icon: clickhouse}
   - {id: analytics, label: "analytics-service\n/analytics/v1/protected", role: service, layer: consumers, parent: f_analytics, icon: go}
 
 edges:

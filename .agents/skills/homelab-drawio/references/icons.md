@@ -34,8 +34,17 @@ Context7 serves library *documentation*, not logo files — use it to confirm a
 product's current name or version, and take the mark itself from sources 2–4.
 
 Reaching step 5 is fine; skipping to it without trying 1–4 is the failure to
-avoid. `icon_style.py audit <dir>` lists product boxes rendering without a logo,
-grouped by which source would supply it — advisory, not a gate.
+avoid.
+
+**The gate.** For a generated diagram, `validate.py --ir` warns
+(`house.missing_logo`) when a box's **first label line** names exactly one
+catalogued product (`RustFS bucket`, `Valkey :6379`, `CNPG Pooler (PgBouncer)`)
+and the node sets no `icon`. Set `icon: <name>`, or `icon: none` when the box
+names a product without being it (`Prometheus endpoint :9363` is a ClickHouse
+port). A product named only on a later line, or a box naming several, is not
+asked. A product missing from the catalogue cannot be asked for: add it first.
+`icon_style.py audit <dir>` remains the manual sweep for hand-drawn diagrams,
+grouped by which source would supply each logo.
 
 ## In the catalog
 
@@ -46,7 +55,8 @@ Kubernetes, Flux, Helm, OpenTelemetry, cert-manager, Kyverno, KEDA,
 CloudNativePG, External Secrets Operator (CNCF Artwork, colour); Grafana,
 Keycloak, Go, PostgreSQL, ClickHouse, Temporal, Envoy, VictoriaMetrics, OpenBao
 (simple-icons); Valkey (valkey.io brand mark), PgDog (project brand, logomark
-cropped from the lockup). Run `icon_style.py list` for the exact names and aliases.
+cropped from the lockup), PgBouncer (pgbouncer.org project SVG), PeerDB
+(PeerDB-io organisation mark, separated from its dark tile). Run `icon_style.py list` for the exact names and aliases.
 
 **Aliases:** `victorialogs` and `victoriatraces` → the VictoriaMetrics mark (one
 company, one logo); `postgres`→`postgresql`, `eso`→`external-secrets`,

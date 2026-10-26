@@ -185,6 +185,24 @@ class TestGenerate(unittest.TestCase):
             fh.write(generate.build(ir))
         return validate.validate(drp, irp)
 
+    def _with_db(self, **db):
+        ir = _ir()
+        node = next(n for n in ir["nodes"] if n["id"] == "db")
+        node.update(db)
+        return {f["rule_id"] for f in self._validate(ir) if f["rule_id"] == "house.missing_logo"}
+
+    def test_missing_logo_warns(self):
+        self.assertEqual(self._with_db(label="Valkey :6379\ncache"), {"house.missing_logo"})
+
+    def test_logo_present_passes(self):
+        self.assertFalse(self._with_db(label="Valkey :6379\ncache", icon="valkey"))
+
+    def test_icon_none_opts_out(self):
+        self.assertFalse(self._with_db(label="Prometheus endpoint :9363", icon="none"))
+
+    def test_product_named_on_a_later_line_is_not_asked(self):
+        self.assertFalse(self._with_db(label="product-db\nPgBouncer pooler"))
+
     def test_unframed_platform_node_warns(self):
         f = self._validate(_ir())  # gw and db sit on the bare canvas
         flagged = {o for x in f if x["rule_id"] == "layout.unframed_node" for o in x["objects"]}
@@ -297,6 +315,17 @@ class TestGenerate(unittest.TestCase):
                 found = {f["rule_id"] for f in validate.validate(path[: -len(".ir.yaml")] + ".drawio")}
                 self.assertFalse(found & {"geometry.edge_leaves_frame", "geometry.edge_on_frame_border",
                                           "geometry.lanes_too_close"}, found)
+
+    def test_repo_product_boxes_carry_their_logo(self):
+        """Every generated box that names one catalogued product carries its
+        logo, or opts out with `icon: none`."""
+        import validate
+        irs = sorted(glob.glob(os.path.join(REPO, "docs", "**", "*.ir.yaml"), recursive=True))
+        for path in irs:
+            with self.subTest(ir=os.path.relpath(path, REPO)):
+                found = [f["objects"] for f in validate.validate(path[: -len(".ir.yaml")] + ".drawio", path)
+                         if f["rule_id"] == "house.missing_logo"]
+                self.assertFalse(found)
 
 
 if __name__ == "__main__":

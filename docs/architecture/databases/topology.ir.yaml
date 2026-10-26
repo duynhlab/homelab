@@ -59,20 +59,19 @@ nodes:
   - {id: c_product, label: "product · cart · order\ncheckout · inventory · payment", role: service, layer: clients, parent: f_clients, icon: go}
   - {id: c_temporal, label: "Temporal server (temporal)\ntemporal · temporal_visibility", role: platform, layer: clients, parent: f_clients, icon: temporal}
   - {id: c_authz, label: "Authorization executors\nauthz Job + CronJob per cluster\npgroles · as db_authz", role: platform, layer: clients, parent: f_clients}
-  - {id: c_peerdb, label: "PeerDB (peerdb)\nflow-worker · snapshot-worker · flow-api\npeerdb_<db> · peerdb_catalog", role: worker, layer: clients, parent: f_clients}
+  - {id: c_peerdb, label: "PeerDB (peerdb)\nflow-worker · snapshot-worker · flow-api\npeerdb_<db> · peerdb_catalog", role: worker, layer: clients, parent: f_clients, icon: peerdb}
   - {id: c_cdcboot, label: "CDC bootstrap Job + CronJob (10 min)\nheartbeat tables · pg_cron jobs\nSELECT on published tables", role: worker, layer: clients, parent: f_clients}
 
   - {id: openbao, label: "OpenBao database engine\nvault_rotator per cluster\n10 runtime static roles", role: platform, layer: poolers, parent: f_cluster, icon: openbao}
-  - {id: pgbouncer, label: "platform-db-pooler-rw\nPgBouncer ×2 · transaction\nclient TLS required", role: data, layer: poolers, parent: f_platform}
+  - {id: pgbouncer, label: "platform-db-pooler-rw\nPgBouncer ×2 · transaction\nclient TLS required", role: data, layer: poolers, parent: f_platform, icon: pgbouncer}
   - {id: cnpg, label: "CloudNativePG operator\n+ barman-cloud plugin", role: platform, layer: poolers, parent: f_cnpg, icon: cloudnativepg}
-  - {id: cdcpool, label: "product-db-pooler-cdc\nPgBouncer · session · replication\nclient TLS required", role: data, layer: poolers, parent: f_product}
+  - {id: cdcpool, label: "product-db-pooler-cdc\nPgBouncer · session · replication\nclient TLS required", role: data, layer: poolers, parent: f_product, icon: pgbouncer}
   - {id: pgdog, label: "pgdog-product ×3 :6432\nprimary only · TLS required\npassthrough auth (ADR-089)", role: data, layer: poolers, parent: f_product, icon: pgdog}
 
   - {id: productdb, label: "product-db ×3 · sync any 1\nproduct · cart · order · payment\ncheckout · inventory", role: data, layer: clusters, parent: f_product, shape: datastore, icon: postgresql}
   - {id: platformdb, label: "platform-db ×3 · sync any 1\nuser · notification · shipping · review\nkeycloak · temporal · temporal_visibility\npeerdb_catalog", role: data, layer: clusters, parent: f_platform, shape: datastore, icon: postgresql}
 
-  - {id: rustfs, label: "RustFS bucket pg-backups-cnpg\nplatform-db/ · product-db/ (30 d)\nproduct-db-replica/ (7 d)", role: data, layer: storage, parent: f_rustfs, shape: datastore}
-
+  - {id: rustfs, label: "RustFS bucket pg-backups-cnpg\nplatform-db/ · product-db/ (30 d)\nproduct-db-replica/ (7 d)", role: data, layer: storage, parent: f_rustfs, shape: datastore, icon: rustfs}
   - {id: replica, label: "product-db-replica ×1\nDR: designated primary\n(3 on promotion)", role: data, layer: dr, parent: f_product, shape: datastore, icon: postgresql}
 
 edges:

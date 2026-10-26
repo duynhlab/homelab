@@ -58,8 +58,7 @@ nodes:
 
   - {id: http, label: "HTTP :8123\nonly /ping here", role: service, layer: access, parent: f_access}
   - {id: native, label: "Native TCP :9000\ntyped columnar blocks", role: service, layer: access, parent: f_access}
-  - {id: prom, label: "Prometheus endpoint :9363\n/metrics", role: service, layer: access, parent: f_access}
-
+  - {id: prom, label: "Prometheus endpoint :9363\n/metrics", role: service, layer: access, parent: f_access, icon: none}
   - {id: parser, label: "Parser\nSQL text → AST", role: service, layer: query, parent: f_query}
   - {id: planner, label: "Analyzer + planner\nAST → optimised query plan", role: service, layer: query, parent: f_query}
   - {id: executor, label: "Pipeline executor\nprocessors on query threads", role: service, layer: query, parent: f_query}
@@ -74,8 +73,7 @@ nodes:
 
   - {id: cold, label: "Disk s3_cache · cold\n1 GiB cache over the s3 disk", role: data, layer: disks, parent: f_storage, shape: datastore}
   - {id: hot, label: "Disk default · hot\nlocal PVC 10Gi", role: data, layer: disks, parent: f_storage, shape: datastore}
-  - {id: rustfs, label: "RustFS bucket\nclickhouse-otel/{replica}/", role: data, layer: coordination, parent: f_rustfs, shape: datastore}
-
+  - {id: rustfs, label: "RustFS bucket\nclickhouse-otel/{replica}/", role: data, layer: coordination, parent: f_rustfs, shape: datastore, icon: rustfs}
   - {id: peers, label: "Replicas 0-1 · 0-2\nsame engine · own disks", role: data, layer: coordination, parent: f_mon, icon: clickhouse}
   - {id: keeper, label: "ClickHouse Keeper ×3\nRaft quorum · :2181", role: platform, layer: coordination, parent: f_mon, icon: clickhouse}
 

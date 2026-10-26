@@ -151,7 +151,7 @@ def ir_problems(ir: dict) -> list[tuple[str, list[str], str]]:
             out.append(("structural.unknown_layer", [n["id"]], f"node '{n['id']}' layer '{n['layer']}' is not in layers"))
         if n.get("parent") and n["parent"] not in bounds:
             out.append(("structural.broken_parent", [n["id"]], f"node '{n['id']}' parent '{n['parent']}' is not a boundary"))
-        if n.get("icon") and n["icon"] not in icons:
+        if node_icon(n) and n["icon"] not in icons:
             out.append(("structural.unknown_icon", [n["id"]], f"node '{n['id']}' icon '{n['icon']}' is not in the catalogue"))
         planned = n.get("status") == "planned" or n["role"] == "planned"
         if planned and "planned" not in n["label"].lower():
@@ -207,11 +207,18 @@ def title_span(ir: dict, fid: str, rect: list[float]) -> tuple[float, float]:
     return (rect[0], rect[0] + w)
 
 
+def node_icon(n: dict) -> str | None:
+    """The node's catalogue icon. `icon: none` marks a box that names a
+    product without being it (validate.py's house.missing_logo skips it)."""
+    icon = n.get("icon")
+    return None if icon in (None, "none") else icon
+
+
 def node_size(n: dict, font_size: int) -> tuple[int, int]:
     lines = n["label"].split("\n")
     multi = len(lines) > 1
     tw = max(text_width(l, font_size, bold=multi and i == 0) for i, l in enumerate(lines))
-    pad = (ICON_PAD if n.get("icon") else PAD_TEXT) + PAD_TEXT
+    pad = (ICON_PAD if node_icon(n) else PAD_TEXT) + PAD_TEXT
     w = max(120, _ceil(tw + pad + 4))
     h = max(40, _ceil(len(lines) * font_size * LINE_H + 18))
     if n.get("shape") == "datastore":
@@ -670,6 +677,11 @@ def _route_pass(ir: dict, lay: Layout) -> tuple[dict[str, dict], dict[tuple[floa
                  else lay._titles_opening(lay.li[nid] + 1) if lay.li[nid] + 1 < len(lay.layers) else [])
         lo, hi = _widest_free(b[0], b[0] + b[2], spans)
         k = len(items)
+        if (hi - lo) / (k + 1) < LANE_GAP:
+            # Too narrow beside the titles for LANE_GAP between ports: spread
+            # over the whole side; a top port under a title takes the detour
+            # route_edges draws around it.
+            lo, hi = b[0] + 10, b[0] + b[2] - 10
         for i, (_, eid, which) in enumerate(items):
             x = lo + _snap((hi - lo) * (i + 1) / (k + 1), 5)
             port_x[(eid, which)] = x
@@ -777,11 +789,11 @@ def node_style(n: dict, P: dict) -> str:
     if n.get("shape") == "datastore":
         rs = role_style(n["role"])
         # A logo is a child cell (logo_cell); the text moves right to clear it.
-        logo = "align=left;spacingLeft=42;" if n.get("icon") else ""
+        logo = "align=left;spacingLeft=42;" if node_icon(n) else ""
         return (P["shapes"]["datastore"] + ("dashed=1;" if dashed else "") + logo +
                 f"size={CYLINDER_CAP};fillColor={rs['fillColor']};strokeColor={rs['strokeColor']};strokeWidth=1.5;"
                 f"fontColor={rs['fontColor']};fontFamily={font['fontFamily']};fontSize={font['fontSize']};")
-    if n.get("icon"):
+    if node_icon(n):
         return _style(P["label_style"], n["role"], dashed, n["icon"], font)
     return _style(P["plain_style"].replace("rounded=1;", "rounded=1;{dashed}", 1), n["role"], dashed, None, font)
 
@@ -974,7 +986,7 @@ def build(ir: dict) -> str:
         x, y, w, h = lay.box[n["id"]]
         ox, oy = origin(n.get("parent"))
         _cell(root, n["id"], label_html(n["label"]), node_style(n, P), n.get("parent") or "1", (x - ox, y - oy, w, h))
-        if n.get("shape") == "datastore" and n.get("icon"):
+        if n.get("shape") == "datastore" and node_icon(n):
             style, geo = logo_cell(n, h)
             _cell(root, n["id"] + LOGO_SUFFIX, "", style, n["id"], geo)
 

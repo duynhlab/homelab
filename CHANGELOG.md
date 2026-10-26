@@ -979,6 +979,13 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Draw.io product boxes carry their logos.** PgBouncer and PeerDB join the
+  homelab-drawio icon catalogue, and the CDC, database, TLS, network-policy,
+  signal-flow and ClickHouse diagrams now show the PgBouncer, PeerDB, Valkey,
+  RustFS and ClickHouse logos on their boxes. `validate.py --ir` warns
+  (`house.missing_logo`) on a box whose first label line names one catalogued
+  product without its logo; `icon: none` opts out a box that only names one.
+
 - Correct Collector pipeline/memory/sampling explanations and telemetry runbooks;
   separate current dashboard artifact reference from historical panel material.
 

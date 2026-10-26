@@ -976,6 +976,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Draw.io edges stay in their frames and apart.** The homelab-drawio
+  generator keeps every edge inside the innermost frame around both its
+  ends and 10 px off frame borders, widens a gutter until its lanes sit
+  14 px apart, and routes a title detour on the inside of the frame. Before
+  this, `databases/cdc` and `security/tls-pki-edge` ran edges outside the
+  Kind cluster frame, 12 runs rode frame borders, and 59 pairs of lanes sat
+  5 px apart or on one line. `validate.py` gains `edge_leaves_frame`
+  (ERROR), `edge_on_frame_border` and `lanes_too_close` (WARN), and sizes
+  multi-line edge labels by their lines; every IR diagram is regenerated.
+
 - **RFC-0030 docs describe what is deployed.** A review against the manifests
   removed "planned" and "fixture-backed" claims for the CDC path across the
   RFC, ADR-066/068/069, the API, observability, databases and platform docs;

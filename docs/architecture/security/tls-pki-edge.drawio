@@ -11,7 +11,7 @@
           <mxGeometry x="40" y="54" width="1330" height="36" as="geometry" />
         </mxCell>
         <mxCell id="f_cluster" value="Kind cluster · homelab" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#1E293B;fontFamily=Helvetica;fontSize=14;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="195" width="1330" height="810" as="geometry" />
+          <mxGeometry x="40" y="205" width="1330" height="930" as="geometry" />
         </mxCell>
         <mxCell id="f_pki" value="PKI" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
           <mxGeometry x="330" y="40" width="490" height="350" as="geometry" />
@@ -20,10 +20,10 @@
           <mxGeometry x="820" y="240" width="230" height="150" as="geometry" />
         </mxCell>
         <mxCell id="f_apps" value="East-west · no mesh" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="570" y="440" width="740" height="160" as="geometry" />
+          <mxGeometry x="570" y="480" width="740" height="190" as="geometry" />
         </mxCell>
         <mxCell id="f_platform" value="Platform" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#64748B;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=right;spacingRight=10;spacingTop=2;" vertex="1" parent="f_cluster">
-          <mxGeometry x="20" y="650" width="1290" height="140" as="geometry" />
+          <mxGeometry x="20" y="740" width="1290" height="170" as="geometry" />
         </mxCell>
         <mxCell id="browser" value="&lt;b&gt;Browser&lt;/b&gt;&lt;br&gt;*.duynh.me" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="920" y="100" width="120" height="50" as="geometry" />
@@ -71,83 +71,83 @@
           <mxGeometry x="520" y="65" width="140" height="50" as="geometry" />
         </mxCell>
         <mxCell id="registry" value="&lt;b&gt;homelab-registry:5000&lt;/b&gt;&lt;br&gt;OCI artifacts (Kind host)" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="575" y="1050" width="150" height="50" as="geometry" />
+          <mxGeometry x="575" y="1190" width="150" height="50" as="geometry" />
         </mxCell>
         <mxCell id="t_browser" value="TLS verified · HTTPS&#10;(once homelab-ca is trusted)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.36;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="eg">
-          <mxGeometry relative="1" as="geometry" x="-0.5">
+          <mxGeometry relative="1" as="geometry" x="-0.49">
             <Array as="points">
-              <mxPoint x="980" y="175" />
-              <mxPoint x="980" y="175" />
-              <mxPoint x="980" y="405" />
-              <mxPoint x="955" y="405" />
+              <mxPoint x="980" y="178" />
+              <mxPoint x="980" y="178" />
+              <mxPoint x="980" y="412" />
+              <mxPoint x="955" y="412" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_sign" value="signs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.33;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="root" target="issuer">
-          <mxGeometry relative="1" as="geometry" x="0.53">
+          <mxGeometry relative="1" as="geometry" x="0.51">
             <Array as="points">
-              <mxPoint x="695" y="405" />
-              <mxPoint x="545" y="405" />
+              <mxPoint x="695" y="412" />
+              <mxPoint x="545" y="412" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_bundle" value="committed copy&#10;stale after rebuild" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.42;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="root" target="bundle">
-          <mxGeometry relative="1" as="geometry" x="0.22">
+          <mxGeometry relative="1" as="geometry" x="0.19">
             <Array as="points">
-              <mxPoint x="765" y="405" />
-              <mxPoint x="725" y="405" />
+              <mxPoint x="765" y="412" />
+              <mxPoint x="725" y="412" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="p_rfc" value="planned · more leaves&#10;from homelab-ca" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.33;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="rfc" target="issuer">
-          <mxGeometry relative="1" as="geometry" x="0.39">
+          <mxGeometry relative="1" as="geometry" x="0.12">
             <Array as="points">
-              <mxPoint x="500" y="405" />
-              <mxPoint x="475" y="405" />
+              <mxPoint x="500" y="412" />
+              <mxPoint x="475" y="412" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_edge" value="issues platform-edge-tls" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.33;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="issuer" target="eg">
-          <mxGeometry relative="1" as="geometry" x="-0.94">
+          <mxGeometry relative="1" as="geometry" x="-0.88">
             <Array as="points">
-              <mxPoint x="560" y="595" />
-              <mxPoint x="950" y="595" />
+              <mxPoint x="560" y="619" />
+              <mxPoint x="950" y="619" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_baoleaf" value="openbao-idp-trust&#10;(ca.crt only)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.88;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="issuer" target="bao">
-          <mxGeometry relative="1" as="geometry" x="0.1">
+          <mxGeometry relative="1" as="geometry" x="0.06">
             <Array as="points">
-              <mxPoint x="460" y="595" />
-              <mxPoint x="190" y="595" />
-              <mxPoint x="190" y="810" />
-              <mxPoint x="235.43" y="810" />
+              <mxPoint x="460" y="619" />
+              <mxPoint x="190" y="619" />
+              <mxPoint x="190" y="902" />
+              <mxPoint x="235.43" y="902" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="c_fluxleaf" value="flux-web-idp-trust&#10;(ca.crt only)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.32;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="issuer" target="fluxop">
-          <mxGeometry relative="1" as="geometry" x="-0.47">
+          <mxGeometry relative="1" as="geometry" x="-0.43">
             <Array as="points">
-              <mxPoint x="510" y="595" />
-              <mxPoint x="540" y="595" />
-              <mxPoint x="540" y="810" />
-              <mxPoint x="625" y="810" />
+              <mxPoint x="510" y="619" />
+              <mxPoint x="540" y="619" />
+              <mxPoint x="540" y="902" />
+              <mxPoint x="625" y="902" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="t_backends" value="PLAINTEXT · HTTP&#10;no BackendTLSPolicy&#10;(admin UIs too)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.67;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eg" target="svc">
-          <mxGeometry relative="1" as="geometry" x="0.5">
+          <mxGeometry relative="1" as="geometry" x="0.79">
             <Array as="points">
-              <mxPoint x="1010" y="625" />
-              <mxPoint x="930" y="625" />
+              <mxPoint x="1010" y="661" />
+              <mxPoint x="930" y="661" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="r_egjwks" value="PLAINTEXT&#10;route + remoteJWKS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.83;exitY=1;exitDx=0;exitDy=0;entryX=0.12;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eg" target="kc">
-          <mxGeometry relative="1" as="geometry" x="0.76">
+          <mxGeometry relative="1" as="geometry" x="0.39">
             <Array as="points">
-              <mxPoint x="1040" y="595" />
-              <mxPoint x="1185" y="595" />
+              <mxPoint x="1040" y="619" />
+              <mxPoint x="1185" y="619" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -155,54 +155,54 @@
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
         <mxCell id="r_graf" value="PLAINTEXT&#10;OAuth token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.29;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="graf" target="kc">
-          <mxGeometry relative="1" as="geometry" x="-0.95">
+          <mxGeometry relative="1" as="geometry" x="-0.94">
             <Array as="points">
-              <mxPoint x="710" y="810" />
-              <mxPoint x="1215" y="810" />
+              <mxPoint x="710" y="848" />
+              <mxPoint x="1215" y="848" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="r_bao" value="TLS verified · live CA&#10;OIDC discovery hairpin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.94;exitY=0;exitDx=0;exitDy=0;entryX=0.17;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bao" target="eg">
-          <mxGeometry relative="1" as="geometry" x="-0.43">
+          <mxGeometry relative="1" as="geometry" x="-0.42">
             <Array as="points">
-              <mxPoint x="245.43" y="820" />
-              <mxPoint x="380" y="820" />
-              <mxPoint x="380" y="605" />
-              <mxPoint x="920" y="605" />
+              <mxPoint x="245.43" y="918" />
+              <mxPoint x="390" y="918" />
+              <mxPoint x="390" y="633" />
+              <mxPoint x="920" y="633" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="r_flux" value="TLS verified · live CA&#10;OIDC hairpin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="fluxop" target="eg">
-          <mxGeometry relative="1" as="geometry" x="-0.2">
+          <mxGeometry relative="1" as="geometry" x="-0.4">
             <Array as="points">
-              <mxPoint x="675" y="820" />
-              <mxPoint x="560" y="820" />
-              <mxPoint x="560" y="615" />
-              <mxPoint x="980" y="615" />
+              <mxPoint x="675" y="918" />
+              <mxPoint x="560" y="918" />
+              <mxPoint x="560" y="647" />
+              <mxPoint x="980" y="647" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="t_temporal" value="PLAINTEXT · gRPC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.33;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="temporal">
-          <mxGeometry relative="1" as="geometry" x="0.61">
+          <mxGeometry relative="1" as="geometry" x="0.6">
             <Array as="points">
-              <mxPoint x="895" y="820" />
-              <mxPoint x="1080" y="820" />
+              <mxPoint x="895" y="902" />
+              <mxPoint x="1080" y="902" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="m_otel" value="PLAINTEXT · OTLP&#10;(services + Envoy)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.67;exitY=1;exitDx=0;exitDy=0;entryX=0.29;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="otel">
-          <mxGeometry relative="1" as="geometry" x="0.89">
+          <mxGeometry relative="1" as="geometry" x="-0.87">
             <Array as="points">
-              <mxPoint x="965" y="835" />
-              <mxPoint x="1230" y="835" />
+              <mxPoint x="965" y="918" />
+              <mxPoint x="1230" y="918" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="d_eso" value="PLAINTEXT&#10;SA JWT + reads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="eso" target="bao">
-          <mxGeometry relative="1" as="geometry" x="-0.96">
+          <mxGeometry relative="1" as="geometry" x="-0.37">
             <Array as="points">
-              <mxPoint x="860" y="1020" />
-              <mxPoint x="170" y="1020" />
+              <mxPoint x="860" y="1088" />
+              <mxPoint x="170" y="1088" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -210,21 +210,21 @@
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
         <mxCell id="d_oci" value="PLAINTEXT · OCI pull&#10;insecure · no cosign" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="fluxop" target="registry">
-          <mxGeometry relative="1" as="geometry" x="-0.5">
+          <mxGeometry relative="1" as="geometry" x="0.1">
             <Array as="points">
-              <mxPoint x="650" y="1035" />
-              <mxPoint x="650" y="1035" />
+              <mxPoint x="650" y="1162" />
+              <mxPoint x="650" y="1162" />
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="note_state" value="&lt;b&gt;Reading the hop state&lt;/b&gt;&lt;br&gt;TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers. PLAINTEXT: nothing is encrypted on the hop. Behind the edge every request, identity and east-west hop is plaintext: Envoy has no BackendTLSPolicy, Keycloak serves HTTP in-cluster, gRPC between services uses insecure credentials, and OpenBao runs tls_disable. Only the two OIDC hairpins (OpenBao, Flux web UI) verify, against the live homelab-ca. Operator-managed TLS (OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1130" width="1330" height="70" as="geometry" />
+          <mxGeometry x="40" y="1270" width="1330" height="70" as="geometry" />
         </mxCell>
         <mxCell id="note_planned" value="&lt;b&gt;Planned, not installed (RFC-0020, provisional)&lt;/b&gt;&lt;br&gt;S0 edge issuer decouple · S1 OpenBao listener TLS · S6 gRPC + Temporal mTLS · S7 intermediate CA · S8 Keycloak HTTPS · S10 Envoy BackendTLSPolicy · S13 OCI registry TLS + cosign · S14 KMS over HTTPS (production). S2–S4 shipped through ADR-089 and are drawn in tls-data-tier." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1212" width="1330" height="60" as="geometry" />
+          <mxGeometry x="40" y="1352" width="1330" height="60" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1302" width="1330" height="110" as="geometry" />
+          <mxGeometry x="40" y="1442" width="1330" height="110" as="geometry" />
         </mxCell>
         <mxCell id="legend-role-external" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;" vertex="1" parent="legend">
           <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />

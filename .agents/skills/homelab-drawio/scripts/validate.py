@@ -220,6 +220,30 @@ def _segs_cross(p1, p2, p3, p4) -> bool:
     return (d1 * d2 < 0) and (d3 * d4 < 0)
 
 
+def _seg_leaves(p, q, r, tol=1.0) -> bool:
+    """True when any part of segment p-q lies outside rect r."""
+    for k in range(21):
+        x, y = p[0] + (q[0] - p[0]) * k / 20, p[1] + (q[1] - p[1]) * k / 20
+        if not (r[0] - tol <= x <= r[0] + r[2] + tol and r[1] - tol <= y <= r[1] + r[3] + tol):
+            return True
+    return False
+
+
+def _seg_on_border(p, q, r, near=4.0, min_run=20.0) -> bool:
+    """True when an axis-parallel segment runs at least `min_run` px along,
+    and within `near` px of, one of rect r's borders."""
+    x0, y0, x1, y1 = r[0], r[1], r[0] + r[2], r[1] + r[3]
+    if abs(p[1] - q[1]) < 0.5:
+        lo, hi = sorted((p[0], q[0]))
+        run = min(hi, x1) - max(lo, x0)
+        return run >= min_run and any(abs(p[1] - b) < near for b in (y0, y1))
+    if abs(p[0] - q[0]) < 0.5:
+        lo, hi = sorted((p[1], q[1]))
+        run = min(hi, y1) - max(lo, y0)
+        return run >= min_run and any(abs(p[0] - b) < near for b in (x0, x1))
+    return False
+
+
 def _length(poly) -> float:
     return sum(math.dist(a, b) for a, b in zip(poly, poly[1:]))
 
@@ -382,6 +406,37 @@ def gate_geometry(d: Diagram, ir: dict | None) -> tuple[list[dict], list]:
         if _length(poly) > max(canvas):
             out.append(finding("WARN", "geometry.long_edge", [eid], f"edge is {_length(poly):.0f}px long",
                                "move the two ends closer, or split the view"))
+    # An edge stays inside the innermost frame around both of its ends, and
+    # never runs along a frame border, where it reads as part of the frame.
+    frame_rects = {f: rects[f] for f in frames if rects.get(f) and not d.in_legend(f)}
+    for eid, poly in routes.items():
+        e = d.by_id[eid]
+        around_t = {e.get("target"), *d.ancestors(e.get("target"))}
+        scope = next((a for a in d.ancestors(e.get("source")) if a in frame_rects and a in around_t), None)
+        if scope and any(_seg_leaves(p, q, frame_rects[scope]) for p, q in zip(poly, poly[1:])):
+            out.append(finding("ERROR", "geometry.edge_leaves_frame", [eid, scope],
+                               f"edge leaves '{(_plain(d.by_id[scope].get('value')) or [scope])[0]}', the frame around both its ends",
+                               "regenerate from the IR, or keep the IR `via` points inside that frame"))
+        rode = sorted(f for f, r in frame_rects.items() if any(_seg_on_border(p, q, r) for p, q in zip(poly, poly[1:])))
+        if rode:
+            out.append(finding("WARN", "geometry.edge_on_frame_border", [eid, *rode],
+                               "edge runs along a frame border", "move the run into a channel clear of the border"))
+    # Two edges' parallel runs a few px apart read as one thick line.
+    runs = [(("h" if abs(p[1] - q[1]) < 0.5 else "v"), eid, p, q) for eid, poly in routes.items()
+            for p, q in zip(poly, poly[1:]) if (abs(p[1] - q[1]) < 0.5) != (abs(p[0] - q[0]) < 0.5)]
+    close = set()
+    for i, (ka, ea, pa, qa) in enumerate(runs):
+        for kb, eb, pb, qb in runs[i + 1:]:
+            if ka != kb or ea == eb:
+                continue
+            ax, bx = (0, 1) if ka == "h" else (1, 0)  # axis along the run, axis across it
+            gap = abs(pa[bx] - pb[bx])
+            overlap = min(max(pa[ax], qa[ax]), max(pb[ax], qb[ax])) - max(min(pa[ax], qa[ax]), min(pb[ax], qb[ax]))
+            if 0 < gap < 8 and overlap >= 20:
+                close.add(tuple(sorted((ea, eb))))
+    for pair in sorted(close):
+        out.append(finding("WARN", "geometry.lanes_too_close", list(pair), "parallel runs under 8px apart",
+                           "regenerate (lanes sit LANE_GAP apart), or move one with IR `via`"))
     ids = sorted(routes)
     crossings = []
     for i, a in enumerate(ids):
@@ -474,8 +529,11 @@ def gate_typography(d: Diagram, routes: dict) -> list[dict]:
         g = e.find("mxGeometry")
         pos = float(g.get("x", 0)) if g is not None else 0.0
         cx, cy = _point_at(poly, (pos + 1) / 2)
-        w = text_width(text, _num(e.get("style") or "", "fontSize", 10)) + 4
-        box = [cx - w / 2, cy - 8, w, 16]
+        lines = _plain(e.get("value") or "")
+        size = _num(e.get("style") or "", "fontSize", 10)
+        w = max(text_width(line, size) for line in lines) + 4
+        h = len(lines) * size * 1.3 + 3  # a multi-line label is as tall as its lines
+        box = [cx - w / 2, cy - h / 2, w, h]
         for other, otext, obox in label_boxes:
             if _overlap(box, obox):
                 out.append(finding("WARN", "typography.label_collision", [other, eid],

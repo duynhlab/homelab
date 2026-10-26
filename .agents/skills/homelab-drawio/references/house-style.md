@@ -165,7 +165,13 @@ shape to aim for when hand-editing one:
 - **Boundaries nest** (cluster → domain → group). A frame owns its boxes, and a
   frame is never used for decoration.
 - **Orthogonal edges only.** A horizontal run belongs in the channel between two
-  tiers, never through a box. Each run gets its own lane.
+  tiers, never through a box. Each run gets its own lane, at least 14px from
+  the next; a gutter too narrow for its lanes grows, so frames move apart
+  rather than squeeze edges together.
+- **An edge stays in its frame.** An edge between two boxes of one frame runs
+  inside that frame (a loop between peers runs under them, above the frame's
+  bottom border), and no run rides a frame border. Keep `via` points inside
+  that frame too.
 - **Labels sit on a vertical run**, where they do not collide. Never on a box,
   on another label, or over a frame title.
 - **When it gets crowded:**

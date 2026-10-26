@@ -105,7 +105,7 @@ edges:
   - {id: e_gf_pyro, source: pyro, target: grafana, type: data, label: queried}
 
 notes:
-  - {id: n_sql, title: "Database access", text: "PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. analytics has no PostgreSQL: it reads ClickHouse serving views (fixture-seeded until CDC lands) over plaintext native :9000. All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology."}
+  - {id: n_sql, title: "Database access", text: "PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. analytics has no PostgreSQL: it reads ClickHouse serving views over plaintext native :9000. PeerDB fills them from product-db by CDC, through its own PgBouncer pooler (not drawn: a node took the crossings from 9 to 24; see databases/cdc). All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology."}
 
 tests:
   - {rule: no-public-datastore}

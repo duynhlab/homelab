@@ -43,7 +43,8 @@ nodes:
   # random orderings measured with validate.py on 2026-10-19, with pin_order off.
   - {id: pgch, label: "product-db · platform-db\npg_stat_ch extension", role: data, layer: producers, parent: f_src, icon: postgresql}
   - {id: targets, label: "Scrape targets\nkube-state-metrics · cAdvisor\nCNPG · Temporal · OpenBao", role: platform, layer: producers, parent: f_src}
-  - {id: svc, label: "Go services ×10 · 2 workers · mockpay\ntraces · metrics · logs", role: service, layer: producers, parent: f_src, icon: go}
+  - {id: svc, label: "Go services ×11 · 2 workers · mockpay\ntraces · metrics · logs", role: service, layer: producers, parent: f_src, icon: go}
+  - {id: peerdb, label: "PeerDB (peerdb)\nflow-api · flow-worker · snapshot-worker\nmetrics only · peerdb_ prefix", role: worker, layer: producers, parent: f_src}
   - {id: vector, label: "Vector DaemonSet\nother pods' stdout · OpenBao audit", role: collector, layer: producers, parent: f_src, icon: vector}
   - {id: pyrosdk, label: "Same Go processes\nPyroscope SDK", role: service, layer: producers, parent: f_src, icon: go}
   - {id: edge, label: "Envoy Gateway\nedge spans · access logs", role: edge, layer: producers, parent: f_src, icon: envoy}
@@ -74,6 +75,7 @@ nodes:
 edges:
   - {id: e_edge, source: edge, target: otel, type: telemetry, protocol: "OTLP/gRPC"}
   - {id: e_svc, source: svc, target: otel, type: telemetry, protocol: "OTLP/HTTP"}
+  - {id: e_peerdb, source: peerdb, target: otel, type: telemetry, signal: metric, label: "OTLP/HTTP :4318"}
 
   - {id: r_traces, source: otel, target: p_traces, type: telemetry, signal: trace}
   - {id: r_logs, source: otel, target: p_logs, type: telemetry, signal: log}

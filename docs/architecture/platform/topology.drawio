@@ -340,11 +340,11 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="n_sql" value="&lt;b&gt;Database access&lt;/b&gt;&lt;br&gt;PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. analytics has no PostgreSQL: it reads ClickHouse serving views (fixture-seeded until CDC lands) over plaintext native :9000. All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1150" width="1620" height="60" as="geometry" />
+        <mxCell id="n_sql" value="&lt;b&gt;Database access&lt;/b&gt;&lt;br&gt;PgDog serves product-db to product, inventory, cart, checkout, order, payment and both workers; the PgBouncer Pooler serves platform-db to user, review, shipping, notification. Every pooled hop is TLS verify-full against homelab-ca; Keycloak and Temporal connect to platform-db-rw directly. analytics has no PostgreSQL: it reads ClickHouse serving views over plaintext native :9000. PeerDB fills them from product-db by CDC, through its own PgBouncer pooler (not drawn: a node took the crossings from 9 to 24; see databases/cdc). All ten runtime passwords are OpenBao static roles that OpenBao rotates and ESO syncs into each namespace's Secret. Detail: databases/topology." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1150" width="1620" height="70" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1240" width="1620" height="88" as="geometry" />
+          <mxGeometry x="40" y="1250" width="1620" height="88" as="geometry" />
         </mxCell>
         <mxCell id="legend-role-external" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;" vertex="1" parent="legend">
           <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />

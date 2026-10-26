@@ -23,6 +23,7 @@ diagram:
       platform: "Namespace: platform component"
       data: "Namespace: database tier"
       collector: "Namespace: monitoring"
+      worker: "Namespace: CDC (PeerDB)"
     edges:
       data: "allowed ingress: SQL / pooler port"
       control: "allowed ingress: operator / engine"
@@ -42,6 +43,7 @@ nodes:
   # pin_order: each layer reads left to right in this order. 2026-10-19: all 720
   # orders of the open tier measured (pinned and unpinned, both tier orders): 19
   # crossings is the floor with pgroles and the second rotation edge added.
+  - {id: peerdb, label: "peerdb\nPeerDB (CDC)", role: worker, layer: open, parent: f_open}
   - {id: cnpg, label: "cloudnative-pg\nCNPG operator", role: platform, layer: open, parent: f_open, icon: cloudnativepg}
   - {id: envoy, label: "envoy-gateway\nEnvoy Gateway proxies", role: edge, layer: open, parent: f_open, icon: envoy}
   - {id: pgroles, label: "pgroles-system\npgroles operator", role: platform, layer: open, parent: f_open}
@@ -55,7 +57,7 @@ nodes:
   - {id: identity, label: "identity\nKeycloak", role: platform, layer: apps, parent: f_fenced, icon: keycloak}
 
   - {id: platform, label: "platform\nplatform-db · PgBouncer pooler", role: data, layer: tier, parent: f_fenced}
-  - {id: product, label: "product\nproduct-db · pgdog-product", role: data, layer: tier, parent: f_fenced}
+  - {id: product, label: "product\nproduct-db · pgdog-product\nproduct-db-pooler-cdc", role: data, layer: tier, parent: f_fenced}
 
 edges:
   - {id: a_product, source: apps_product, target: product, type: data, label: ":6432 · :5432"}
@@ -66,6 +68,8 @@ edges:
   - {id: a_openbao_product, source: openbao, target: product, type: control, label: ":5432 (rotation)"}
   - {id: g_pg_product, source: pgroles, target: product, type: control, label: ":5432 (grants)"}
   - {id: g_pg_platform, source: pgroles, target: platform, type: control, label: ":5432 (grants)"}
+  - {id: a_peerdb_product, source: peerdb, target: product, type: data, label: ":5432 (CDC pooler pods only)"}
+  - {id: a_peerdb_platform, source: peerdb, target: platform, type: data, label: ":5432 (catalog)"}
   - {id: a_floci, source: openbao, target: floci, type: control, label: ":4566"}
 
   - {id: c_product, source: cnpg, target: product, type: control, label: ":8000 · :5432"}
@@ -80,7 +84,7 @@ edges:
 notes:
   - id: note_rules
     title: "Reading it"
-    text: "Every namespace inside the fenced frame starts from deny-all-ingress (Kyverno generates it for tier=app namespaces; identity carries a committed copy), so an arrow is the only way in. Not drawn, but allowed: the ten service namespaces reach identity :8080 for JWKS; pods inside product reach each other on :5432 / :6432 / :8000 and inside platform on :5432 / :8000; envoy-gateway and the service mesh reach the services on :8080 / :9090 (§ 3)."
+    text: "Every namespace inside the fenced frame starts from deny-all-ingress (Kyverno generates it for tier=app namespaces; identity carries a committed copy), so an arrow is the only way in. Not drawn, but allowed: the eleven service namespaces reach identity :8080 for JWKS; pods inside product reach each other on :5432 / :6432 / :8000 and inside platform on :5432 / :8000; envoy-gateway and the service mesh reach the services on :8080 / :9090 (§ 3)."
   - id: note_limits
     title: "Not fenced (yet)"
     text: "No egress rules exist anywhere, so DNS and outbound traffic are open. mTLS on gRPC :9090 and a ClickHouse policy for :9000 / :8123 are planned follow-ups, not deployed."

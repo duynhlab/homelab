@@ -6,30 +6,6 @@ The architecture is sound: shared instrumentation, OTLP transport, independent a
 
 There is already a shared implementation contract in [Application observability](../../api/observability.md). The documentation problem is discoverability and drift between normative rules, historical evidence, and current implementation. Creating a second policy owner would make that worse; the proposed authoring guide below should link the existing rules.
 
-## Bảng tổng hợp tiếng Việt
-
-Bảng này được bổ sung theo yêu cầu của chủ repo. **P1:** cần ưu tiên sửa vì ảnh hưởng tính đúng đắn hoặc an toàn dữ liệu telemetry; **P2:** sửa tiếp hoặc hoàn tất trước khi vận hành ngoài phạm vi lab tin cậy; **P3:** cải thiện tính nhất quán và khả năng bảo trì. Không xác nhận sự cố P0 hay rò rỉ dữ liệu thực tế. Test tái hiện chỉ dùng dữ liệu giả lập.
-
-| ID | Mức | Phát hiện | Ảnh hưởng / việc nên làm | Bằng chứng |
-|---|---|---|---|---|
-| F01 | P1 | Nhiều business span ghi exception nhưng vẫn `Unset` | Truy vấn theo Error status bỏ sót lỗi; chuẩn hóa lỗi bất ngờ và business outcome | Đã tái hiện bằng code `user-service` |
-| F02 | P1 | Nội dung lỗi đi qua traces mà không được redact như logs | Secret trong lỗi provider có thể vào trace store; sanitize trước khi ghi span và bổ sung lớp bảo vệ exporter | Đã tái hiện bằng secret giả lập |
-| F03 | P1 | Checkout đếm confirmed hai lần sau lỗi `Finish` rồi retry | Một order nhưng counter tăng 2; sửa vị trí ghi metric và test recovery | Đã tái hiện bằng code checkout |
-| F04 | P2 | Baggage đầu vào được chuyển nguyên sang outbound HTTP | Thiếu allowlist tại biên tin cậy; lọc trước khi gọi provider | Đã tái hiện ở shared transport; chưa thử qua gateway thật |
-| F05 | P2 | `GetUser` bỏ context do logic span trả về | DB span trở thành sibling thay vì con của use case; giữ context mới | Đã tái hiện với repository fake |
-| F06 | P2 | Manifests còn pin release trước bản sửa shutdown trên `main` | Flush có thể nhận context hết hạn; checkout worker còn shutdown không giới hạn ở tag đã pin | Đối chiếu source tag và `main` |
-| F07 | P2 | Product log cùng lỗi ở adapter và fallback | Một lỗi dependency tạo nhiều record, mức Error dù response degraded thành công | Đọc đầy đủ đường gọi |
-| F08 | P2 | Mockpay callback mất trace causality | Trace charge và webhook bị tách; cần context/span link cho callback do mình kiểm soát | Đọc emitter và HTTP client |
-| F09 | P2 | Alert thiếu queue pressure và một số lỗi export traces/logs | Có thể chỉ thấy telemetry biến mất sau khi queue đầy hoặc sink lỗi | Kiểm tra toàn bộ live alert manifests |
-| F10 | P2 | CI dependency floor chậm hơn policy một minor | CI vẫn cho phép dùng thư viện cũ hơn giới hạn đã quy định | Đối chiếu workflow pin và package tags |
-| F11 | P2 | Collector Compose thiếu memory limit/limiter | E2E local không kiểm tra được khả năng chịu áp lực giống cluster | Kiểm tra Compose và Collector YAML |
-| F12 | P2 trước production | OTLP plaintext, monitoring ingress chưa giới hạn, CH dùng tài khoản rộng quyền | Cần xác định trust zone, quyền ingest tối thiểu và isolation; không phải bằng chứng public exposure | Cấu hình mong muốn, chưa xác minh CNI runtime |
-| F13 | P2 trước production | Queue volatile và chưa có loss budget định lượng | Restart/outage có thể mất telemetry; lab đã chấp nhận best-effort nhưng chưa đo mức mất | Cấu hình queue/Vector và runbook |
-| F14 | P3 | Weaver kiểm tra một tập emissions đã được lọc | Không thể dùng C22 để tuyên bố mọi telemetry thô đều compliant | Đọc overlay và release gate |
-| F15 | P3 | Inventory đặt tracer scope theo service name | Không đúng quy định package-path scope; sửa kèm test scope | Kiểm tra helper tracing |
-| F16 | P3 | Docs lẫn trạng thái cũ, trạng thái hiện tại và mục tiêu | Dễ dùng sai hướng dẫn; sửa tại đúng owner, thêm guide hướng dẫn từng bước | Đối chiếu docs, source tags và manifests |
-| F17 | P2 | Inventory Backoffice chưa có HTTP server spans và RED | Khó theo dõi riêng request quản trị; cân nhắc bổ sung middleware, giữ probe filters | Source main và tag; docs đã ghi nhận đúng giới hạn này |
-
 > **Publication context (2026-10-26):** this report retains the 2026-10-23
 > baseline and source snapshots. Main has since changed service pins and deployed
 > analytics. Recheck each finding against the candidate image; this publication

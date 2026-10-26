@@ -516,7 +516,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ## Related Documentation
 
-- [Telemetry implementation audit (2026-10-23)](audits/2026-10-23-telemetry-implementation.md) — code/config review, isolated reproductions, release gaps and documentation proposal; Vietnamese findings table included
+- [Telemetry implementation audit (2026-10-23)](audits/2026-10-23-telemetry-implementation.md) — code/config review, isolated reproductions, release gaps and documentation proposal
 - [Telemetry standards audit (2026-09-16)](audits/2026-09-16-telemetry-standards.md) -- static logs, traces, metrics, and ClickHouse conformance review
 
 - [OpenTelemetry (platform)](opentelemetry/README.md) -- Collector topology, sampling, operations (app policy → [api/observability.md](../api/observability.md))

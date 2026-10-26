@@ -240,7 +240,7 @@ Dashboard lookup: [current artifact](./observability/grafana/dashboard-reference
 
 Documentation quality: [Telemetry documentation review](./observability/audits/2026-10-23-telemetry-documentation.md).
 
-Implementation evidence: **[Telemetry implementation audit (2026-10-23)](./observability/audits/2026-10-23-telemetry-implementation.md)** — Go code paths, shared packages, configured releases and pipeline controls; includes a Vietnamese findings table.
+Implementation evidence: **[Telemetry implementation audit (2026-10-23)](./observability/audits/2026-10-23-telemetry-implementation.md)** — Go code paths, shared packages, configured releases and pipeline controls.
 
 #### Metrics
 

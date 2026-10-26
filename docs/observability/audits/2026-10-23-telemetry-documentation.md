@@ -5,20 +5,6 @@ area, and related Compose/Kind verification entry points. This record separates
 editorial/source review from runtime evidence. No cluster or release gate was
 run as part of the documentation work.
 
-## Bảng đánh giá tiếng Việt
-
-| Vấn đề | Cách xử lý | Giới hạn bằng chứng |
-|---|---|---|
-| Người mới phải tự ghép các trang | Thêm luồng học → triển khai → quy định → kiểm chứng trong hai hub | Đã kiểm tra điều hướng; chưa có user study |
-| Quy định trộn API signatures và lịch sử | Rút gọn bootstrap/lifecycle trong contract, thêm guide từng bước | Đối chiếu shared packages; không sửa code |
-| Mô tả hiện tại còn dùng zap và sampling cũ | Cập nhật slogx/otelslog, phân biệt Kind và baseline planned | Source/manifests; không xác nhận deployed runtime |
-| Collector thiếu Vector path và sai giới hạn bộ nhớ | Bổ sung logs/vector :4319, soft 600/hard 800MiB, stateful scaling | Đối chiếu HelmRelease, không render chart từ cluster |
-| Hướng dẫn có thể khiến người đọc tin helpers tự sanitize | Ghi rõ error text phải an toàn trước khi RecordError | Lỗi F02 vẫn mở; tài liệu không sửa được implementation |
-| Dashboard reference lẫn hiện tại và panel đã xóa | Reference mới từ OCI v0.7.0; giữ bài cũ dưới nhãn historical | Đã pull artifact, chưa query Grafana |
-| Runbook export metrics sai expression và thiếu recovery | Sửa theo increase 15m / for 0m; thêm recovery/escalation | Annotation trong manifest còn sai, ghi nhận bên dưới |
-| Collector/Pyroscope runbook suy luận outage từ scrape | Phân biệt scrape/ingest/query, sửa namespace và giới hạn mất dữ liệu | Không diễn tập outage |
-| Chưa có gói bàn giao Linux rõ ràng | Checklist baseline + focused findings + evidence/cleanup | Các ca cần fault fixture được đánh NOT RUN nếu thiếu |
-
 ## Ownership and reader model
 
 | Document family | Reader's question | Owns | Evidence source |

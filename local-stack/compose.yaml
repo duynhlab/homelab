@@ -1395,7 +1395,7 @@ services:
   # plane has loaded the routes and Envoy is serving. Stands in for the
   # healthcheck the distroless gateway image cannot run.
   gateway-ready:
-    image: busybox:1.37
+    image: busybox:1.38
     mem_limit: *oneshot-mem
     command: ["sh", "-c", "until wget -q -O /dev/null http://gateway:8000/product/v1/public/products; do sleep 2; done"]
     depends_on:

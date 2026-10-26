@@ -611,6 +611,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Architecture diagrams show the CDC path** (RFC-0030). `databases/topology`
+  adds PeerDB, the CDC pooler and the CDC bootstrap Job; `tls-data-tier` adds
+  PeerDB's three verified PostgreSQL hops (the plaintext ClickHouse, RustFS and
+  Temporal hops in a note) and re-counts homelab-ca at 7 leaves and 14
+  anchors, matched in `docs/secrets/cert-manager.md` §12.1; `network-policies`
+  draws the unfenced `peerdb` namespace and its two allows; `app-mesh` adds
+  analytics; `signal-flow` adds PeerDB's OTLP metrics. `databases/cdc` now
+  shows the snapshot worker holding the exported snapshot while flow-worker
+  copies, as PeerDB v0.37.5 does.
+
 - **CDC hub: components, Temporal and drill results** (RFC-0030). The
   components table names what `peerdb-server` is and what the chart ships but
   the platform turns off; a new "Why Temporal" section explains why PeerDB

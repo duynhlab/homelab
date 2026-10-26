@@ -57,7 +57,7 @@ nodes:
   - {id: browser, label: "Browser\n*.duynh.me", role: external, layer: client}
   - {id: root, label: "homelab-ca root CA\nself-signed · 10y · no renewBefore\nregenerated every make up", role: platform, layer: pki, parent: f_pki}
   - {id: rfc, label: "RFC-0020 slices (planned)\nS0 · S1 · S5–S14 · provisional\nnot installed (S2–S4 via ADR-089)", role: planned, layer: pki, parent: f_pki, status: planned}
-  - {id: issuer, label: "ClusterIssuer homelab-ca\n6 leaves + 13 ca.crt anchors\n90d · renew 15d", role: platform, layer: edge, parent: f_pki, icon: cert-manager}
+  - {id: issuer, label: "ClusterIssuer homelab-ca\n7 leaves + 14 ca.crt anchors\n90d · renew 15d", role: platform, layer: edge, parent: f_pki, icon: cert-manager}
   - {id: bundle, label: "trust-manager Bundle\ncommitted CA copy\nmonitoring only · no consumer", role: platform, layer: edge, parent: f_pki}
   - {id: eg, label: "Envoy Gateway\n:443 platform-edge-tls\n:80 → 301 https · HSTS", role: edge, layer: edge, parent: f_edge, icon: envoy}
   - {id: svc, label: "10 Go services + 2 workers\ngRPC :9090 between them:\nPLAINTEXT (insecure creds)", role: service, layer: apps, parent: f_apps, icon: go}

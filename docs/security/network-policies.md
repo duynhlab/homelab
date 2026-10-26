@@ -217,7 +217,7 @@ flowchart LR
 > NetworkPolicy is the fence, never a route rule.
 
 The same question, drawn per namespace:
-- the gateway's eleven north-south allows (ten services + identity) collapse into one arrow into the fenced frame;
+- the gateway's twelve north-south allows (eleven services + identity) collapse into one arrow into the fenced frame;
 - east-west calls are drawn caller → callee, with their ports;
 - the moving dashes follow the calls.
 

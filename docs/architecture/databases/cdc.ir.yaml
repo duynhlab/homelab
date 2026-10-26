@@ -7,12 +7,17 @@
 # cdc/bootstrap/{jobs.yaml,bootstrap.py} (peerdb-bootstrap: flow-api :8113,
 # source = product-db-pooler-cdc requireTls + rootCa + tlsHost, ClickHouse peer
 # :9000 disableTls replicated; analytics-views Job), product-db/cdc/ (pooler.yaml:
-# PgBouncer session, client TLS required, server verify-full; publications.yaml;
-# bootstrap.sh: pg_cron 30-second heartbeat per database), the
+# PgBouncer session, client TLS required, server verify-full; bootstrap.sh:
+# pg_cron 30-second heartbeat per database, SELECT grants on the published
+# tables), cdc/source/publications.yaml, the
 # clickhouse-analytics-reader ClusterExternalSecret, docs/api/analytics.md
 # (native :9000), and live Kind (kubectl -n peerdb get deploy,sts).
 # Re-laid out 2026-10-23 (owner review): RustFS, Temporal and the catalog share
 # the stores tier after the PeerDB workers, so the data path has no detour.
+# Re-verified 2026-10-26: in PeerDB v0.37.5 the snapshot worker creates the
+# slot and holds the exported snapshot (flow/cmd/snapshot_worker.go,
+# SnapshotActivity); the partition copy runs as QRepFlowWorkflow children on
+# the peer-flow task queue, i.e. flow-worker (flow/workflows/snapshot_flow.go).
 diagram:
   id: cdc
   title: "duynhlab homelab — Commerce CDC path (PeerDB)"
@@ -47,15 +52,16 @@ boundaries:
 nodes:
   # Order measured 2026-10-23 over every peer and store ordering, both pin_order
   # settings: 0 crossings, 0 warnings, and flow-worker -> raw runs straight down.
+  # Re-measured 2026-10-26 after the snapshot-worker Avro edge was removed.
   - {id: cron, label: "pg_cron (inside product-db)\nheartbeat upsert every 30 s\nper database", role: worker, layer: source, parent: f_product}
   - {id: productdb, label: "product-db primary\norder · checkout · payment\npublications analytics_<db>", role: data, layer: source, parent: f_product, shape: datastore, icon: postgresql}
 
   - {id: pooler, label: "product-db-pooler-cdc\nPgBouncer · session mode\nclient TLS required", role: data, layer: pooling, parent: f_product}
 
-  - {id: snapshot, label: "flow-snapshot-worker\ninitial snapshot", role: worker, layer: cdc, parent: f_peerdb}
-  - {id: worker, label: "flow-worker\nCDC: one mirror per database", role: worker, layer: cdc, parent: f_peerdb}
+  - {id: snapshot, label: "flow-snapshot-worker\nslot + exported snapshot", role: worker, layer: cdc, parent: f_peerdb}
   - {id: server, label: "peerdb-server\ncatalog migrations", role: service, layer: cdc, parent: f_peerdb}
   - {id: api, label: "flow-api :8113\npeers · mirrors", role: service, layer: cdc, parent: f_peerdb}
+  - {id: worker, label: "flow-worker\nCDC: one mirror per database", role: worker, layer: cdc, parent: f_peerdb}
 
   - {id: rustfs, label: "RustFS bucket\nanalytics-service-cdc\nAvro staging", role: data, layer: stores, parent: f_rustfs, shape: datastore, icon: rustfs}
   - {id: temporal, label: "Temporal server\nnamespace peerdb", role: platform, layer: stores, parent: f_temporal, icon: temporal}
@@ -69,11 +75,10 @@ nodes:
 edges:
   - {id: e_heartbeat, source: cron, target: productdb, type: data, label: "upsert heartbeat"}
   - {id: e_stream, source: productdb, target: pooler, type: replication, label: "logical replication · verify-full"}
-  - {id: e_cdc, source: pooler, target: worker, type: replication, label: "pgoutput · TLS"}
-  - {id: e_snap, source: pooler, target: snapshot, type: data, label: "snapshot SELECT"}
+  - {id: e_cdc, source: pooler, target: worker, type: replication, label: "pgoutput + snapshot copy · TLS"}
+  - {id: e_snap, source: pooler, target: snapshot, type: data, label: "creates slot · exports snapshot"}
 
   - {id: e_stage, source: worker, target: rustfs, type: data, label: "Avro batches"}
-  - {id: e_stage_snap, source: snapshot, target: rustfs, type: data, label: "Avro"}
   - {id: e_load, source: worker, target: raw, type: data, label: "load + normalize"}
   - {id: e_s3, source: rustfs, target: raw, type: data, label: "read by s3()"}
   - {id: e_serve, source: raw, target: views, type: data, label: "FINAL"}
@@ -90,10 +95,10 @@ notes:
     text: "The column-listed publications decide what PostgreSQL emits, and each mirror's column exclusions decide what PeerDB writes, so a non-allowlisted column never reaches ClickHouse, the Avro staging or PeerDB's logs (gate G6.4). peerdb-bootstrap admits one source at a time: order, then checkout, then payment, each after its heartbeat and every table's row count arrive. Beside each raw table PeerDB keeps a _peerdb_raw_<mirror> staging table; the _live views run as definer analytics_view_owner, so analytics_reader needs no grant on the raw tables."
   - id: note_boot
     title: "Who creates the path"
-    text: "Nothing is created by hand. In the cdc-local wave, peerdb-bootstrap calls flow-api to upsert the peers and create the three mirrors, and analytics-views creates the ten *_live views once the raw tables exist. product-db-cdc-bootstrap, in the databases wave, creates the heartbeat tables and schedules the pg_cron jobs."
+    text: "Nothing is created by hand. In the cdc-local wave, peerdb-bootstrap calls flow-api to upsert the peers and create the three mirrors, and analytics-views creates the ten *_live views once the raw tables exist. product-db-cdc-bootstrap, in the databases wave (Job, then a CronJob every 10 min), creates the heartbeat tables, schedules the pg_cron jobs and grants peerdb_<db> SELECT on exactly the tables its publication carries."
   - id: note_tls
     title: "Credentials and TLS"
-    text: "Every PostgreSQL hop verifies the homelab-ca certificate: PeerDB to the CDC pooler, the pooler to the primary, and PeerDB to its catalog. ClickHouse and RustFS are plaintext inside the cluster, and RustFS uses a shared key; both gaps are recorded in ADR-067. PeerDB logs in to each database as peerdb_<db> and to ClickHouse (native :9000) as analytics_ingest; analytics-service reads only the views, as analytics_reader. The flow-snapshot-worker also runs Temporal activities, and flow-worker also writes mirror state to the catalog."
+    text: "Every PostgreSQL hop verifies the homelab-ca certificate: PeerDB to the CDC pooler, the pooler to the primary, and PeerDB to its catalog. ClickHouse and RustFS are plaintext inside the cluster: ClickHouse TLS is ADR-069 obligation T1, and RustFS's shared key is the open part of ADR-066's isolation obligation (#1315). PeerDB logs in to each database as peerdb_<db> and to ClickHouse (native :9000) as analytics_ingest; analytics-service reads only the views, as analytics_reader. The flow-snapshot-worker holds the slot's exported snapshot while flow-worker copies the tables from it; flow-worker also writes mirror state to the catalog."
 
 tests:
   - {rule: no-public-datastore}

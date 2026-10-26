@@ -2,7 +2,16 @@
 
 Platform diagram sources and previews, with the RFC-0011 reference designs collected here for review.
 
-[Architecture index](../README.md) · [Current platform topology](topology.drawio)
+[Architecture index](../README.md)
+
+## Current topology
+
+How a request travels once the platform is up: edge → apps → data, with the
+observability and secrets planes. Explained in
+[`README.md` § Topology](../../../README.md#topology).
+
+<p align="center"><a href="topology.svg"><img src="topology.svg" alt="Request path from the edge through the apps to the data tier, with the observability and secrets planes" width="960"></a></p>
+<p align="center"><sub>Source <a href="topology.drawio"><code>topology.drawio</code></a> · <a href="img/topology.png">PNG</a></sub></p>
 
 ## RFC-0011 previews
 

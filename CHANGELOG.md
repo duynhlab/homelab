@@ -618,6 +618,11 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Each `docs/architecture/` folder renders its diagrams.** api, databases,
+  observability, secrets, security and workflows gain a `README.md` that shows
+  every diagram in the folder with the question it answers and where it is
+  explained; platform's README now shows the current topology too.
+
 - Add the Go telemetry implementation guide, Linux Kind verification checklist
   and dated code/documentation audits; connect the learning and verification paths.
 

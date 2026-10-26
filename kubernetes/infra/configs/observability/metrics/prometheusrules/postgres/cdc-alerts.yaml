@@ -71,6 +71,21 @@ spec:
             summary: "{{ $value }} of 3 CDC slots exist on product-db"
             description: "A mirror was terminated or its slot was dropped. peerdb-bootstrap recreates the mirror and its slot."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
+        # #1377: after a switchover the demoted primary keeps non-synced PeerDB
+        # slots and PostgreSQL's slot sync stops on that standby. 15 min covers
+        # the seconds a healthy standby needs to sync after a promotion.
+        - alert: CDCStandbySlotsNotSynced
+          expr: |
+            max by (cnpg_io_cluster, pod) (cnpg_cdc_standby_slots_in_recovery{cnpg_io_cluster="product-db"}) == 1
+            and on (cnpg_io_cluster, pod)
+            max by (cnpg_io_cluster, pod) (cnpg_cdc_standby_slots_synced{cnpg_io_cluster="product-db"}) < 3
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Standby {{ $labels.pod }} lacks synced copies of the CDC slots"
+            description: "A promotion of this standby would lose the mirrors. After a switchover, drop its non-synced peerflow slots (guarded command in the runbook); the slot-sync worker then recreates synced copies."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/cdc/README.md#operations"
     - name: cdc-peerdb
       interval: 30s
       rules:

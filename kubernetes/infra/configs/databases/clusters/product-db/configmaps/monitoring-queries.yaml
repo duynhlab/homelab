@@ -479,6 +479,27 @@ data:
             usage: "GAUGE"
             description: "1 if the role is missing or its rolconfig differs from the specified defaults"
 
+    # CDC slots on every instance (RFC-0030, #1377). One row per instance. A
+    # standby should hold a synced copy of each PeerDB slot; a demoted primary
+    # keeps NON-synced copies after a switchover, which block PostgreSQL's
+    # slot sync until they are dropped (CDC hub, "After every switchover").
+    cdc_standby_slots:
+      query: "SELECT pg_is_in_recovery()::int AS in_recovery,
+                     count(*) FILTER (WHERE synced) AS synced,
+                     count(*) FILTER (WHERE NOT synced AND pg_is_in_recovery()) AS stale
+               FROM pg_replication_slots
+               WHERE slot_type = 'logical' AND slot_name LIKE 'peerflow_slot_%'"
+      metrics:
+        - in_recovery:
+            usage: "GAUGE"
+            description: "1 on a standby, 0 on the primary"
+        - synced:
+            usage: "GAUGE"
+            description: "PeerDB slots on this instance that the slot-sync worker maintains"
+        - stale:
+            usage: "GAUGE"
+            description: "Non-synced PeerDB slots on a standby (left by a switchover; must be dropped)"
+
     # ADR-088: the owner's default privileges in each converted database
     # (pgroles applies them on product-db). The runtime's entry
     # must be exactly the declared set, and functions must have no PUBLIC

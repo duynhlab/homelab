@@ -268,6 +268,10 @@ kubectl -n product exec <old-primary> -c postgres -- psql -Atc \
 
 The `pg_is_in_recovery()` guard makes it a no-op on the primary, where every
 slot reads `synced = false` and dropping one would break its mirror.
+`CDCStandbySlotsNotSynced` fires when a standby has held fewer than three
+synced copies for 15 minutes (custom query `cdc_standby_slots` in product-db's
+monitoring ConfigMap). Automatic dropping was considered and declined: the
+alert plus this command is the procedure (#1377).
 
 **Restoring product-db** works on the `postgresql-cron` operand like any other
 recovery. `scripts/analytics/pgcron-restore-check.sh` restores a throwaway

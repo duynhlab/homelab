@@ -28,7 +28,7 @@ prove every expression matched data.
 
 ## Summary
 
-**266 statically defined alerts** exist in `.yaml` files under
+**267 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -37,19 +37,19 @@ rg '^\s*- alert:' \
   -g '*.yaml' | wc -l
 ```
 
-The 2026-10-23 breakdown is: postgres 73 (six CDC rules, [§4d](#4d-cdc-and-analytics-rfc-0030)),
+The 2026-10-26 breakdown is: postgres 74 (seven CDC rules, [§4d](#4d-cdc-and-analytics-rfc-0030)),
 microservices 58 (five analytics rules), victoriametrics 31, kubernetes 29,
 observability 26, envoy-gateway 16, gitops 9, valkey 7, keycloak 5, kyverno 4,
 keda 4, pooler 3, and one root watchdog. The glob excludes retired `.yaml.bak`
 files. Two CNPG topology rules are gated and therefore not applied, leaving
-**264 deployed rules** from this tree.
+**265 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **276
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **277
 hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **320**. Of the 264 deployed entries from
+22 SLOs, bringing the cluster total to **321**. Of the 265 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **258**. The inert
+need do not exist; effective Kind coverage for that tree is **259**. The inert
 rules and both gated rules are marked inline rather than presented as working
 coverage.
 
@@ -68,7 +68,7 @@ error forward a fourth time.
 | [Keycloak identity](#2b-keycloak-identity) | 5 | The identity provider — new logins and token refreshes, and the DB pool + token endpoint behind them |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 53 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
-| [CDC and analytics](#4d-cdc-and-analytics-rfc-0030) | 11 | The PeerDB slots on product-db, the three mirrors, and the analytics freshness they feed (RFC-0030) |
+| [CDC and analytics](#4d-cdc-and-analytics-rfc-0030) | 12 | The PeerDB slots on product-db, the three mirrors, and the analytics freshness they feed (RFC-0030) |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
@@ -308,7 +308,7 @@ checked here. Every guarded edge and its expected options are listed in the quer
 `prometheusrules/postgres/cdc-alerts.yaml` reads the three PeerDB slots from
 CNPG's exporter, primary's view only, and PeerDB's own OTLP metrics.
 `prometheusrules/microservices/analytics-alerts.yaml` reads the analytics
-sampler. All eleven share the [CDC operations](../../databases/cdc/README.md#operations)
+sampler. All twelve share the [CDC operations](../../databases/cdc/README.md#operations)
 and [analytics recovery](../analytics/README.md#investigation-and-recovery) runbooks.
 The older `CNPGInactiveSlotRetainingWAL` cannot cover these slots: it waits for
 1 GiB, and `max_slot_wal_keep_size` invalidates them at 1 GB.
@@ -319,6 +319,7 @@ The older `CNPGInactiveSlotRetainingWAL` cannot cover these slots: it waits for
 | CDCReplicationSlotRetentionHigh | warning | `cnpg_pg_replication_slots_pg_wal_lsn_diff` > 512 MiB | Half-way to slot invalidation | 5m |
 | CDCReplicationSlotNearInvalidation | critical | same > 900 MiB | The next step is a full resync | 1m |
 | CDCReplicationSlotMissing | warning | fewer than 3 CDC slots on product-db | A mirror was terminated or never created | 15m |
+| CDCStandbySlotsNotSynced | warning | a product-db standby holds fewer than 3 synced `peerflow_slot_*` copies (`cnpg_cdc_standby_slots_synced`, custom query) | A promotion of it would lose the mirrors; after a switchover the demoted primary keeps non-synced copies (#1377) | 15m | [CDC operations](../../databases/cdc/README.md#operations) |
 | PeerDBMirrorNotRunning | warning | `peerdb_flow_status{flowStatus!="STATUS_RUNNING"}` | Mirror paused, resyncing or failed | 10m |
 | PeerDBMetricsMissing | warning | `absent_over_time(peerdb_instance_status[10m])` | flow-worker or its export is down; mirror alerts blind | 5m |
 | AnalyticsSourceStale | warning | `analytics_source_state_ratio{analytics_source_state="stale"}` | A source heartbeat is 120–300 s old | 1m |

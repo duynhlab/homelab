@@ -181,6 +181,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`CDCStandbySlotsNotSynced`** (#1377). A custom CNPG query on product-db
+  counts each instance's synced and stale `peerflow_slot_*` copies; the alert
+  fires when a standby has held fewer than three synced copies for 15 min, the
+  state a switchover leaves on the demoted primary. Detection plus the guarded
+  drop in the CDC hub is the procedure; automatic dropping was declined.
+
 - **CDC and analytics alerts are live** (RFC-0030, ADR-069). `cdc-alerts.yaml`
   watches the three PeerDB slots through CNPG's exporter (inactive 5 min,
   WAL retained over 512 MiB and over 900 MiB, a slot missing) and the mirrors

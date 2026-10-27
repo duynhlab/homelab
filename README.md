@@ -2,7 +2,7 @@
 
 <a name="readme-top"></a>
 
-<h1>duynhlab homelab</h1>
+<h1>duynhlab - homelab</h1>
 
 <p><em>Infrastructure, GitOps, and observability for the duynhlab microservices platform.</em></p>
 
@@ -10,14 +10,21 @@
   <a href="kubernetes/">Kubernetes</a>
   &middot;
   <a href="terraform/">OpenTofu</a>
-  &middot;
-  <a href="local-stack/">Local Stack</a>
 </p>
 
 <p>
   <a href="https://kind.sigs.k8s.io/"><img src="https://img.shields.io/badge/Kind-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kind"></a>&nbsp;
   <a href="https://fluxcd.io/"><img src="https://img.shields.io/badge/GitOps-Flux-5468ff?style=for-the-badge&logo=flux&logoColor=white" alt="Flux"></a>&nbsp;
   <a href="https://opentofu.org/"><img src="https://img.shields.io/badge/OpenTofu-7B42BC?style=for-the-badge&logo=opentofu&logoColor=white" alt="OpenTofu"></a>&nbsp;
+</p>
+
+<p>
+  <a href="https://helm.sh/"><img src="https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white" alt="Helm"></a>&nbsp;
+  <a href="https://gateway.envoyproxy.io/"><img src="https://img.shields.io/badge/Envoy-Gateway-AC6199?style=for-the-badge&logo=envoyproxy&logoColor=white" alt="Envoy Gateway"></a>&nbsp;
+  <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>&nbsp;
+  <a href="https://grafana.com/"><img src="https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white" alt="Grafana"></a>&nbsp;
+  <a href="https://www.keycloak.org/"><img src="https://img.shields.io/badge/Keycloak-4D4D4D?style=for-the-badge&logo=keycloak&logoColor=white" alt="Keycloak"></a>&nbsp;
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go"></a>&nbsp;
 </p>
 
 </div>
@@ -139,9 +146,7 @@ release tag:
 cd local-stack && docker compose up -d --build
 ```
 
-SPA at http://localhost:3001, gateway at http://localhost:8080. The
-[full E2E release audit](local-stack/docs/e2e-audit.md) must pass before the
-candidate is tagged and pinned for Kind.
+SPA at http://localhost:3001, gateway at http://localhost:8080.
 
 ---
 

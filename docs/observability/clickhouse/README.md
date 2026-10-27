@@ -72,9 +72,10 @@ or for the primary observability stack.
 4. **Trace-id lookup** — [materialized-views](materialized-views.md) (incremental `TO`, not a Postgres index)
 5. **Storage lifecycle** — [parts, merges, partitions, and TTL](parts-merges-and-ttl.md)
 6. **On call** — [operations](operations.md) → [alert runbooks](../runbooks/clickhouse/README.md)
-7. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
-8. **Hands-on** — [Playground](#playground--mergetree-by-hand)
-9. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
+7. **Profiler** — [profiling](profiling.md) (reading `system.trace_log`, CPU and memory flame graphs with `flameGraph()`)
+8. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
+9. **Hands-on** — [Playground](#playground--mergetree-by-hand)
+10. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
 Pair with the PostgreSQL [WAL and checkpoints chapter](../../databases/fundamentals/04-wal-and-checkpoints.md)
 if you already know Postgres heap / WAL / B-tree.
@@ -428,6 +429,10 @@ override works because `config.d` loads lexicographically and this repo's file i
 including `ORDER BY event_time`. **The cost of that override:** a future operator
 change to its own `trace_log` template is silently ignored here, so re-read that
 file on operator bumps.
+
+What those seven days of samples are good for — CPU and memory flame graphs of
+one query or of the merges, built with `flameGraph()` and `flamegraph.pl` from
+nothing but SQL — is in [Profiling ClickHouse](profiling.md).
 
 **Why the partition key moves with the TTL.** All five shipped monthly
 (`toYYYYMM`). A 7-day TTL on a monthly partition is the misaligned case in

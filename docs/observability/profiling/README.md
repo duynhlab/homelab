@@ -183,6 +183,11 @@ Verified inventory of the actual deployment:
 | Code change | Yes (one helper) | Zero |
 | Fit here | ✅ Go-only fleet, already wired via `obsx` | Better for polyglot / unowned binaries |
 
+**ClickHouse needs neither.** The one non-Go server on the platform ships its own
+sampling profiler, writing per-`query_id` CPU and memory stacks to
+`system.trace_log` — attribution an eBPF agent cannot give. How to read it:
+[Profiling ClickHouse](../clickhouse/profiling.md).
+
 **Single-binary vs microservices mode** — we run single-binary (one pod, simplest to
 operate); microservices mode scales the read/write paths independently and is the choice
 once ingest or query volume outgrows one pod.

@@ -514,7 +514,7 @@ services:
   # routing (alertmanager) is a later decision, recorded in
   # local-stack/docs/observability.md § Non-goals.
   vmalert:
-    image: victoriametrics/vmalert:v1.154.0
+    image: victoriametrics/vmalert:v1.155.0
     mem_limit: 128m
     command:
       - "-datasource.url=http://victoria-metrics:8428"

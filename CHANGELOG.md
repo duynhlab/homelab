@@ -1195,6 +1195,13 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **trust-manager chart 0.25.0 → 0.26.0, default CA package unpinned.** The
+  release exists to drop the compromised eMudhra roots (emSign ECC Root CA - G3,
+  AAA Certificate Services) from the default CA bundle; the repository had
+  pinned `defaultPackageImage` to a 2023 bookworm package, which would have
+  kept those roots in `homelab-ca-bundle` after the bump. The pin is gone, so
+  the bundle follows the chart (`trust-pkg-debian-trixie` 20250419-deb13u1.1 at
+  0.26.0). No Bundle API or CRD change.
 - **Kyverno chart 3.9.1 → 3.9.2 (v1.19.2, 24 GHSAs)** with the CI Kyverno CLI
   pinned to the same v1.19.2, as the `ci.yml` comment requires. Policy Reporter
   chart 3.11.0 → 3.11.2 (UI 2.9.1, Kyverno plugin 0.7.3). cert-manager

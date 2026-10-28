@@ -556,7 +556,7 @@ services:
       # (datasource-victorialogs.yaml) — closes the "logs only via vmui" gap.
       # Plugin install happens at container start and needs outbound internet
       # once; the grafana-plugins volume keeps them across down + up.
-      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.22.1,victoriametrics-logs-datasource 0.32.0
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.22.1,victoriametrics-logs-datasource 0.33.1
       # Same as the cluster (grafana.yaml): keep the Prometheus/Pyroscope plugins
       # the image ships instead of self-updating them at start. Here the update
       # succeeds (writable filesystem), so the stack would silently run a newer

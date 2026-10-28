@@ -41,7 +41,7 @@ concurrency:
 jobs:
   review:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'renovate[bot]'
-    uses: duynhlab/gha-workflows/.github/workflows/renovate-review.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/renovate-review.yml@feat/renovate-review
     permissions:
       contents: read
       pull-requests: write

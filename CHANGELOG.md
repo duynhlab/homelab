@@ -618,6 +618,17 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **New `homelab-troubleshooting` skill.** [`.agents/skills/homelab-troubleshooting/`](.agents/skills/homelab-troubleshooting/SKILL.md)
+  (with its `.claude/skills` symlink) routes an incident or firing alert to its
+  owning runbook and consolidates stray debug notes into their authoritative
+  home. A concise SKILL.md router over `references/` (triage/safety, entry
+  modes, signal correlation, docs hygiene) and ten per-domain routing files; it
+  points at existing procedures rather than copying them, enforces
+  read-only-first diagnosis with approval gates for failover/PITR/secret and
+  live non-GitOps changes, and reports runbook-index gaps instead of inventing
+  steps. Routed from `AGENTS.md` and the platform-engineer skill, with
+  `evals/evals.json`.
+
 - **New `git-worktrees` hygiene skill.** `.agents/skills/git-worktrees/SKILL.md`
   (with its `.claude/skills` symlink) captures worktree lifecycle rules: one
   worktree per task, commit before removing, and proving a squash-merged branch

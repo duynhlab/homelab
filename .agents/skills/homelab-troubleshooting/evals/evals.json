@@ -1,0 +1,71 @@
+{
+  "skill_name": "homelab-troubleshooting",
+  "evals": [
+    {
+      "id": 0,
+      "name": "flux-kustomization-not-ready",
+      "prompt": "In the homelab repo, a FluxKustomizationNotReady alert is firing for the local cluster and nothing new is deploying. Walk me through diagnosing and fixing it.",
+      "expected_output": "Routes to the gitops domain and the FluxKustomizationNotReady runbook, finds the head of the dependency chain first, uses read-only kubectl/flux inspection, and fixes via Git -> make validate -> make flux-push -> reconcile rather than kubectl apply.",
+      "files": [],
+      "assertions": [
+        {"id": "routes_runbook", "text": "Routes to docs/observability/runbooks/gitops/FluxKustomizationNotReady.md (or the runbook index), not an invented procedure"},
+        {"id": "head_of_chain", "text": "Finds the head of the dependency chain before touching the symptom wave, noting dependency '...' is not ready means upstream"},
+        {"id": "read_only_first", "text": "Starts with read-only inspection (kubectl get kustomization -A | grep -v ' True ', flux get sources, make flux-status)"},
+        {"id": "no_apply_over_flux", "text": "Does not kubectl apply/edit over Flux; fixes in Git then reconciles"},
+        {"id": "unknown_state", "text": "Notes that Unknown/progressing states do not page and cold bring-up retries are transient"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "service-5xx-cross-signal",
+      "prompt": "A homelab microservice is returning 5xx at the edge. How do I find the root cause?",
+      "expected_output": "Routes to the applications domain and the microservices investigation workflow, uses the metrics -> logs(trace_id) -> traces -> profiles correlation path, and keeps application code changes in the service repo.",
+      "files": [],
+      "assertions": [
+        {"id": "routes_microservices", "text": "Routes to docs/observability/runbooks/microservices investigation workflows"},
+        {"id": "trace_id_pivot", "text": "Uses the trace_id pivot from VictoriaLogs to VictoriaTraces and notes exemplars are not available (RFC-0014 D-14)"},
+        {"id": "signal_freshness", "text": "Verifies the signal is live and labels are current before concluding"},
+        {"id": "repo_boundary", "text": "Keeps handler/business-logic fixes in the owning *-service repo, treating docs/api as the contract truth"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "cnpg-corruption-vs-availability",
+      "prompt": "Someone ran a bad migration on product-db and the data looks wrong. Should I fail over to the DR replica to recover?",
+      "expected_output": "Distinguishes integrity from availability, refuses failover/promotion for corruption because the bad WAL already replicated, routes to emergency-recovery and PITR, and treats the recovery as IC-gated and approval-required.",
+      "files": [],
+      "assertions": [
+        {"id": "integrity_vs_availability", "text": "Classifies this as an integrity incident, not availability"},
+        {"id": "no_failover", "text": "Explicitly does NOT fail over or promote, because HA/DR replicates the bad write"},
+        {"id": "pitr", "text": "Routes to PITR to a new cluster via emergency-recovery.md"},
+        {"id": "approval_gate", "text": "Treats recovery as incident-only, IC go/no-go, requiring explicit approval"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "slo-burn-rate-routing",
+      "prompt": "An SLO burn-rate alert is paging for the order service in homelab. Which runbook do I open?",
+      "expected_output": "Recognizes that burn-rate pages have no per-alert runbook tree and routes through slo-burn-rate-alerts.md to the owning service rather than a RED alert file.",
+      "files": [],
+      "assertions": [
+        {"id": "slo_doc", "text": "Routes through docs/observability/alerting/slo-burn-rate-alerts.md"},
+        {"id": "no_per_alert_tree", "text": "States burn-rate alerts have no per-alert runbook tree and must not be mapped onto a RED runbook file"},
+        {"id": "owning_service", "text": "Pivots to the owning service's RED runbook after the burn-rate doc"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "cleanup-stale-debug-note",
+      "prompt": "Clean up the scattered debug and troubleshooting notes in the homelab database docs.",
+      "expected_output": "Applies the four-way retain/promote/move/remove disposition, checks current manifests before changing status claims, preserves dated evidence and planned/historical labels, stays scoped to the database docs, and reports index drift separately.",
+      "files": [],
+      "assertions": [
+        {"id": "four_way", "text": "Classifies each note as retain-in-place / promote / move-to-evidence / remove"},
+        {"id": "preserve_evidence", "text": "Preserves dated decision/incident/drill/verification evidence and planned/historical/known-gap labels still true"},
+        {"id": "check_reality", "text": "Checks the current manifest or source before changing any status claim"},
+        {"id": "scoped", "text": "Stays scoped to the requested database docs and does not open a repo-wide rewrite"},
+        {"id": "report_drift", "text": "Reports index drift and deferred candidates separately rather than silently correcting them"}
+      ]
+    }
+  ]
+}

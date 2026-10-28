@@ -311,6 +311,7 @@ reference style.
 | Topic | Start here |
 |-------|-----------|
 | Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
+| Incident troubleshooting / debug-note cleanup | [homelab-troubleshooting](.agents/skills/homelab-troubleshooting/SKILL.md) |
 | Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
 | Worktree lifecycle and cleanup | [git-worktrees](.agents/skills/git-worktrees/SKILL.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |

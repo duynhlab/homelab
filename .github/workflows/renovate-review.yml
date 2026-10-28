@@ -55,5 +55,8 @@ jobs:
       # been read; flip the first clause to `false` to post for real.
       dry-run: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run == true }}
       model: ${{ vars.RENOVATE_REVIEW_MODEL }}
+      # A dispatch from a branch reads that branch (rules file under review);
+      # pull_request events leave this empty and read main.
+      ref: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
     secrets:
       COPILOT_PAT: ${{ secrets.COPILOT_PAT }}

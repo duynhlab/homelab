@@ -545,7 +545,7 @@ services:
       - pyroscope-data:/data
 
   grafana:
-    image: grafana/grafana:13.2.3
+    image: grafana/grafana:13.3.0
     mem_limit: 768m # 338 MiB after the full gate; dashboard renders spike
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"

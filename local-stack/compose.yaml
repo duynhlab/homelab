@@ -471,7 +471,7 @@ services:
       victoria-logs: { condition: service_started }
 
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:v1.154.0
+    image: victoriametrics/victoria-metrics:v1.155.0
     mem_limit: 1g
     command:
       - "-storageDataPath=/victoria-metrics-data"

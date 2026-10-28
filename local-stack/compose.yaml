@@ -362,7 +362,7 @@ services:
       temporal: { condition: service_healthy }
 
   temporal-ui:
-    image: temporalio/ui:2.55.0
+    image: temporalio/ui:2.57.0
     mem_limit: 128m
     environment:
       TEMPORAL_ADDRESS: temporal:7233

@@ -15,7 +15,7 @@ spec:
       maxLines: "50" # plugin default became 1000 in 0.31; keep Explore light
   plugins:
     - name: victoriametrics-logs-datasource
-      version: "0.32.0"
+      version: "0.33.1"
   instanceSelector:
     matchLabels:
       dashboards: grafana

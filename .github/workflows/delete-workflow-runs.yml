@@ -1,11 +1,17 @@
 name: Delete workflow runs
 
-# Manual cleanup of finished Actions runs through the shared reusable workflow
-# in gha-workflows. The first run is a dry run: it lists what would be deleted
-# and changes nothing; run it again with dry_run unchecked to delete.
-# retain_days: 0 deletes every finished run. The executing run is never deleted.
+# Prunes finished Actions runs through the shared reusable workflow in
+# gha-workflows. Two ways in:
+#   - schedule: every Monday 02:17 Asia/Ho_Chi_Minh (Sunday 19:17 UTC), a real
+#     delete of finished runs older than 30 days.
+#   - manual: pick retain_days and dry_run yourself; dry_run defaults to true,
+#     so a hand run previews unless you untick it. retain_days: 0 deletes
+#     every finished run. The executing run is never deleted.
 
 on:
+  schedule:
+    # Off the hour to dodge the top-of-hour cron stampede.
+    - cron: "17 19 * * 0"
   workflow_dispatch:
     inputs:
       retain_days:
@@ -26,8 +32,10 @@ jobs:
   delete-runs:
     uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
     with:
-      retain_days: ${{ inputs.retain_days }}
-      dry_run: ${{ inputs.dry_run }}
+      # Scheduled runs have no inputs: fix the window at 30 days and delete for
+      # real. A manual run keeps whatever was typed, including retain_days 0.
+      retain_days: ${{ github.event_name == 'schedule' && 30 || inputs.retain_days }}
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
     permissions:
       actions: write
       contents: read

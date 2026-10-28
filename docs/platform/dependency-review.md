@@ -94,7 +94,7 @@ that fails the schema or the invariants in `post.mjs`.
 |---|---|
 | `safe-static` | No relevant breaking item; the files read keep working as configured. The static checks are listed in `verification[]`. |
 | `safe-for-repo-use` | A relevant change exists, but this repository does not exercise it (feature off, mode unused); the summary names the file that proves it. |
-| `hold` | Something relevant cannot be settled by reading. `hold_reason` names the family (the #1262 vocabulary): behavior/migration verification, hidden dependency or version alignment, secret-output validation, image-level bootstrap proof, existing-state migration proof, telemetry behavior verification, persistent-state migration or rollback, query behavior and operations docs, confirmed repo breaking change, other. |
+| `hold` | Something relevant cannot be settled by reading, or the owner wants a decision first. `hold_reason` names the family (the #1262 vocabulary): behavior/migration verification, hidden dependency or version alignment, secret-output validation, image-level bootstrap proof, existing-state migration proof, telemetry behavior verification, persistent-state migration or rollback, query behavior and operations docs, confirmed repo breaking change, adoptable feature, frozen by owner, other. |
 
 | `impact` | Meaning | Label |
 |---|---|---|
@@ -178,6 +178,20 @@ The prompt reads this section as authoritative on every run and never edits
 it. Keep entries short and dated when they come from an incident or an audit;
 link the owning ADR/RFC instead of restating its reasoning.
 
+### Owner decisions that hold a PR
+
+- **An adoptable feature holds the bump.** A release whose new capability this
+  platform could use only after a repository change is `hold` with
+  `hold_reason: adoptable-feature`, so the owner decides in the audit issue
+  (#1262) before merging. Round 2 examples: trust-manager 0.26 default CA
+  package, Vector 0.60 namespace annotations, RustFS 1.0.4 IAM/STS against gap
+  #1315. A UI-only feature never holds a PR.
+- **ClickHouse is frozen** (`clickhouse/clickhouse-server`,
+  `clickhouse/clickhouse-keeper`, `grafana/clickhouse-datasource` and the
+  ClickHouse dashboards) until the owner's open flame-graph item closes:
+  `hold` with `hold_reason: frozen-by-owner`, no other analysis needed beyond
+  listing the affected files.
+
 ### Pinned by decision
 
 - `grafana/tempo` stays `<3` — Tempo 3.0 removed the `ingester` and
@@ -258,5 +272,5 @@ link the owning ADR/RFC instead of restating its reasoning.
 
 - [`cicd.md` § Supply-chain automation](cicd.md#9-supply-chain-automation) — where Renovate and Dependabot split
 - [`.renovaterc.json5`](../../.renovaterc.json5) — managers, custom regex managers, pins and holds with their reasons
-- Issue #1262 — the manual audit this workflow replaces; its held rows seeded the rules above
+- Issue #1262 — the running Renovate audit (round 1 2026-10-13, round 2 2026-10-28); its held rows and owner decisions seeded the rules above
 - GitHub Copilot CLI documentation (programmatic mode, tool permissions, PAT authentication)

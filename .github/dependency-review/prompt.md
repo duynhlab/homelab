@@ -182,7 +182,14 @@ the same family, using the family map in `RULES_FILE` and these heuristics:
     `secret-output-validation`, `image-level-bootstrap-proof`,
     `existing-state-migration-proof`, `telemetry-behavior-verification`,
     `persistent-state-migration-rollback`, `query-behavior-operations-docs`,
-    `confirmed-repo-breaking-change`, `other`.
+    `confirmed-repo-breaking-change`, `adoptable-feature` (the release adds a
+    capability this repository could adopt only after a repo change; the owner
+    decides before merging), `frozen-by-owner` (the rules freeze this
+    dependency), `other`.
+- An `adoptable-feature` hold is still `impact: "minor"` unless a relevant
+  breaking item exists; list the feature in `features[]` with
+  `useful_for_homelab: true` and put the adoption question in `verification[]`
+  as a `docs` step. A UI-only feature never holds a PR.
 - `impact`
   - `none` — no `breaking[]` item is `relevant`.
   - `minor` — at least one relevant item, but it is additive or

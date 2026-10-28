@@ -55,6 +55,8 @@
         "persistent-state-migration-rollback",
         "query-behavior-operations-docs",
         "confirmed-repo-breaking-change",
+        "adoptable-feature",
+        "frozen-by-owner",
         "other"
       ]
     },

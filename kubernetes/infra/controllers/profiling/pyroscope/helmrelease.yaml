@@ -35,7 +35,7 @@ spec:
       replicaCount: 1
       fullnameOverride: pyroscope
       image:
-        tag: "2.4.0"
+        tag: "2.4.2"
       extraArgs:
         log.level: warn
         # Expand ${ACCESS_KEY_ID}/${ACCESS_SECRET_KEY} from the env into the config.

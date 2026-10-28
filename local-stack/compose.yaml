@@ -114,7 +114,7 @@ services:
       retries: 20
 
   cache:
-    image: valkey/valkey:9.1.2-alpine # the cluster chart's appVersion
+    image: valkey/valkey:9.1.3-alpine # the cluster chart's appVersion
     mem_limit: 128m
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]

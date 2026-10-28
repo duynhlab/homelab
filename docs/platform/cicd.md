@@ -1047,6 +1047,11 @@ Caveats:
   managers); **Dependabot** (`.github/dependabot.yml`, `github-actions` ecosystem, daily)
   maintains the workflow action SHA pins. Service repos wire their own equivalents.
 - Base images updated on a schedule; Trivy gates regressions on the next build.
+- **Dependency review** (`dependency-review.yml`): every Renovate PR gets one AI-written
+  comment (verdict, relevant breaking changes, affected files, verification checklist) and
+  an `impact/*` label, produced by Copilot CLI in a read-only job and posted from a
+  schema-validated file by a separate job. Rules and operations:
+  [`dependency-review.md`](dependency-review.md).
 
 ### 10. Reusable-workflow versioning (target)
 

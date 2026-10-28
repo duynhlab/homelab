@@ -86,3 +86,15 @@
 - name: area/adr
   description: Architecture Decision Records
   color: '#9c36b5'
+- name: impact/none
+  description: Dependency review found no change relevant to this repository
+  color: '#2ea043'
+- name: impact/minor
+  description: Dependency review found relevant but compatible changes; read the checklist
+  color: '#d4a72c'
+- name: impact/breaking
+  description: Dependency review found a relevant breaking change or a confirmed hold
+  color: '#cf222e'
+- name: ai/needs-verification
+  description: Dependency review verdict is hold; runtime or docs verification listed in the review comment
+  color: '#8250df'

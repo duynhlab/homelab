@@ -2,8 +2,10 @@
 # and peerdb-server from the upstream `peerdb` chart. Owner decisions
 # 2026-10-23 (#1313): ELv2 accepted for internal self-hosting; upstream chart.
 #
-# Chart 0.9.17 ships app v0.37.5, the core qualified on Compose; images are
-# pinned by digest through each component's `version`. External dependencies:
+# Chart 0.9.19 defaults to app v0.37.12; the images stay pinned by digest at
+# v0.37.5, the core qualified on Compose, through each component's `version`
+# (a bump past 0.37.5 adds a flow-api migrate init container that also needs
+# the peerdb-ca mount from the post-renderer). External dependencies:
 #   - catalog: peerdb_catalog on platform-db, verify-full (catalog.yaml)
 #   - Temporal: the platform server, namespace `peerdb`, no TLS (as for mop)
 #   - staging: RustFS bucket analytics-service-cdc (shared key, #1315 gap)
@@ -21,7 +23,7 @@ spec:
   chart:
     spec:
       chart: peerdb
-      version: "0.9.17"
+      version: "0.9.19"
       sourceRef:
         kind: HelmRepository
         name: peerdb

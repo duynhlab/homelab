@@ -523,6 +523,13 @@ validate_rustfs_bucket_lists() {
     exit 1
   fi
   echo "  ${a}"
+  a=$(grep -ohE 'CONSUMERS="[^"]*"' "$job" | head -1)
+  b=$(grep -ohE 'CONSUMERS="[^"]*"' "$cron" | head -1)
+  if [[ -z "$a" || "$a" != "$b" ]]; then
+    echo "ERROR - RustFS consumer lists differ: ${job} has ${a:-<none>}, ${cron} has ${b:-<none>}" >&2
+    exit 1
+  fi
+  echo "  ${a}"
 }
 
 validate_kyverno_policies

@@ -8,7 +8,7 @@
 # the peerdb-ca mount from the post-renderer). External dependencies:
 #   - catalog: peerdb_catalog on platform-db, verify-full (catalog.yaml)
 #   - Temporal: the platform server, namespace `peerdb`, no TLS (as for mop)
-#   - staging: RustFS bucket analytics-service-cdc (shared key, #1315 gap)
+#   - staging: RustFS bucket analytics-service-cdc (own IAM user `peerdb`, #1315)
 # The two workers are Temporal workers with no health endpoint, so they carry
 # no probes; flow-api and peerdb-server ship their own.
 ---

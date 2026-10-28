@@ -39,7 +39,13 @@ kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
 kubectl rollout restart deployment/<name> -n <namespace>
 ```
 
-## Example: RustFS backup credentials
+## Example: a RustFS consumer key
+
+Each RustFS consumer has its own IAM user, created from its OpenBAO path by the
+setup CronJob (`secret/local/infra/rustfs/{cnpg,pyroscope,clickhouse,peerdb}`;
+the table in [openbao.md](../openbao.md#51-kv-v2--static-secrets) lists the
+consumer behind each). Rotating one means re-seeding the path, letting RustFS
+learn the new secret, then restarting the consumer.
 
 Mint a temporary root token first via the
 [break-glass ceremony](./add-secret-live-cluster.md) (steps 1–3, inside
@@ -47,18 +53,27 @@ Mint a temporary root token first via the
 inside `openbao-0` with `BAO_TOKEN` exported:
 
 ```bash
-bao kv put secret/local/infra/rustfs/backup-cnpg \
-  access_key_id=<new-key> \
+bao kv put secret/local/infra/rustfs/cnpg \
+  access_key_id=cnpgbackup \
   secret_access_key=<new-secret>
 bao token revoke -self   # revoke the temporary root when done
 ```
 
-Then force the ExternalSecret to pick it up:
+Force both copies of the path to sync, then re-run the setup script so the IAM
+user gets the new secret (every call is create-or-replace):
 
 ```bash
-kubectl annotate externalsecret pg-backup-rustfs-cnpg -n product \
+kubectl annotate externalsecret rustfs-consumer-credentials -n rustfs \
   force-sync=$(date +%s) --overwrite
+kubectl annotate clusterexternalsecret pg-backup-rustfs-cnpg \
+  force-sync=$(date +%s) --overwrite
+kubectl -n rustfs create job --from=cronjob/setup-pg-backup-buckets rotate-$(date +%s)
+kubectl -n rustfs logs -f job/rotate-<ts>   # ends with the isolation matrix
 ```
+
+Then restart the consumer (Barman reads the Secret per backup, so CNPG needs no
+restart; Pyroscope and PeerDB take the key as env, so `kubectl rollout restart`
+their Deployments).
 
 ## Verify
 

@@ -592,6 +592,18 @@ Skeleton (copy what you need):
 
 #### Secrets
 
+- **Each RustFS consumer has its own identity.** The bucket setup Job and
+  CronJob now also create one IAM user per bucket (`cnpgbackup`, `pyroscope`,
+  `clickhouse`, `peerdb`) bound to a policy scoped to that bucket, through
+  RustFS's `/rustfs/admin/v3` API with `curl --aws-sigv4`, and prove the
+  isolation (own bucket reachable, a neighbour's denied) before reporting
+  Complete. OpenBAO seeds `secret/local/infra/rustfs/{cnpg,pyroscope,clickhouse,peerdb}`
+  and the Barman, Pyroscope and PeerDB ClusterExternalSecrets read them; the
+  root key is left to the setup scripts and, until its freeze lifts, to
+  ClickHouse's cold tier (its user is provisioned, not yet consumed). This
+  closes the shared-key gap recorded under ADR-066 (#1315). Verified against
+  RustFS 1.0.4 in a container (provisioning, re-run, object round-trip,
+  cross-bucket write denied); the Kind pass is the merge gate.
 - **No literal passwords in the OpenBAO bootstrap.** The `temporal`,
   `keycloak` and `product` (initdb) seeds are random per cluster, like every
   other seed, and the KV seed loop no longer holds platform-db runtime
@@ -1157,6 +1169,12 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **RustFS chart and image 1.0.1 → 1.0.4** (cluster and the Compose analytics
+  twin). 1.0.2 fixes seven advisories, two of them bypasses of scoped
+  permissions (`?versionId=` overwrite, dot-segment delete), and makes the
+  audit log record the real identity; 1.0.3 is Console only; 1.0.4 refreshes
+  trust roots. The chart adds a `tls:` block (off) and nothing else changes for
+  the plain-HTTP standalone setup. The IAM code is the same as 1.0.1.
 - **PeerDB chart 0.9.17 → 0.9.19.** The component images stay digest-pinned at
   v0.37.5, so the running app is unchanged; the chart's goose migrate init
   container only renders for images ≥ 0.37.6, and the header comment records

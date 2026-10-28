@@ -6,7 +6,9 @@
 # bucket. This Job creates the buckets immediately. It lives in the
 # ./controllers/storage path (storage-local, wait: true), so Flux blocks on it;
 # tracing-local / profiling-local dependsOn storage-local. Idempotent (HeadBucket before
-# CreateBucket) — the CronJob keeps them present thereafter.
+# CreateBucket) — the CronJob keeps them present thereafter. It also provisions
+# one IAM user + bucket-scoped policy per consumer and proves the isolation
+# (own bucket reachable, a neighbour's denied) before it reports Complete.
 #
 # That dependency is only worth anything if a Complete Job PROVES the buckets
 # exist, which is exactly what the first version did not do: its wait loop fell
@@ -114,6 +116,51 @@ spec:
                 echo "FATAL: bucket(s) absent after creation:$missing" >&2
                 exit 1
               fi
+
+              # Per-consumer identities (ADR-066 isolation obligation, #1315). One IAM
+              # user and one canned policy per bucket, scoped to that bucket only; the
+              # consumer keys arrive in the env from Secret/rustfs-consumer-credentials
+              # (ExternalSecret, OpenBAO secret/local/infra/rustfs/<consumer>). Every
+              # call is create-or-replace, so the CronJob re-provisions after a PVC
+              # rebuild. The admin API is plain JSON under /rustfs/admin/v3, signed as
+              # SigV4 for service s3 with the root key.
+              echo "=== Provisioning per-consumer identities ==="
+              CONSUMERS="cnpgbackup:pg-backups-cnpg pyroscope:pyroscope-profiles clickhouse:clickhouse-otel peerdb:analytics-service-cdc"
+              admin() { curl -fsS --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" --aws-sigv4 "aws:amz:us-east-1:s3" "$@"; }
+              key_of() { eval "printf '%s' \"\$$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')_$2\""; }
+              for pair in $CONSUMERS; do
+                u=${pair%%:*}; b=${pair##*:}
+                ak=$(key_of "$u" ACCESS_KEY); sk=$(key_of "$u" SECRET_KEY)
+                if [ -z "$ak" ] || [ -z "$sk" ]; then
+                  echo "FATAL: no credentials in the env for consumer $u" >&2
+                  exit 1
+                fi
+                policy=$(printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:ListBucket","s3:GetBucketLocation","s3:ListBucketMultipartUploads"],"Resource":["arn:aws:s3:::%s"]},{"Effect":"Allow","Action":["s3:GetObject","s3:GetObjectVersion","s3:PutObject","s3:DeleteObject","s3:DeleteObjectVersion","s3:AbortMultipartUpload","s3:ListMultipartUploadParts"],"Resource":["arn:aws:s3:::%s/*"]}]}' "$b" "$b")
+                admin -X PUT "$ENDPOINT/rustfs/admin/v3/add-canned-policy?name=$u" -H 'Content-Type: application/json' --data-binary "$policy" >/dev/null
+                admin -X PUT "$ENDPOINT/rustfs/admin/v3/add-user?accessKey=$ak" -H 'Content-Type: application/json' --data-binary "{\"secretKey\":\"$sk\",\"status\":\"enabled\"}" >/dev/null
+                admin -X PUT "$ENDPOINT/rustfs/admin/v3/set-user-or-group-policy?policyName=$u&userOrGroup=$ak&isGroup=false" >/dev/null
+                echo "  user $ak -> policy $u -> bucket $b"
+              done
+
+              # Prove the isolation, not just the provisioning: each consumer key must
+              # reach its own bucket and be refused on a neighbour's.
+              echo "=== Verifying isolation ==="
+              bad=""
+              for pair in $CONSUMERS; do
+                u=${pair%%:*}; b=${pair##*:}
+                ak=$(key_of "$u" ACCESS_KEY); sk=$(key_of "$u" SECRET_KEY)
+                other=""
+                for p in $CONSUMERS; do
+                  if [ "$p" != "$pair" ]; then other=${p##*:}; break; fi
+                done
+                if AWS_ACCESS_KEY_ID="$ak" AWS_SECRET_ACCESS_KEY="$sk" s3 head-bucket --bucket "$b" >/dev/null 2>&1; then own=ok; else own=DENIED; bad="$bad $u"; fi
+                if AWS_ACCESS_KEY_ID="$ak" AWS_SECRET_ACCESS_KEY="$sk" s3 head-bucket --bucket "$other" >/dev/null 2>&1; then nb=ALLOWED; bad="$bad $u"; else nb=denied; fi
+                echo "  $u: $b=$own $other=$nb"
+              done
+              if [ -n "$bad" ]; then
+                echo "FATAL: isolation check failed for:$bad" >&2
+                exit 1
+              fi
               echo "=== Done ==="
           env:
             - name: AWS_DEFAULT_REGION
@@ -130,6 +177,46 @@ spec:
                 secretKeyRef:
                   name: rustfs-credentials
                   key: RUSTFS_SECRET_KEY
+            - name: CNPGBACKUP_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: CNPGBACKUP_ACCESS_KEY
+            - name: CNPGBACKUP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: CNPGBACKUP_SECRET_KEY
+            - name: PYROSCOPE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: PYROSCOPE_ACCESS_KEY
+            - name: PYROSCOPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: PYROSCOPE_SECRET_KEY
+            - name: CLICKHOUSE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: CLICKHOUSE_ACCESS_KEY
+            - name: CLICKHOUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: CLICKHOUSE_SECRET_KEY
+            - name: PEERDB_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: PEERDB_ACCESS_KEY
+            - name: PEERDB_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-consumer-credentials
+                  key: PEERDB_SECRET_KEY
           # The AWS CLI is Python: one run peaks at ~80 MiB (measured), where mc
           # fitted in 64.
           resources:

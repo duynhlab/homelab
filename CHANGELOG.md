@@ -742,6 +742,11 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0034 reserved (`researching`).** Open research for a platform-wide
+  Kubernetes labels and annotations standard: inventory the two custom prefixes
+  in use (`platform.duynhlab.dev/*` and the no-`.dev` `platform.duynhlab/*`), the
+  uneven `app.kubernetes.io/*` set, and the load-bearing selectors, then compare
+  options. `research.md` + index row only; no README.md, no manifest changes.
 - **RFC-0030 implemented.** ADR-066, ADR-067 and ADR-068 are
   `Accepted / Complete`: drills, alerts, failover slots and a cold bring-up all
   passed on Kind. ADR-069 is Complete with admin-service 0.5.2, released after

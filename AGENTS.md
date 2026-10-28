@@ -151,8 +151,10 @@ of truth for their conventions.
   sub-issue per obligation); tradeoffs the ADR did not settle go on that
   issue, not only in the PR
   ([`docs/proposals/adr/README.md` § Working log](docs/proposals/adr/README.md#working-log)).
-- `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
-  for PRs.
+- Author every commit as `duynhne <108656040+duynhne@users.noreply.github.com>`
+  (set `--author` explicitly — agent machines default to the bot identity) with a
+  `Co-Authored-By: duynebot <bot@duynh.me>` trailer; **`gh auth switch --user duynhne`**
+  for PRs. See [git-commits](.agents/skills/git-commits/SKILL.md).
 
 ### Issue naming
 

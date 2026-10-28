@@ -6,7 +6,7 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-10-27 |
-| **Last updated** | 2026-10-27 |
+| **Last updated** | 2026-10-28 |
 
 > **Research only.** Nothing described here is applied to the cluster or the `duynh`
 > chart. This document inventories how Homelab labels and annotates objects today,
@@ -225,11 +225,68 @@ the key load-bearing (or "informational" when nothing selects on it).
 
 ### Recommended set `app.kubernetes.io/*` and unprefixed
 
-| Key | Observed use | Gap |
-|-----|--------------|-----|
-| `name`, `component`, `managed-by`, `part-of` | Upstream charts (CNPG, ESO) consistently; homelab-authored objects partially (`openbao-bootstrap`, PrometheusRules, `rsip-product` `part-of: backend-services`, chart `podLabels` `component: api`) | No fleet-wide guarantee → `-l app.kubernetes.io/part-of` rollup is unreliable; `part-of` values disagree (`backend-services` vs none). |
-| `instance`, `version` | Rare on homelab-authored objects | Version/rollup queries unavailable fleet-wide. |
-| `environment: local` (unprefixed) | Every namespace | Private key, collision-prone; environment axis not under a platform prefix. |
+The `duynh` chart ([`helm-charts/charts/duynh`](https://github.com/duynhlab/helm-charts/tree/main/charts/duynh)),
+which renders every one of the 10 services + the two SPAs, already emits a solid
+`app.kubernetes.io/*` subset through its `duynh.labels` helper. The gaps below are relative
+to *that* baseline, not to a blank slate.
+
+| Key | On `duynh`-chart workloads | On infra/operator objects | Gap |
+|-----|---------------------------|---------------------------|-----|
+| `name` | **Rendered** (`duynh.selectorLabels` → `app.kubernetes.io/name`) | Upstream charts (CNPG, ESO) consistently | — reliable for chart + operator objects |
+| `instance` | **Rendered** (`duynh.selectorLabels` → `.Release.Name`) | Upstream charts | — |
+| `version` | **Rendered** (`duynh.labels`, from `.Chart.AppVersion`) | Upstream charts | Rare on homelab-authored loose manifests |
+| `managed-by` | **Rendered** (`duynh.labels` → `.Release.Service` = `Helm`) | Upstream charts | — |
+| `component` | **Not a chart default** — only set per-service via `podLabels` override ([`fulfillment-rs.yaml`](../../../../kubernetes/apps/domains/fulfillment-rs.yaml) sets `component: api`) | Partial (CNPG, ESO) | No fleet-wide guarantee; value chosen per ResourceSet, not by the chart |
+| `part-of` | **Never rendered** by the chart | Partial (`rsip-product` `part-of: backend-services`, some PrometheusRules) | `-l app.kubernetes.io/part-of` rollup is unreliable; values disagree (`backend-services` vs none) |
+| `environment: local` (unprefixed) | Set on namespaces, not chart workloads | Every namespace | Private key, collision-prone; environment axis not under a platform prefix |
+
+> **The chart is already most of the way there.** `name`, `instance`, `version` and
+> `managed-by` are rendered on every service by `duynh.labels`; the two keys the standard
+> would still have to add are `part-of` (never rendered) and a chart-level default for
+> `component` (today only a per-ResourceSet `podLabels` override). `helm.sh/chart` is also
+> rendered but is a Helm bookkeeping key, not part of the recommended set.
+
+### The `duynh` chart render path
+
+How a label reaches a running service object today — and why the chart can safely *add*
+labels but must not touch the selector. `duynh.labels` feeds both the object `metadata` and
+(via `duynh.podLabels`, which merges `duynh.labels` with `.Values.podLabels`) the pod
+template; `duynh.selectorLabels` — `name` + `instance` only — feeds `spec.selector.matchLabels`,
+which is **immutable** after creation.
+
+```mermaid
+flowchart TD
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+
+    RSIP["ResourceSetInputProvider<br/>(per service)"]:::platform
+    RS["domain ResourceSet<br/>renders HelmRelease"]:::platform
+    VAL["chart values<br/>podLabels / extraSelectorLabels / annotations"]:::service
+
+    subgraph CHART["duynh chart helpers"]
+      LBL["duynh.labels<br/>helm.sh/chart + name + instance + version + managed-by"]:::service
+      SEL["duynh.selectorLabels<br/>name + instance (+ extraSelectorLabels)"]:::service
+      POD["duynh.podLabels<br/>merge(duynh.labels, .Values.podLabels)"]:::service
+    end
+
+    META["Deployment metadata.labels"]:::data
+    SELECTOR["spec.selector.matchLabels<br/>IMMUTABLE"]:::data
+    TMPL["pod template labels"]:::data
+
+    RSIP --> RS --> VAL
+    VAL --> POD
+    LBL --> META
+    LBL --> POD
+    SEL --> SELECTOR
+    SEL --> LBL
+    POD --> TMPL
+```
+
+> **In plain terms:** the chart already stamps the `app.kubernetes.io/*` baseline onto every
+> object's `metadata` and pod template. A standard that adds `part-of` and a `component`
+> default extends `duynh.labels`/`podLabels` only — it must never widen `duynh.selectorLabels`,
+> because that line is welded into the immutable selector of the running Deployments.
 
 ### Annotations in use
 
@@ -238,6 +295,7 @@ the key load-bearing (or "informational" when nothing selects on it).
 | Flux | `kustomize.toolkit.fluxcd.io/*`, image-policy marker comments | Controller config |
 | cert-manager | `cert-manager.io/cluster-issuer` | Controller config |
 | Kubernetes core | `kubectl.kubernetes.io/last-applied-configuration`, `deployment.kubernetes.io/revision` | Core bookkeeping |
+| `duynh` chart | `deploymentAnnotations`, `podAnnotations` (default `{}`) | Opt-in passthrough — the chart adds no annotations of its own |
 
 ---
 
@@ -253,7 +311,7 @@ flowchart TD
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
     STD["Written standard<br/>docs: required + recommended keys"]:::planned
-    CHART["duynh chart<br/>renders app.kubernetes.io/* set"]:::planned
+    CHART["duynh chart (extend duynh.labels/podLabels)<br/>add part-of + component default;<br/>never spec.selector"]:::planned
     PREFIX["Single prefix<br/>platform.duynhlab.dev/* only"]:::planned
     KYV["Kyverno require-labels<br/>(optional, audit→enforce)"]:::planned
 
@@ -294,7 +352,7 @@ Decision stays open — these are the shapes an RFC would choose between.
 - [ ] Which keys are **mandatory** vs **recommended**? (Candidate mandatory: `app.kubernetes.io/name`, `app.kubernetes.io/managed-by`, `app.kubernetes.io/part-of`, `platform.duynhlab.dev/domain` on services; `platform.duynhlab.dev/tier` on app namespaces.)
 - [ ] Collapse the **two prefixes** onto `platform.duynhlab.dev/*`? If yes, the `platform.duynhlab/*` secret selectors and the namespace labels must migrate together (load-bearing, coordinated change) — or do we keep both and just document them?
 - [ ] **Enforce** at admission (Kyverno `require-labels`, Audit first) or document-only?
-- [ ] Apply the recommended set through the **`duynh` chart** in `helm-charts` (cross-repo) — and confirm it only adds **pod-template** labels, never `spec.selector.matchLabels` (immutable on the running Deployments)?
+- [ ] Close the chart gaps through the **`duynh` chart** in `helm-charts` (cross-repo): extend `duynh.labels`/`duynh.podLabels` to render `app.kubernetes.io/part-of` and a chart-level `component` default (today only a per-ResourceSet `podLabels` override), while leaving `duynh.selectorLabels` (`name` + `instance`) untouched so `spec.selector.matchLabels` stays immutable on the running Deployments?
 - [ ] Are **cost/team** labels meaningful for a single-tenant homelab, or out of scope (Non-Goal)?
 - [ ] Likely **ADR split**: (1) label/annotation taxonomy + canonical prefix; (2) enforcement mechanism; (3) chart render + migration of `platform.duynhlab/*`.
 - [ ] Is a **domain reference doc** (`docs/platform/labels.md`) wanted as the durable home for the catalog?
@@ -331,14 +389,16 @@ Official documentation only (synthesized in-house; no third-party tutorials embe
 - Kubernetes — Annotations: <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>
 - Kubernetes — Well-Known Labels, Annotations and Taints: <https://kubernetes.io/docs/reference/labels-annotations-taints/>
 - Homelab admission rules: [`AGENTS.md`](../../../../AGENTS.md) · [`docs/security/policy-catalog.md`](../../../security/policy-catalog.md)
+- `duynh` chart label helpers: [`helm-charts/charts/duynh/templates/_helpers.tpl`](https://github.com/duynhlab/helm-charts/blob/main/charts/duynh/templates/_helpers.tpl) (`duynh.labels`, `duynh.selectorLabels`, `duynh.podLabels`)
 
 ---
 
 ## Context7 audit log
 
 Verification used the official Kubernetes documentation pages listed in References
-(versions current as of 2026-10-27); Homelab claims cross-checked against the cited
-manifests in the same worktree.
+(versions current as of 2026-10-28); Homelab claims cross-checked against the cited
+manifests in the same worktree, and `duynh` chart claims against the `helm-charts` sibling
+repository.
 
 | Claim / section | Source checked | Result |
 |-----------------|----------------|--------|
@@ -348,6 +408,7 @@ manifests in the same worktree.
 | `spec.selector.matchLabels` immutable on Deployments/StatefulSets | K8s Labels and Selectors / Deployment API | confirmed |
 | Two prefixes in use (`platform.duynhlab.dev/*` and `platform.duynhlab/*`) | Repo grep of `kubernetes/**` (2026-10-27) | confirmed |
 | `otlp-logs` / `tier` / `domain` / `platform.duynhlab/*` are load-bearing selectors | `vector.yaml`, `namespaces.yaml`, `domains/*-rs.yaml`, cluster-external-secrets | confirmed |
+| `duynh` chart renders `name`+`instance`+`version`+`managed-by`+`helm.sh/chart`; selector = `name`+`instance`; `part-of` never rendered, `component` only via `podLabels` override | `helm-charts/charts/duynh` `_helpers.tpl`, `deployment.yaml`, `values.yaml` (sibling repo, 2026-10-28) | confirmed |
 
 ---
 
@@ -367,4 +428,4 @@ manifests in the same worktree.
 
 ---
 
-_Last verified: 2026-10-27 (official Kubernetes docs + manifest cross-check)._
+_Last verified: 2026-10-28 (official Kubernetes docs + homelab manifest cross-check; `duynh` chart helpers cross-checked against the `helm-charts` sibling repo)._

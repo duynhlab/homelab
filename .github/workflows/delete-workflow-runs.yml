@@ -23,7 +23,21 @@ on:
 permissions: {}
 
 jobs:
-  delete-runs:
+  # Two jobs, not one with conditional expressions: a reusable workflow's typed
+  # inputs reject computed values ("Unexpected value '30'"), so each trigger
+  # passes literals or its own inputs.
+  scheduled:
+    if: github.event_name == 'schedule'
+    uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
+    with:
+      retain_days: 30
+      dry_run: false
+    permissions:
+      actions: write
+      contents: read
+
+  manual:
+    if: github.event_name == 'workflow_dispatch'
     uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
     with:
       retain_days: ${{ inputs.retain_days }}

@@ -1,0 +1,59 @@
+name: Renovate review
+
+# AI reads the release notes of a Renovate PR against this repository and
+# leaves one structured comment plus impact/* labels. The workflow itself
+# lives in gha-workflows (renovate-review.yml); this caller passes the rules
+# file and the first-party prefix. Guide and the owner-maintained review
+# rules: docs/platform/renovate-review.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number, or 'all' for every open Renovate PR"
+        required: false
+        default: "all"
+      max:
+        description: "Maximum PRs to review in this run"
+        required: false
+        default: "10"
+      force:
+        description: "Re-review even if the current head SHA already has a review"
+        type: boolean
+        required: false
+        default: false
+      dry_run:
+        description: "Print the comment and label plan instead of posting"
+        type: boolean
+        required: false
+        default: true
+
+# Deny-all baseline; the reusable workflow's jobs widen only what they need.
+permissions: {}
+
+concurrency:
+  # One review per PR at a time; a push mid-review cancels the stale one.
+  group: renovate-review-${{ github.event.pull_request.number || inputs.pr || 'all' }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'renovate[bot]'
+    uses: duynhlab/gha-workflows/.github/workflows/renovate-review.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      rules-file: docs/platform/renovate-review.md
+      first-party-prefix: ghcr.io/duynhlab/
+      pr: ${{ inputs.pr }}
+      max: ${{ inputs.max || '10' }}
+      force: ${{ inputs.force == true }}
+      # pull_request events stay in dry-run until the first dispatches have
+      # been read; flip the first clause to `false` to post for real.
+      dry-run: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run == true }}
+      model: ${{ vars.RENOVATE_REVIEW_MODEL }}
+    secrets:
+      COPILOT_PAT: ${{ secrets.COPILOT_PAT }}

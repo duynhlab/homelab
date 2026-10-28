@@ -1,4 +1,4 @@
-# Dependency review (AI-read release notes for Renovate PRs)
+# Renovate review (AI-read release notes for Renovate PRs)
 
 Every Renovate pull request in this repository gets one structured review
 comment: what changed upstream, which of it matters for the way this
@@ -9,14 +9,14 @@ replaces the hand-written compatibility audits such as issue #1262.
 
 | | |
 |---|---|
-| **Workflow** | [`.github/workflows/dependency-review.yml`](../../.github/workflows/dependency-review.yml) — `pull_request` from `renovate[bot]` and `workflow_dispatch` |
-| **Prompt** | [`.github/dependency-review/prompt.md`](../../.github/dependency-review/prompt.md), `PROMPT_VERSION` 1 |
-| **Contract** | [`.github/dependency-review/schema.json`](../../.github/dependency-review/schema.json) — one JSON document per review |
+| **Workflow** | [`.github/workflows/renovate-review.yml`](../../.github/workflows/renovate-review.yml) — a caller of the reusable `renovate-review.yml` in `duynhlab/gha-workflows`; `pull_request` from `renovate[bot]` and `workflow_dispatch` |
+| **Prompt** | `.github/renovate-review/prompt.md` in `duynhlab/gha-workflows`, `PROMPT_VERSION` 1 |
+| **Contract** | `.github/renovate-review/schema.json` in `duynhlab/gha-workflows` — one JSON document per review |
 | **Record** | A PR comment whose first line is `<!-- dep-radar:v1 {json} -->`; one per PR, replaced on every push |
 | **Labels** | `impact/none` · `impact/minor` · `impact/breaking` · `ai/needs-verification` (declared in `.github/labels.yaml`) |
 | **AI runtime** | Copilot CLI (`@github/copilot`), authenticated with the `COPILOT_PAT` secret (fine-grained PAT, *Copilot Requests* only) |
 | **Rules** | [Review rules](#review-rules) below — owner-authored, the prompt treats them as authoritative |
-| **Write side** | Comment and labels only. **Nothing merges automatically.** `pull_request` events run in dry-run until `PULL_REQUEST_DRY_RUN` is flipped |
+| **Write side** | Comment and labels only. **Nothing merges automatically.** `pull_request` events run in dry-run until the caller's `dry-run` expression is flipped |
 | **Mirror** | `dep-radar` (planned) reads the hidden JSON from the comments and renders the inbox |
 
 ---
@@ -65,8 +65,11 @@ flowchart LR
   class radar planned;
 ```
 
-The three jobs exist because release notes are third-party text that the AI
-reads with `--allow-all-tools`. The job that runs the AI has `contents: read`,
+The jobs run in `duynhlab/gha-workflows` (`renovate-review.yml`, with the
+prompt, schema and scripts under `.github/renovate-review/`, checked out at the
+workflow's own commit); this repository contributes the caller, the labels and
+the rules file. The three jobs exist because release notes are third-party
+text that the AI reads with `--allow-all-tools`. The job that runs the AI has `contents: read`,
 checks out `main` (never the PR branch), carries a token with no repository
 write scope, and is denied `gh pr`, `gh api`, `gh issue`, `git push`, `curl`
 and `wget`. The only artifact it can produce is `review.json`. The `post` job
@@ -113,14 +116,15 @@ label set on every rebase).
 | Name | Kind | Scope |
 |---|---|---|
 | `COPILOT_PAT` | repository secret | Fine-grained PAT for the account that holds the Copilot subscription. Permissions: **Copilot Requests** plus public-repository read. No `contents` or `pull-requests` write. Rotate on a calendar reminder. |
-| `DEPENDENCY_REVIEW_MODEL` | repository variable, optional | Passed as `--model`; leave unset for the CLI default. |
+| `RENOVATE_REVIEW_MODEL` | repository variable, optional | Passed as `--model`; leave unset for the CLI default. |
 
 ### Running it
 
 - **Automatic:** every `opened`, `synchronize` and `reopened` event on a PR
   authored by `renovate[bot]`. A push mid-review cancels the stale run
-  (`cancel-in-progress`). While `PULL_REQUEST_DRY_RUN` is `"true"` in the
-  workflow `env`, these runs print the comment in the job log and post nothing.
+  (`cancel-in-progress`). While the caller's `dry-run` expression keeps
+  `pull_request` events in dry-run, these runs print the comment in the job
+  log and post nothing.
 - **Backfill:** Actions → *Dependency review* → *Run workflow* with
   `pr=all`, `max=10`, `dry_run=false`. Repeat until the log reports
   `selected 0`. `force=true` re-reviews a head SHA that already has a comment
@@ -164,18 +168,21 @@ that JSON by `post.mjs`:
 
 ### Changing the prompt or the schema
 
+Both live in `duynhlab/gha-workflows` under `.github/renovate-review/`.
 Bump `PROMPT_VERSION` in the prompt when the questions change, and
 `schema_version` only when the JSON shape changes incompatibly (dep-radar
-parses by version). `post.mjs` reads `schema.json` at run time, so a schema
-change needs no code change unless it adds a construct the small validator
-does not know (`type`, `enum`, `const`, `required`, `properties`,
-`additionalProperties`, `items`, `pattern`, `minLength`, `maxLength`,
-`minimum`, `format: uri|date-time`).
+parses by version). This repository's rules below are the only part the
+prompt reads from here.
 
 ## Review rules
 
-The prompt reads this section as authoritative on every run and never edits
-it. Keep entries short and dated when they come from an incident or an audit;
+The prompt reads this whole file as authoritative on every run and never
+edits it. It needs to know where things live: Kubernetes manifests under
+`kubernetes/` (Flux + Kustomize; `kubernetes/infra/configs/` by area,
+`kubernetes/infra/controllers/` for Helm-installed controllers), the Docker
+Compose stack under `local-stack/`, OpenTofu under `terraform/`, scripts under
+`scripts/`, docs and design records under `docs/` (`docs/proposals/` for
+RFC/ADR). Images under `ghcr.io/duynhlab/` are first-party. Keep entries short and dated when they come from an incident or an audit;
 link the owning ADR/RFC instead of restating its reasoning.
 
 ### Owner decisions that hold a PR

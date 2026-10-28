@@ -890,16 +890,16 @@ Skeleton (copy what you need):
 
 #### CI
 
-- **Every Renovate PR gets an AI dependency review.** `dependency-review.yml`
-  runs Copilot CLI headless against the PR's release notes and the `main`
-  checkout, writes one schema-validated JSON (`.github/dependency-review/`),
-  and a separate write-scoped job posts it as a single replaced-in-place
+- **Every Renovate PR gets an AI review.** `renovate-review.yml` calls the
+  reusable workflow of the same name in `gha-workflows`: Copilot CLI reads the
+  PR's release notes against the `main` checkout, writes one schema-validated
+  JSON, and a separate write-scoped job posts it as a single replaced-in-place
   comment with `impact/none|minor|breaking` and `ai/needs-verification`
   labels. The AI job is read-only and denied `gh pr`, `gh api` and `git push`
   because release notes are third-party text. `pull_request` events start in
-  dry-run (`PULL_REQUEST_DRY_RUN`); `workflow_dispatch` backfills in batches.
-  Vocabulary, operations and the owner-maintained review rules (seeded from
-  the #1262 audit) live in `docs/platform/dependency-review.md`.
+  dry-run; `workflow_dispatch` backfills in batches. Vocabulary, operations
+  and the owner-maintained review rules (seeded from the #1262 audit) live in
+  `docs/platform/renovate-review.md`, the file the prompt reads.
 
 ### Bugfix
 

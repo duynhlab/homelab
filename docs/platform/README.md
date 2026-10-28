@@ -105,7 +105,7 @@ specific Kustomization or run `make sync`.
 | [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
 | [`keycloak.md`](keycloak.md) | The identity provider: deployment, realm import, database, reset procedure, signals |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
-| [`dependency-review.md`](dependency-review.md) | AI-read release notes on every Renovate PR: verdict/impact vocabulary, permission split, backfill, review rules |
+| [`renovate-review.md`](renovate-review.md) | AI-read release notes on every Renovate PR: verdict/impact vocabulary, permission split, backfill, review rules |
 | [Git commits](../../.agents/skills/git-commits/SKILL.md) | Current homelab commit messages, squash messages and branch names |
 | [`gitflow.md`](gitflow.md) | Microservice branching and release model (**target** — prod cluster TBD) |
 | [`kyverno.md`](kyverno.md) | Admission policy tiers, Audit→Enforce, PolicyExceptions |

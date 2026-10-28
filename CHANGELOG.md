@@ -888,6 +888,14 @@ Skeleton (copy what you need):
   keeps Phase 0 live rotation plus owner approval visibly open; no RFC README or
   Vietnamese domain guide is created before those gates pass.
 
+#### CI
+
+- **Manual cleanup of finished Actions runs.** `delete-workflow-runs.yml`
+  calls the shared `delete-workflow-runs` reusable workflow in
+  `gha-workflows`: dry-run by default, `retain_days` (30) decides what is
+  kept, the executing run is never deleted. The repository carried 4,854
+  runs when the caller was added.
+
 ### Bugfix
 
 #### GitOps

@@ -496,7 +496,7 @@ services:
   # shows up as collector export failures. Jobs live in
   # observability/vmagent/prometheus.yml (the local ServiceMonitor analogue).
   vmagent:
-    image: victoriametrics/vmagent:v1.154.0
+    image: victoriametrics/vmagent:v1.155.0
     mem_limit: 384m
     command:
       - "-promscrape.config=/etc/vmagent/prometheus.yml"

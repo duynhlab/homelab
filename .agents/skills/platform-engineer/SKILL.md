@@ -141,7 +141,9 @@ Design **before** building when the change is substantial or contested.
 ## Contribution workflow
 
 When writing or reviewing commit messages, squash messages, or branch names,
-read [git-commits](../git-commits/SKILL.md). The PR workflow and Git/GitHub
+read [git-commits](../git-commits/SKILL.md). For worktree lifecycle and cleanup
+(including proving a squash-merged branch landed before deletion), read
+[git-worktrees](../git-worktrees/SKILL.md). The PR workflow and Git/GitHub
 identity remain in [AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow).
 
 ## IDE skills map
@@ -161,6 +163,7 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | GitOps incident | `gitops-cluster-debug` | `make flux-status` |
 | Draw.io diagram (asked by name, or editing a `.drawio`) | [`homelab-drawio`](../homelab-drawio/SKILL.md) | Mermaid stays the default (AGENTS.md Diagrams) |
 | Before PR | `code-review-and-quality` | one change per branch |
+| Worktree cleanup | [`git-worktrees`](../git-worktrees/SKILL.md) | prove landed before deleting |
 | Rollout | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |
 
 **Homelab overrides** (win over generic skill defaults): RFC/ADR paths and owner

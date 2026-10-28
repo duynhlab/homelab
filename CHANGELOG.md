@@ -618,6 +618,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **New `git-worktrees` hygiene skill.** `.agents/skills/git-worktrees/SKILL.md`
+  (with its `.claude/skills` symlink) captures worktree lifecycle rules: one
+  worktree per task, commit before removing, and proving a squash-merged branch
+  landed via a file-scoped diff before deletion. Routed from `AGENTS.md` and the
+  platform-engineer skill.
+
 - **Each `docs/architecture/` folder renders its diagrams.** api, databases,
   observability, secrets, security and workflows gain a `README.md` that shows
   every diagram in the folder with the question it answers and where it is

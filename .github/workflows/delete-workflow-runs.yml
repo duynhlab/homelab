@@ -23,11 +23,28 @@ on:
 permissions: {}
 
 jobs:
-  delete-runs:
+  # Two jobs, not one with conditional expressions: the scheduled trigger has
+  # no inputs, so it passes literals; the manual one forwards its own.
+  scheduled:
+    if: github.event_name == 'schedule'
     uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
     with:
-      retain_days: ${{ inputs.retain_days }}
-      dry_run: ${{ inputs.dry_run }}
+      retain_days: 30
+      dry_run: false
+    permissions:
+      actions: write
+      contents: read
+
+  manual:
+    if: github.event_name == 'workflow_dispatch'
+    uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
+    with:
+      # A dispatch from the API or `gh workflow run -f` delivers the inputs as
+      # strings, and the called workflow's typed inputs reject "30" / "true"
+      # ("Unexpected value '30'"). format() makes the value a string whatever
+      # the source, fromJSON turns it back into a number / boolean.
+      retain_days: ${{ fromJSON(format('{0}', inputs.retain_days)) }}
+      dry_run: ${{ fromJSON(format('{0}', inputs.dry_run)) }}
     permissions:
       actions: write
       contents: read

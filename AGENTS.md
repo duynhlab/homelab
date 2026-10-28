@@ -142,7 +142,9 @@ Every manifest applied to the cluster must satisfy admission:
 
 When writing or reviewing commit messages, squash messages, or branch names,
 read [the git-commits skill](.agents/skills/git-commits/SKILL.md), the source
-of truth for their conventions.
+of truth for their conventions. For creating, using, or cleaning up worktrees
+(including proving a squash-merged branch landed before deletion), read
+[the git-worktrees skill](.agents/skills/git-worktrees/SKILL.md).
 
 - **Never push to `main`.** Branch → PR → squash-merge.
 - **PR body** follows `.github/pull_request_template.md`: `Part of #<sub-issue>`
@@ -310,6 +312,7 @@ reference style.
 |-------|-----------|
 | Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
 | Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
+| Worktree lifecycle and cleanup | [git-worktrees](.agents/skills/git-worktrees/SKILL.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

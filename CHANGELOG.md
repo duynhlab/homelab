@@ -1113,8 +1113,35 @@ Skeleton (copy what you need):
 
 ### Dependency
 
+#### GitOps
+
+- **Renovate audit round 2 (#1262, 2026-10-28):** 24 Renovate PRs merged after a
+  static review with the PR CI as the gate; 14 held with the decisions listed in
+  the issue. renovatebot/github-action 46.3.10; aws-cli 2.39.0 for the RustFS
+  bucket Jobs and the Compose analytics setup (only `s3api` calls, unaffected
+  by the new CRT transfer default); `postgres:18.6-trixie` digest refresh.
+
+#### Gateway
+
+- **Envoy Gateway v1.9.2 → v1.9.3** (chart by digest, Compose image). Proxies
+  move to Envoy 1.39.5 (CVE-2026-35189, OAuth2/API-key filter crashes); the CRDs
+  are identical between the tags, so nothing was re-vendored. Renovate's PR used
+  the un-prefixed `1.9.3` tag, a different chart artifact, so #1436 pins
+  `v1.9.3` by hand and `.renovaterc.json5` now offers only v-prefixed tags for
+  this chart.
+
 #### Observability
 
+- **Grafana 13.2.3 → 13.3.0** (cluster and Compose). The one breaking change
+  renames the `[marketplace]` ini section, which is not set; the pinned plugins
+  accept 13.3. VictoriaLogs datasource 0.32.0 → 0.33.1 (Drilldown drawer,
+  incremental hits).
+- **Pyroscope 2.4.0 → 2.4.2** (chart, cluster `image.tag`, Compose). The chart
+  templates are unchanged; the image pin, which Renovate does not track, moves
+  with it for the 2.4.1 security updates.
+- **OTel collector chart range `<0.176.0` → `<0.179.0`** (resolves 0.178.0):
+  internal-telemetry resource attributes now render in list form; the contrib
+  image stays pinned at 0.161.0 (#1239 held).
 - **VictoriaMetrics operator chart 0.67.2 → 0.68.1 (operator v0.75.0).** The
   cluster follows the operator's defaults, so VMSingle, VMAgent and VMAlert move
   from v1.148.0 to v1.152.0. VictoriaLogs stays at v1.52.0, and VTSingle stays
@@ -1130,6 +1157,13 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **PeerDB chart 0.9.17 → 0.9.19.** The component images stay digest-pinned at
+  v0.37.5, so the running app is unchanged; the chart's goose migrate init
+  container only renders for images ≥ 0.37.6, and the header comment records
+  the `peerdb-ca` mount that bump will need.
+- **Valkey chart 0.12.0 → 0.12.1 (Valkey 9.1.2 → 9.1.3, Compose too).** 9.1.3
+  is a security release (cluster Pub/Sub heap overflow; the cache runs
+  non-cluster) and fixes a 9.0 ↔ 9.1 RDB incompatibility (persistence is off).
 - **PgDog chart v0.90 → v0.92 (PgDog v0.1.60 → v0.1.61).** v0.1.61 stops
   one client with a wrong password from blocking the pool under passthrough
   auth; the chart adds only QoS backoff settings.
@@ -1152,8 +1186,25 @@ Skeleton (copy what you need):
   the dashboards and alerts read still exists. Upstream breaking changes
   in this range touch sharding, plugins and 2PC, none of which are used.
 
+#### Secrets
+
+- **OpenBao chart 0.30.3 → 0.30.6 (server 2.7.1 → 2.7.2) and the Job CLI
+  images 2.7.2.** Security fixes in auth/cert, approle, the identity OIDC
+  provider, ssh and transit; seal, Raft storage and the KMS plugin pin are
+  untouched. 0.30.4 adds a `$namespace` variable to the bundled dashboard.
+
+#### Security
+
+- **Kyverno chart 3.9.1 → 3.9.2 (v1.19.2, 24 GHSAs)** with the CI Kyverno CLI
+  pinned to the same v1.19.2, as the `ci.yml` comment requires. Policy Reporter
+  chart 3.11.0 → 3.11.2 (UI 2.9.1, Kyverno plugin 0.7.3). cert-manager
+  1.21.2 → 1.21.3 (ACME ARI renewal-loop fix; additive CRD status field).
+
 #### Services
 
+- **Worker Deployments follow the fleet patch release:** checkout-worker
+  0.13.7 and order-worker 2.10.7, closing the skew with the API Deployments
+  that Flux image automation had already moved.
 - **admin-service `0.5.2`** replaces the `sha-e97325a` pin: the same commit,
   now released after the full local-stack E2E audit (A/B/C, C22) on
   2026-10-24. The Analytics page's default window includes today (#1334).
@@ -1180,6 +1231,18 @@ Skeleton (copy what you need):
   inventory 0.9.3, cart 2.4.3, order 2.10.4, review 2.6.2, shipping 1.10.2,
   notification 2.4.2, payment 2.8.2 (mockpay with it, up from 2.8.0) and
   checkout 0.13.4; both workers follow their service.
+
+#### Temporal
+
+- **Temporal UI 2.55.0 → 2.57.0** (Compose and the cluster `web.image.tag`,
+  which is pinned to match local-stack). 2.56 stops honouring
+  X-HTTP-Method-Override (CVE fix) and adds the NOT IN filter.
+
+#### Local-stack
+
+- **VictoriaMetrics, vmagent and vmalert v1.154.0 → v1.155.0** (Compose only;
+  the cluster follows the operator). vmalert's alert-state restore query drops
+  `default_rollup()`, which the VictoriaMetrics remote read accepts.
 
 ## [2.0.0] - 2026-10-05
 

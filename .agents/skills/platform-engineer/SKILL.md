@@ -160,6 +160,7 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | Observability | `observability-and-instrumentation` | alert catalog + runbook |
 | CI | `ci-cd-and-automation` | often `gha-workflows` |
 | E2E Phase B | `agent-browser` | [e2e-audit Phase B](../../../local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-8-min) |
+| Incident triage / debug-note cleanup | [`homelab-troubleshooting`](../homelab-troubleshooting/SKILL.md) | runbook index + `make validate` |
 | GitOps incident | `gitops-cluster-debug` | `make flux-status` |
 | Draw.io diagram (asked by name, or editing a `.drawio`) | [`homelab-drawio`](../homelab-drawio/SKILL.md) | Mermaid stays the default (AGENTS.md Diagrams) |
 | Before PR | `code-review-and-quality` | one change per branch |

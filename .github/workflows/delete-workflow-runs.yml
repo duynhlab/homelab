@@ -1,0 +1,33 @@
+name: Delete workflow runs
+
+# Manual cleanup of finished Actions runs through the shared reusable workflow
+# in gha-workflows. The first run is a dry run: it lists what would be deleted
+# and changes nothing; run it again with dry_run unchecked to delete.
+# retain_days: 0 deletes every finished run. The executing run is never deleted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      retain_days:
+        description: "Delete finished runs older than this many days. 0 deletes every finished run."
+        required: false
+        type: number
+        default: 30
+      dry_run:
+        description: "Log the runs that would be deleted and do not delete them."
+        required: false
+        type: boolean
+        default: true
+
+# Deny-all baseline; the reusable job widens to actions: write (cicd.md § permissions).
+permissions: {}
+
+jobs:
+  delete-runs:
+    uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
+    with:
+      retain_days: ${{ inputs.retain_days }}
+      dry_run: ${{ inputs.dry_run }}
+    permissions:
+      actions: write
+      contents: read

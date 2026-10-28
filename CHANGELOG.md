@@ -742,6 +742,12 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0034 research expands with the `duynh` chart as-built.** Record that the
+  chart already renders the `app.kubernetes.io/{name,instance,version,managed-by}`
+  baseline via `duynh.labels`, that its selector (`name` + `instance`) is
+  immutable, and that the only gaps are `part-of` (never rendered) and a
+  chart-level `component` default. Adds a render-path diagram and sharpens the
+  chart open question; still `research.md`-only, no manifest or chart changes.
 - **RFC-0034 reserved (`researching`).** Open research for a platform-wide
   Kubernetes labels and annotations standard: inventory the two custom prefixes
   in use (`platform.duynhlab.dev/*` and the no-`.dev` `platform.duynhlab/*`), the

@@ -28,7 +28,7 @@ prove every expression matched data.
 
 ## Summary
 
-**267 statically defined alerts** exist in `.yaml` files under
+**268 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -39,17 +39,17 @@ rg '^\s*- alert:' \
 
 The 2026-10-26 breakdown is: postgres 74 (seven CDC rules, [§4d](#4d-cdc-and-analytics-rfc-0030)),
 microservices 58 (five analytics rules), victoriametrics 31, kubernetes 29,
-observability 26, envoy-gateway 16, gitops 9, valkey 7, keycloak 5, kyverno 4,
+observability 27, envoy-gateway 16, gitops 9, valkey 7, keycloak 5, kyverno 4,
 keda 4, pooler 3, and one root watchdog. The glob excludes retired `.yaml.bak`
 files. Two CNPG topology rules are gated and therefore not applied, leaving
-**265 deployed rules** from this tree.
+**266 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **277
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **278
 hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **321**. Of the 265 deployed entries from
+22 SLOs, bringing the cluster total to **322**. Of the 266 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **259**. The inert
+need do not exist; effective Kind coverage for that tree is **260**. The inert
 rules and both gated rules are marked inline rather than presented as working
 coverage.
 
@@ -642,6 +642,7 @@ Per-alert runbooks: [`runbooks/clickhouse/README.md`](../runbooks/clickhouse/REA
 | ClickHouseServerNotScraped | warning | `absent(up{job="clickhouse-server"} == 1)` | The `:9363` PodMonitor selects nothing or every replica's endpoint is down — ten rules report healthy while blind. Live-signal verified 2026-09-10: three targets at one | 10m | [ClickHouseServerNotScraped](../runbooks/clickhouse/ClickHouseServerNotScraped.md) |
 | ClickHouseTooManyPartsPerPartition | warning | `max by (replica) (ClickHouseAsyncMetrics_MaxPartCountForPartition) > 300` | The guards count parts in one partition. Live-signal verified 2026-09-10: three series at five; live delay/throw guards 1,000/3,000 | 10m | [ClickHouseTooManyPartsPerPartition](../runbooks/clickhouse/ClickHouseTooManyPartsPerPartition.md) |
 | ClickHouseOtelTTLLagging | warning | active daily partitions per `otel` table >93 | The 90-day DELETE TTL has stopped retiring partitions. Live-signal verified 2026-09-14: all three tables exported six active partitions | 6h | [ClickHouseOtelTTLLagging](../runbooks/clickhouse/ClickHouseOtelTTLLagging.md) |
+| ClickHouseSystemTablesLarge | warning | `sum by (hostname) (chi_clickhouse_table_parts_bytes{database="system",active="1"})` >2 GiB | A `system.*` log table without a TTL (or a stale `*_N` leftover) is filling the replica's 10Gi data volume that `otel` needs. Live-signal 2026-10-29: about 0.15 GiB per replica | 1h | [ClickHouseSystemTablesLarge](../runbooks/clickhouse/ClickHouseSystemTablesLarge.md) |
 | ClickHouseInsertsRejected | warning | `max by (replica) (rate(ClickHouseProfileEvents_RejectedInserts[5m])) > 0` | The terminal link of parts → delayed → rejected. Predicate exercised 2026-09-10 on an isolated low-guard table | 5m | [ClickHouseInsertsRejected](../runbooks/clickhouse/ClickHouseInsertsRejected.md) |
 | ClickHouseInsertsFailing | warning | `max by (replica) (rate(ClickHouseProfileEvents_FailedInsertQuery[5m])) > 0` | Every INSERT error for any reason. Predicate exercised 2026-09-10 on an isolated failed INSERT | 5m | [ClickHouseInsertsFailing](../runbooks/clickhouse/ClickHouseInsertsFailing.md) |
 | ClickHouseReplicationLag | warning | `max by (replica) (ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay) > 300` s | A replica five minutes behind serves stale data to a third of Grafana queries. Live-signal verified 2026-09-10: three series at zero | 10m | [ClickHouseReplicationLag](../runbooks/clickhouse/ClickHouseReplicationLag.md) |

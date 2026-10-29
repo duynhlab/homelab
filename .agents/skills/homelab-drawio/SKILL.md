@@ -9,6 +9,8 @@ description: >-
   Mermaid stays the default for diagrams in this repo (AGENTS.md); reach for
   this skill only when Draw.io is asked for by name or a `.drawio` already
   exists. For a plain Mermaid diagram, do NOT use this skill.
+metadata:
+  version: "1.0.0"
 ---
 
 # homelab-drawio

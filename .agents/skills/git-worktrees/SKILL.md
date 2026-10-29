@@ -4,6 +4,8 @@ description: >-
   Create, use, and clean up Git worktrees for homelab tasks without losing work
   or leaking stale checkouts. Use when starting a task in a worktree, deleting a
   branch or worktree, or recovering a locked or orphaned checkout.
+metadata:
+  version: "1.0.0"
 ---
 
 # Git worktrees

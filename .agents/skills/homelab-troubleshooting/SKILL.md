@@ -11,6 +11,8 @@ description: >-
   consolidate debug notes, troubleshooting notes, or known-issue scribbles in
   docs. Not for application code (owned by service repos) or new runbook alerts
   without a backing rule.
+metadata:
+  version: "0.0.1"
 ---
 
 # Homelab troubleshooting

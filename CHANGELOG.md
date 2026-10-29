@@ -618,6 +618,11 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Repository skills carry a version.** Each of the five skills under
+  `.agents/skills/` declares a semver `metadata.version` and keeps a
+  `CHANGELOG.md`; AGENTS.md § Skill versioning sets the bump rules.
+  homelab-troubleshooting starts at 0.0.1, the others at 1.0.0.
+
 - **New `homelab-troubleshooting` skill.** [`.agents/skills/homelab-troubleshooting/`](.agents/skills/homelab-troubleshooting/SKILL.md)
   (with its `.claude/skills` symlink) routes an incident or firing alert to its
   owning runbook and consolidates stray debug notes into their authoritative

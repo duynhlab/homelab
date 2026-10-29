@@ -5,6 +5,8 @@ description: >-
   secrets, security, gateway, API contracts, and platform docs or proposals.
   Use for non-trivial work in this repo; route application code and shared CI
   to their owning repositories.
+metadata:
+  version: "1.0.0"
 ---
 
 # Platform engineer (homelab)

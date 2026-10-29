@@ -33,6 +33,45 @@ kubectl port-forward -n rustfs svc/rustfs-svc 9000:9000 9001:9001
 #     -o jsonpath='{.data.RUSTFS_ACCESS_KEY}' | base64 -d
 ```
 
+## Identities
+
+The setup Job (`job-setup-buckets.yaml`, run once at bring-up) and the
+`setup-pg-backup-buckets` CronJob (every 30 min) create the buckets **and** one
+IAM user per consumer, each bound to a canned policy scoped to its bucket only.
+The root key is used by the scripts and, until its freeze lifts, by ClickHouse.
+
+| IAM user | Bucket | Consumer | OpenBAO path |
+|----------|--------|----------|--------------|
+| `cnpgbackup` | `pg-backups-cnpg` | CloudNativePG Barman | `secret/local/infra/rustfs/cnpg` |
+| `pyroscope` | `pyroscope-profiles` | Pyroscope | `secret/local/infra/rustfs/pyroscope` |
+| `clickhouse` | `clickhouse-otel` | ClickHouse cold tier (provisioned; pod still on root) | `secret/local/infra/rustfs/clickhouse` |
+| `peerdb` | `analytics-service-cdc` | PeerDB staging | `secret/local/infra/rustfs/peerdb` |
+
+Each policy allows `s3:ListBucket`, `s3:GetBucketLocation` and
+`s3:ListBucketMultipartUploads` on the bucket, and Get/Put/Delete object (plus
+their version forms), `s3:AbortMultipartUpload` and
+`s3:ListMultipartUploadParts` on its objects. Users and policies live on the
+data PVC, so a rebuilt volume is re-provisioned by the next CronJob run; the
+script ends with an isolation check (own bucket reachable, a neighbour's
+denied) and fails the Job otherwise.
+
+The admin API is plain JSON under `/rustfs/admin/v3`, signed as SigV4 for
+service `s3` with the root key:
+
+```bash
+kubectl port-forward -n rustfs svc/rustfs-svc 9000:9000
+AK=$(kubectl -n rustfs get secret rustfs-credentials -o jsonpath='{.data.RUSTFS_ACCESS_KEY}' | base64 -d)
+SK=$(kubectl -n rustfs get secret rustfs-credentials -o jsonpath='{.data.RUSTFS_SECRET_KEY}' | base64 -d)
+curl -fsS --user "$AK:$SK" --aws-sigv4 aws:amz:us-east-1:s3 http://localhost:9000/rustfs/admin/v3/list-users
+curl -fsS --user "$AK:$SK" --aws-sigv4 aws:amz:us-east-1:s3 "http://localhost:9000/rustfs/admin/v3/info-canned-policy?name=peerdb"
+```
+
+Rotation: re-seed the consumer's OpenBAO path, force-sync its
+ClusterExternalSecret and `rustfs-consumer-credentials`, run the CronJob once
+(`kubectl -n rustfs create job --from=cronjob/setup-pg-backup-buckets rotate-$(date +%s)`),
+then restart the consumer — see
+[rotate-static-secret](../../../../../docs/secrets/runbooks/rotate-static-secret.md).
+
 ## Switch to Distributed Mode
 
 Edit `helmrelease.yaml`:

@@ -29,6 +29,12 @@ metadata:
     app.kubernetes.io/component: identity
 spec:
   replicas: 1
+  # Recreate, not RollingUpdate: a minor upgrade migrates the database schema
+  # on first boot, and Keycloak requires every old-version node to be stopped
+  # before that (the new schema is not readable by the old server, and a
+  # rolling overlap would also join both versions to one cache cluster).
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: keycloak

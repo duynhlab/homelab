@@ -7,7 +7,7 @@ bypassing the connection pooler that every application service goes through.
 
 | | |
 |---|---|
-| **Image** | `quay.io/keycloak/keycloak:26.7.4`, digest-pinned (same digest in the cluster and local-stack) |
+| **Image** | `quay.io/keycloak/keycloak:26.8.1`, digest-pinned (same digest in the cluster and local-stack) |
 | **Shape** | Raw `Deployment`, `replicas: 1` — no Helm chart, no Keycloak Operator |
 | **Namespace** | `identity` — a platform component, not an app-tier service |
 | **Realms** | `duynhlab` (customers) · `duynhlab-staff` (workforce, [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) |

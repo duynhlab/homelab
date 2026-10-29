@@ -1,50 +1,25 @@
 name: Delete workflow runs
 
-# Manual cleanup of finished Actions runs through the shared reusable workflow
-# in gha-workflows. The first run is a dry run: it lists what would be deleted
-# and changes nothing; run it again with dry_run unchecked to delete.
-# retain_days: 0 deletes every finished run. The executing run is never deleted.
+# Prunes finished Actions runs through the shared reusable workflow in
+# gha-workflows: every day at 02:17 Asia/Ho_Chi_Minh (19:17 UTC) it deletes
+# finished runs older than 7 days. Runs still queued or in progress and the
+# executing run itself are never deleted. No manual trigger: the window is a
+# repository decision, not a per-run choice.
 
 on:
-  workflow_dispatch:
-    inputs:
-      retain_days:
-        description: "Delete finished runs older than this many days. 0 deletes every finished run."
-        required: false
-        type: number
-        default: 30
-      dry_run:
-        description: "Log the runs that would be deleted and do not delete them."
-        required: false
-        type: boolean
-        default: true
+  schedule:
+    # Off the hour to dodge the top-of-hour cron stampede.
+    - cron: "17 19 * * *"
 
 # Deny-all baseline; the reusable job widens to actions: write (cicd.md § permissions).
 permissions: {}
 
 jobs:
-  # Two jobs, not one with conditional expressions: the scheduled trigger has
-  # no inputs, so it passes literals; the manual one forwards its own.
-  scheduled:
-    if: github.event_name == 'schedule'
+  delete-runs:
     uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
     with:
-      retain_days: 30
+      retain_days: 7
       dry_run: false
-    permissions:
-      actions: write
-      contents: read
-
-  manual:
-    if: github.event_name == 'workflow_dispatch'
-    uses: duynhlab/gha-workflows/.github/workflows/delete-workflow-runs.yml@main
-    with:
-      # A dispatch from the API or `gh workflow run -f` delivers the inputs as
-      # strings, and the called workflow's typed inputs reject "30" / "true"
-      # ("Unexpected value '30'"). format() makes the value a string whatever
-      # the source, fromJSON turns it back into a number / boolean.
-      retain_days: ${{ fromJSON(format('{0}', inputs.retain_days)) }}
-      dry_run: ${{ fromJSON(format('{0}', inputs.dry_run)) }}
     permissions:
       actions: write
       contents: read

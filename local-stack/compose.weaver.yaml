@@ -2,8 +2,11 @@
 #
 #   docker compose -f compose.yaml -f compose.weaver.yaml up -d
 #   … run the gate traffic …
-#   curl -s -X POST localhost:4320/stop > live-check.json   # the report IS the response
-#   docker compose -f compose.yaml -f compose.weaver.yaml ps -a weaver   # exit 1 = a violation
+#   make -C .. e2e-conformance   # POST /stop, GET /report, POST /shutdown, verdict
+#
+# Weaver >= 0.27 with --output=http: /stop returns once the report is ready,
+# GET /report serves it, POST /shutdown ends the process (exit 1 = a violation).
+# The client owns the run, so there is no inactivity timeout.
 #
 # The collector gets a second config that copies every signal to Weaver's
 # live-check; the base pipelines are untouched. WEAVER_REGISTRY points at the
@@ -17,7 +20,7 @@ services:
       weaver: { condition: service_started }
 
   weaver:
-    image: otel/weaver:v0.26.1
+    image: otel/weaver:v0.28.0
     environment:
       HOME: /tmp
     command:
@@ -28,11 +31,10 @@ services:
       - --otlp-grpc-address=0.0.0.0
       - --otlp-grpc-port=4317
       - --admin-port=4320
-      - --inactivity-timeout=7200
       - --format=json
-      - --output=http # the report is returned as the /stop response: no volume, no file permissions
+      - --output=http # the report is served on GET /report: no volume, no file permissions
       - --fail-on=violation
     volumes:
       - ${WEAVER_REGISTRY:-../../pkg/semconv/registry}:/registry:ro
     ports:
-      - "127.0.0.1:4320:4320" # admin: POST /stop ends the session and answers with the report
+      - "127.0.0.1:4320:4320" # admin: /health, POST /stop, GET /report, POST /shutdown

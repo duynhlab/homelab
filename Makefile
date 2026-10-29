@@ -150,11 +150,22 @@ e2e-analytics-api: ## The analytics protected surface: guard chain + contract (c
 
 .PHONY: e2e-conformance
 e2e-conformance: ## Row C22: stop Weaver's live-check, save its report, fail on a violation (needs compose.weaver.yaml)
-	@cd local-stack && curl -sf -X POST localhost:4320/stop -o .weaver-live-check.json \
-	  && { docker compose -f compose.yaml -f compose.weaver.yaml wait weaver >/dev/null 2>&1 || true; }; \
+	@# Weaver >= 0.27 over HTTP: POST /stop waits for the report, GET /report
+	@# reads it, POST /shutdown ends the process. Shutdown runs even when a step
+	@# fails, and every call is bounded; the verdict needs both a zero exit code
+	@# and zero violations in the saved report.
+	@cd local-stack && rc=0; \
+	  curl -fsS --max-time 300 -X POST localhost:4320/stop >/dev/null \
+	    && curl -fsS --max-time 120 localhost:4320/report -o .weaver-live-check.json \
+	    || { rc=1; echo 'C22 FAIL: could not stop Weaver or read its report'; }; \
+	  if curl -fsS --max-time 30 -X POST localhost:4320/shutdown >/dev/null; then \
+	    docker compose -f compose.yaml -f compose.weaver.yaml wait weaver >/dev/null 2>&1 || true; \
+	  else rc=1; echo 'C22 FAIL: Weaver did not accept /shutdown; stopping it'; \
+	    docker compose -f compose.yaml -f compose.weaver.yaml stop -t 10 weaver >/dev/null 2>&1 || true; fi; \
+	  [ "$$rc" = 0 ] || exit 1; \
 	  code=$$(docker inspect -f '{{.State.ExitCode}}' local-stack-weaver-1); \
-	  python3 -c "import json;s=json.load(open('.weaver-live-check.json'))['statistics'];print('C22 advice:',s.get('advice_level_counts'))"; \
-	  if [ "$$code" = 0 ]; then echo 'C22 OK: every emitted name is in the registry'; else echo "C22 FAIL: weaver exit $$code — see local-stack/.weaver-live-check.json"; exit 1; fi
+	  python3 -c "import json,sys;c=json.load(open('.weaver-live-check.json'))['statistics'].get('advice_level_counts') or {};print('C22 advice:',c);sys.exit(1 if c.get('violation',0) else 0)" || code=violations; \
+	  if [ "$$code" = 0 ]; then echo 'C22 OK: every emitted name is in the registry'; else echo "C22 FAIL: weaver exit/verdict $$code — see local-stack/.weaver-live-check.json"; exit 1; fi
 
 # The registry lives in duynhlab/pkg; pin the commit whose catalog logs.md is
 # held to, and bump it in the same change that updates the table.

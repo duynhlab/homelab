@@ -658,6 +658,15 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Runbook: slow ClickHouse query → flame graph.**
+  `runbooks/clickhouse/slow-query-flame-graph.md` walks on-call from a slow
+  panel or a `MEMORY_LIMIT_EXCEEDED` to the `query_id` and its replica, checks
+  the sample count, re-runs a `SELECT` at 100 Hz when needed, exports the
+  stacks with `INTO OUTFILE … FORMAT TSVRaw` (the password stays at the
+  prompt), draws them with `flamegraph.pl`, and maps the widest bar to a fix
+  for the `otel` sorting keys and indexes. The profiling guide's commands now
+  use `FORMAT TSVRaw`, which keeps C++ names such as `'lambda'` intact.
+
 - **Profiling ClickHouse guide** — `docs/observability/clickhouse/profiling.md`
   explains the sampling profiler the server has been running since day one
   (1 Hz CPU and wall-clock timers per query thread, a 4 MiB memory step, the

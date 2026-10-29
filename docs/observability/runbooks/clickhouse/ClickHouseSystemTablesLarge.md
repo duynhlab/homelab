@@ -70,8 +70,10 @@ is an upgrade leftover.
 1. **Table without a TTL.** Add a block for it to `02-system-log-retention.xml`
    in `kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml`. Use
    the merge form (`partition_by`, `ttl`, `settings`) unless the table needs
-   `replace="1"`. On the next ClickHouse restart the server renames the old
-   table to `<name>_0` and creates the new one with the TTL.
+   `replace="1"`. Once a replica has loaded the new config (the operator rolls
+   the pods) and the table next flushes, the server renames the old table to
+   `<name>_0` or the next free `_N` and creates the new one with the TTL. Run
+   `SYSTEM FLUSH LOGS` to force it, then check `ttl_days` on every replica.
 2. **`*_N` leftovers.** They are never written again. One with a TTL empties
    itself; one without (empty `ttl_days`) stays forever. After confirming that
    nothing reads it, drop it on **each** replica (they are local, not

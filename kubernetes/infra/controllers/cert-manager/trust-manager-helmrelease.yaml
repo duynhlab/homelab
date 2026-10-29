@@ -19,7 +19,7 @@ spec:
         kind: HelmRepository
         name: jetstack
         namespace: flux-system
-      version: "v0.25.0"
+      version: "v0.26.0"
   install:
     crds: CreateReplace
     createNamespace: false
@@ -46,10 +46,10 @@ spec:
       limits:
         cpu: 100m
         memory: 128Mi
-    # Default CA package (Mozilla via Debian Bookworm trust-pkg) — kept enabled
-    # so Bundles using `useDefaultCAs: true` resolve immediately.
-    defaultPackageImage:
-      repository: quay.io/jetstack/trust-pkg-debian-bookworm
-      tag: "20230311.0"
+    # Default CA package left at the chart's own image (0.26.0 ships
+    # trust-pkg-debian-trixie 20250419-deb13u1.1, the Mozilla set without the
+    # compromised eMudhra roots) so a chart bump carries the bundle with it;
+    # `useDefaultCAs: true` Bundles still resolve immediately. The earlier pin
+    # to a 2023 bookworm package would have kept those roots in homelab-ca-bundle.
     secretTargets:
       enabled: false

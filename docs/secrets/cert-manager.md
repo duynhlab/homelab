@@ -511,7 +511,7 @@ flowchart LR
     Secret[Secret<br/>homelab-ca-secret<br/>tls.crt + tls.key]
     Copy[ConfigMap<br/>homelab-ca-source<br/>ca.crt only<br/>committed to git]
     Bundle[Bundle<br/>homelab-ca-bundle<br/>cluster-scoped]
-    Default[useDefaultCAs<br/>Mozilla via Debian Bookworm]
+    Default[useDefaultCAs<br/>Mozilla via Debian Trixie<br/>chart default package]
   end
 
   subgraph workloads["Labeled namespaces"]

@@ -126,12 +126,15 @@ spec:
               # SigV4 for service s3 with the root key.
               echo "=== Provisioning per-consumer identities ==="
               CONSUMERS="cnpgbackup:pg-backups-cnpg pyroscope:pyroscope-profiles clickhouse:clickhouse-otel peerdb:analytics-service-cdc"
+              # No double dollar and no dollar-paren-NAME in this script: the kubelet
+              # rewrites both in command/args before sh runs (2026-10-29 Kind gate: a
+              # double dollar became one and users got their variable NAMES as keys).
               admin() { curl -fsS --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" --aws-sigv4 "aws:amz:us-east-1:s3" "$@"; }
-              key_of() { eval "printf '%s' \"\$$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')_$2\""; }
+              key_of() { printenv "$(printf '%s_%s' "$1" "$2" | tr '[:lower:]' '[:upper:]')" || true; }
               for pair in $CONSUMERS; do
                 u=${pair%%:*}; b=${pair##*:}
                 ak=$(key_of "$u" ACCESS_KEY); sk=$(key_of "$u" SECRET_KEY)
-                if [ -z "$ak" ] || [ -z "$sk" ]; then
+                if [ -z "$ak" ] || [ -z "$sk" ] || [ "$ak" = "$(printf '%s_ACCESS_KEY' "$u" | tr '[:lower:]' '[:upper:]')" ]; then
                   echo "FATAL: no credentials in the env for consumer $u" >&2
                   exit 1
                 fi

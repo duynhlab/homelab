@@ -391,6 +391,13 @@ spec:
                 <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
                 <settings>ttl_only_drop_parts = 1</settings>
             </blob_storage_log>
+            <!-- Born once analytics queries began carrying trace context; upstream
+                 ships it with no TTL. -->
+            <opentelemetry_span_log>
+                <partition_by>finish_date</partition_by>
+                <ttl>finish_date + INTERVAL 7 DAY DELETE</ttl>
+                <settings>ttl_only_drop_parts = 1</settings>
+            </opentelemetry_span_log>
             <query_metric_log remove="1"/>
         </clickhouse>
       # Cold tier on RustFS (2026-09-07). Prose here, not in the XML: XML forbids

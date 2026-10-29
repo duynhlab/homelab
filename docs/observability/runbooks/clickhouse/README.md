@@ -37,6 +37,7 @@ alert name.
 | ClickHouseTooManyParts | warning | homelab | live-signal | [ClickHouseTooManyParts.md](ClickHouseTooManyParts.md) |
 | ClickHouseTooManyPartsPerPartition | warning | homelab | live-signal | [ClickHouseTooManyPartsPerPartition.md](ClickHouseTooManyPartsPerPartition.md) |
 | ClickHouseOtelTTLLagging | warning | homelab | live-signal | [ClickHouseOtelTTLLagging.md](ClickHouseOtelTTLLagging.md) |
+| ClickHouseSystemTablesLarge | warning | homelab | live-signal | [ClickHouseSystemTablesLarge.md](ClickHouseSystemTablesLarge.md) |
 | ClickHouseInsertsDelayed | info | homelab | live-signal | [ClickHouseInsertsDelayed.md](ClickHouseInsertsDelayed.md) |
 | ClickHouseInsertsRejected | warning | homelab + compose | predicate-exercised | [ClickHouseInsertsRejected.md](ClickHouseInsertsRejected.md) |
 | ClickHouseInsertsFailing | warning | homelab + compose | predicate-exercised | [ClickHouseInsertsFailing.md](ClickHouseInsertsFailing.md) |

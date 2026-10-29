@@ -186,6 +186,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`system.*` log tables are watched and bounded.** `ClickHouseSystemTablesLarge`
+  (warning) fires when a replica's `system` database passes 2 GiB, 20 % of its
+  10Gi data volume, with a runbook for finding a log without a TTL and for
+  dropping `*_N` upgrade leftovers. `system.opentelemetry_span_log`, born once
+  analytics queries began carrying trace context and shipped by upstream
+  without a TTL, now keeps 7 days.
+
 - **Flux dashboards sit under GitOps in Grafana.** Two `GrafanaFolder` CRs with
   fixed UIDs build the tree GitOps → Flux; the Flux boards use `folderRef:
   flux`, and a post-renderer pins the Kyverno chart board to `gitops`, since the

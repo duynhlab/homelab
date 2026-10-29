@@ -485,7 +485,10 @@ Measured 2026-09-06: **24 declared, 13 born.** Of the eleven not yet created,
 `crash_log` is deliberately left alone — a crash record is the last thing to
 expire — and the rest (`backup_log`, `session_log`, `opentelemetry_span_log`,
 the lake-format logs, `instrumentation_trace_log`) belong to features this
-platform does not use. `query_metric_log` was in that list and then appeared on
+platform does not use. `opentelemetry_span_log` appeared once analytics queries
+began carrying trace context; found without a TTL on 2026-10-29, it now has a
+7-day one, and `ClickHouseSystemTablesLarge` watches the whole `system`
+database for the next such table. `query_metric_log` was in that list and then appeared on
 the 2026-09-07 audit as the seventh table with no TTL — it is now removed from
 the config outright. Revisit this list when one of them appears.
 

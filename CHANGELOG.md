@@ -186,6 +186,11 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Flux dashboards sit under GitOps in Grafana.** Two `GrafanaFolder` CRs with
+  fixed UIDs build the tree GitOps → Flux; the Flux boards use `folderRef:
+  flux`, and a post-renderer pins the Kyverno chart board to `gitops`, since the
+  chart can only name a folder by title.
+
 - **`CDCStandbySlotsNotSynced`** (#1377). A custom CNPG query on product-db
   counts each instance's synced and stale `peerflow_slot_*` copies; the alert
   fires when a standby has held fewer than three synced copies for 15 min, the

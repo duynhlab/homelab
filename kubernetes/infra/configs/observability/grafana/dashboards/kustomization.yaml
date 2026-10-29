@@ -21,7 +21,8 @@ resources:
   - grafana-dashboard-vmsingle.yaml
   - grafana-dashboard-vmagent.yaml
   - grafana-dashboard-vmalert.yaml
-  # Flux GitOps dashboards
+  # Flux GitOps dashboards, filed under the GitOps → Flux folder tree
+  - grafana-folders-gitops.yaml
   - grafana-dashboard-flux-cluster.yaml
   - grafana-dashboard-flux-controlplane.yaml
   # ADR-059 left the Tempo replacement half-built: the dependency data existed,

@@ -30,6 +30,19 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+  # The chart can only name a folder by title, which can bind to a stale
+  # same-titled folder; pin its board to the GitOps folder by UID.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: GrafanaDashboard
+            patch: |
+              - op: remove
+                path: /spec/folder
+              - op: add
+                path: /spec/folderRef
+                value: gitops
   values:
     # PolicyExceptions accepted ONLY from the kyverno namespace (where the
     # registry-tracked exceptions live) — pinned explicitly rather than

@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | **Manifest** | `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml` (HelmRelease, ns `monitoring`) |
-| **Distribution** | `otel/opentelemetry-collector-contrib:0.161.0` |
+| **Distribution** | `otel/opentelemetry-collector-contrib:0.164.0` |
 | **Mode** | Gateway — `deployment`, 1 replica (SPOF — single replica accepted for the homelab) |
 | **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318`; Vector-only HTTP `:4319` |
 | **Pipelines** | `traces`, `logs`, `logs/clickhouse`, `logs/vector`, `metrics`, `metrics/spanmetrics` — see [table below](#the-deployed-pipelines) |
@@ -230,6 +230,13 @@ into exporters (the old dedicated retry processor is long deprecated):
   streaming-aggregation stay at one choke point.
 - Logs to VictoriaLogs carry `VL-Stream-Fields: service.name` — one stream
   per service.
+- The span-metrics series go through `prometheus_remote_write` with
+  `resource_to_telemetry_conversion`, so every resource attribute becomes a
+  label. Since contrib 0.164.0 label names keep a leading underscore and
+  repeated underscores (`_foo` stays `_foo`, not `key_foo`; `a__b` is no longer
+  collapsed), and the old behaviour cannot be switched back. No key the fleet
+  or the edge sets has either shape today; a new one that does will appear
+  under its literal name.
 - All queues are **in-memory**: a collector restart loses whatever is queued.
   Durable buffering would require a storage extension — not deployed,
   accepted for a lab.
@@ -272,7 +279,7 @@ only after the first failure, so a query that adds `_total` matches nothing.
 | Log: `Memory usage is above soft limit`, clients see refusals | `memory_limiter` backpressure — collector or a backend is overloaded | Check exporter queue metrics for the slow backend; raise limits/replicas only after the backend is healthy. Never reorder the limiter later in the chain |
 | Export errors: `context deadline exceeded` | Backend unreachable or too slow before the exporter timeout | Verify endpoint/NetworkPolicy; exporters buffer + retry with backoff, so transient blips self-heal — persistent ones need the backend fixed or `timeout` raised |
 | `tls: first record does not look like a TLS handshake` | Exporter speaks TLS to a plaintext endpoint (or vice versa) | Match the exporter `tls.insecure` setting to the backend — in-cluster hops here are plaintext |
-| Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.161.0` |
+| Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.164.0` |
 | Collector crash-loops at startup, ClickHouse also down | Historically the `create_schema` DDL coupling (above); **the old DDL path is disabled in current values** — if you see it, check whether `create_schema` was set back to `true` | Restore ClickHouse first; confirm `create_schema: false` in the collector values |
 
 ## References

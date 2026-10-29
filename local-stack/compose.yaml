@@ -403,7 +403,7 @@ services:
     volumes:
       - victoria-traces-data:/victoria-traces-data
     ports:
-      - "127.0.0.1:10428:10428" # OTLP ingest + Jaeger query API + LogsQL + vmui
+      - "127.0.0.1:10428:10428" # OTLP ingest + Jaeger query API + LogsQL + VTUI
 
   # RFC-0019 Phase B: ClickHouse OLAP for long-retention SQL over OTel logs+traces.
   # Runs ALONGSIDE VictoriaTraces/VictoriaLogs (supplementary, not a replacement);

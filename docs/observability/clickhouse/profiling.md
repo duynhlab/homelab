@@ -9,12 +9,12 @@ tool for this particular binary.
 
 | Quick facts | |
 |---|---|
-| **Status** | Deployed data, documented 2026-10-27 from the manifests and the ClickHouse docs; the runtime lab in [Verify it on the live cluster](#verify-it-on-the-live-cluster) has not yet been run |
-| **Server** | `clickhouse/clickhouse-server:26.9`, one shard × three replicas, namespace `monitoring` |
+| **Status** | Deployed data. Every query in this guide was run on Kind on 2026-10-29 against ClickHouse 26.10.3.7 ([results](#verify-it-on-the-live-cluster)) |
+| **Server** | `clickhouse/clickhouse-server:26.10`, one shard × three replicas, namespace `monitoring` |
 | **Where samples land** | `system.trace_log` — plain local `MergeTree` on each replica, **not replicated** |
 | **Retention** | 7 days, daily partitions, `ttl_only_drop_parts = 1` — repo override of the operator's 30 days ([why](README.md#trace_log-the-biggest-table-and-it-is-not-query-traffic)) |
 | **Sampling** | Upstream defaults: CPU and wall-clock timers at 1 Hz per query thread, memory profiler every 4 MiB, random allocation sampling off |
-| **Symbolization** | On by default since 25.4: the `symbols` column holds demangled function names, so no introspection functions are needed |
+| **Symbolization** | On (upstream default since 25.4): the `symbols` column holds demangled function names. `flameGraph()` is still gated as an introspection function, so every query adds `SETTINGS allow_introspection_functions = 1` |
 | **Viewer** | `flameGraph()` → `flamegraph.pl` → SVG. No Grafana panel and no Pyroscope ingestion exist for this data |
 | **Not this** | Pyroscope profiles the Go services ([Continuous Profiling](../profiling/README.md)); it does not and should not profile ClickHouse |
 
@@ -80,12 +80,16 @@ ptr               allocation address for MemorySample, 0 otherwise
 ```
 
 `symbols` is the column that makes this guide short. Before 25.4 a flame graph
-needed `addressToSymbol()` and `demangle()`, which are gated behind
-`allow_introspection_functions` and therefore behind a user-profile change.
-Since 25.4 the server resolves frames at collection time when
-`<symbolize>` under `<trace_log>` is true, which is the upstream default. The
-`lines` column needs debug info that the official image does not ship, so
-expect it to be sparse; function names are enough for a flame graph.
+needed `addressToSymbol()` and `demangle()` on every frame. Since 25.4 the
+server resolves frames at collection time when `<symbolize>` under
+`<trace_log>` is true, which is the upstream default and is on here. That
+removes the address resolution, not the gate: `flameGraph()` itself is classed
+as an introspection function and fails with `FUNCTION_NOT_ALLOWED` (code 446)
+unless the query sets `allow_introspection_functions = 1`. Every query below
+sets it in its own `SETTINGS` clause, which changes nothing for the other
+clients of the `default` profile. The `lines` column needs debug info that the
+official image does not ship, so expect it to be sparse; function names are
+enough for a flame graph.
 
 ## How a flame graph is built
 
@@ -137,8 +141,8 @@ What is deployed, and why the defaults were kept, lives in the
 | Why 7 days and not off | 6.3 M rows in 14 hours projected to 7.3 GiB per replica at 30 days; memory samples were judged worth a week on a server that had already refused admin queries at its self-cap | [platform hub](README.md#trace_log-the-biggest-table-and-it-is-not-query-traffic) |
 | Profiler settings | None set in the CHI; the `default` profile carries upstream defaults | `spec.configuration.users` |
 | `query_thread_log` | Removed by the operator; per-thread query stats are not available, `trace_log` is the per-thread view | [platform hub](README.md#the-engines-own-log-tables) |
-| Users | One user, `default`, shared by the Collector, the schema Job and Grafana | `spec.configuration.users` |
-| Grafana | ClickHouse datasource plugin 4.22.1 has no flame-graph query format; the Pyroscope datasource reads Pyroscope only | [Grafana chapter](README.md#grafana) |
+| Users | Six: `default` (shared by the Collector, the schema Job and Grafana, no memory ceiling), plus the scoped `pg_stat_ch`, `analytics_ingest`, `analytics_reader`, `analytics_view_owner` and `clickhouse_operator` | `spec.configuration.users` |
+| Grafana | ClickHouse datasource plugin 4.23.3 has no flame-graph query format; the Pyroscope datasource reads Pyroscope only | [Grafana chapter](README.md#grafana) |
 
 Three consequences for anyone running the procedures below:
 
@@ -147,13 +151,15 @@ Three consequences for anyone running the procedures below:
   Always bound the time range too.
 - **The table is per replica.** A flame graph built on `chi-clickhouse-otel-0-0-0`
   shows only the threads that ran there. The round-robin Service will not say
-  which replica answered a Grafana query, so pick the pod deliberately or
-  aggregate with `clusterAllReplicas('otel', system.trace_log)`.
+  which replica answered a Grafana query, so pick the pod deliberately and run
+  the query on each replica you need. `clusterAllReplicas()` does not help: the
+  cluster definition carries no inter-replica credentials, so a distributed
+  query as `default` fails with `AUTHENTICATION_FAILED` on the other replicas.
 - **The single `default` user has no memory or time ceiling.** A
   `flameGraph()` over ten minutes of `Memory` rows is itself a query that
   allocates; start with one or two minutes, or one `query_id`, before widening.
-  Splitting that user into a read-only profile with a `max_memory_usage` is a
-  tracked follow-up of the review that produced this guide.
+  Splitting that user into ingest, read-only and DDL users is tracked in
+  [#1460](https://github.com/duynhlab/homelab/issues/1460).
 
 ## Operations
 
@@ -201,7 +207,8 @@ Three consequences for anyone running the procedures below:
      FROM system.trace_log
      WHERE trace_type = 'CPU'
        AND query_id = 'probe-1'
-       AND event_date >= today() - 1" \
+       AND event_date >= today() - 1
+     SETTINGS allow_introspection_functions = 1" \
      | ./FlameGraph/flamegraph.pl --title 'probe-1 CPU' > probe-1-cpu.svg
    ```
 
@@ -230,7 +237,8 @@ clickhouse-client --user="$CH_USER" --ask-password -q "
   SELECT arrayJoin(flameGraph(arrayReverse(symbols), size))
   FROM system.trace_log
   WHERE trace_type = 'Memory'
-    AND event_time > now() - INTERVAL 2 MINUTE" \
+    AND event_time > now() - INTERVAL 2 MINUTE
+  SETTINGS allow_introspection_functions = 1" \
   | ./FlameGraph/flamegraph.pl --countname=bytes --colors=mem \
       --title 'allocations, last 2 min, this replica' > mem-2min.svg
 ```
@@ -246,8 +254,9 @@ allocation and deallocation, so keep it to a single short query.
 ### Fallback when `symbols` is empty
 
 If the `symbols` column comes back as empty arrays, symbolization is off on
-that server. The raw addresses in `trace` can still be resolved on the fly with
-the introspection functions, enabled for that session only:
+that server (it is on here: verified 2026-10-29). The raw addresses in `trace`
+can still be resolved on the fly with `addressToSymbol()` and `demangle()`,
+under the same session-only setting:
 
 ```sql
 SET allow_introspection_functions = 1;
@@ -256,9 +265,9 @@ FROM system.trace_log
 WHERE trace_type = 'CPU' AND query_id = 'probe-1' AND event_date >= today() - 1;
 ```
 
-Do not put `allow_introspection_functions` into the `default` profile: that
-profile is shared by the Collector and Grafana, and the introspection functions
-are deliberately gated. If the column is empty on this cluster the right fix is
+Do not put `allow_introspection_functions` into the `default` profile, even
+though every procedure here needs it: that profile is shared by the Collector
+and Grafana, and the introspection functions are deliberately gated. If the column is empty on this cluster the right fix is
 an explicit `<symbolize>true</symbolize>` in the `trace_log` override, as a
 focused manifest change.
 
@@ -292,7 +301,7 @@ focused manifest change.
 | Per-query `query_profiler_*` at 100 Hz | About 100× the rows of that query only; a 10-thread, 5-second query writes about 5 000 rows per timer | Fine for an investigation; never in the profile |
 | Per-query `memory_profiler_sample_probability = 1` | One row per allocation and free; a heavy query can write millions | Only for the "not freed" question, on one short query |
 | Server-wide `global_profiler_*` faster than 10 s | Every background thread sampled, cluster-wide, needs a restart | Not done; the table is already the largest |
-| `allow_introspection_functions` in a profile | Opens the introspection functions to every client using that profile | Session only, and only when `symbols` is empty |
+| `allow_introspection_functions` in a profile | Opens the introspection functions to every client using that profile | Per query or per session only; every `flameGraph()` needs it |
 | Unbounded `trace_log` scan | Seven days × tens of millions of rows per replica, inside a 1.8 GiB self-cap | Always filter `event_date` or `event_time` |
 
 ### Verify it on the live cluster
@@ -318,18 +327,36 @@ WHERE event_time > now() - INTERVAL 10 MINUTE GROUP BY trace_type;
 
 -- 4. flameGraph works on the symbols column
 SELECT length(flameGraph(arrayReverse(symbols))) FROM system.trace_log
-WHERE event_time > now() - INTERVAL 2 MINUTE AND trace_type = 'Memory';
-
--- 5. the per-replica reminder, made visible
-SELECT hostName(), count() FROM clusterAllReplicas('otel', system.trace_log)
-WHERE event_date = today() GROUP BY 1;
+WHERE event_time > now() - INTERVAL 2 MINUTE AND trace_type = 'Memory'
+SETTINGS allow_introspection_functions = 1;
 ```
 
-Then run the CPU and memory procedures above end to end once and keep the two
-SVGs beside the audit record. Until that run exists, every claim in this guide
-about *this* cluster rests on the manifests and the measurements already in the
-platform hub; the ClickHouse behaviour itself rests on the upstream docs listed
-below.
+```bash
+# 5. the per-replica reminder, made visible: one exec per pod, since
+#    clusterAllReplicas() fails authentication as `default`
+for r in 0 1 2; do
+  kubectl -n monitoring exec -it chi-clickhouse-otel-0-$r-0 -c clickhouse -- \
+    clickhouse-client --user="$CH_USER" --ask-password -q \
+    "SELECT hostName(), count() FROM system.trace_log WHERE event_date = today()"
+done
+```
+
+**Recorded run: Kind, 2026-10-29, ClickHouse 26.10.3.7, replica
+`chi-clickhouse-otel-0-0-0`.** The query side was run; `flamegraph.pl` was not.
+
+| Check | Result |
+|---|---|
+| 1. Settings | Upstream defaults, none changed: `query_profiler_cpu/real_time_period_ns` 1 000 000 000, `memory_profiler_step` 4 194 304, `memory_profiler_sample_probability` 0, `allow_introspection_functions` 0. Server: `global_profiler_*` 10 s, `max_server_memory_usage` 1 931 787 878 |
+| 2. Symbolization | `symbols` populated (25 frames on a `Memory` row, leaf `MemoryTracker::commitAllocation`) |
+| 3. Mix, 10 min | `Real` 15 803, `Memory` 14 128, `MemoryPeak` 14 101, `CPU` 428. Memory rows are 64 % now, `Real` rows most of the rest |
+| 4. `flameGraph()` | Fails with code 446 without the setting; 132 folded stacks with it |
+| 5. Per replica | 839 645 / 994 173 / 771 319 rows today on replicas 0/1/2. `clusterAllReplicas` fails with `AUTHENTICATION_FAILED` |
+| CPU procedure | A 375 ms query at 100 Hz left 9 `CPU` and 57 `Real` samples; 9 folded stacks |
+| Memory procedure | 171 folded stacks for 2 minutes, all in valid `stack count` form |
+
+The SVG step was not part of this run: render the folded text with
+`flamegraph.pl` on a workstation. The ClickHouse behaviour itself rests on the
+upstream docs listed below.
 
 ## Related
 

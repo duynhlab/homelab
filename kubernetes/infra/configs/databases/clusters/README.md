@@ -21,7 +21,7 @@ For detailed architecture, configuration, and components of each cluster, please
 - **[product-db](product-db/)**: Consolidated CNPG cluster hosting Product,
   Cart, Order, Checkout, Inventory, and Payment databases. It has a PgDog
   pooler, backup, and monitoring; the payment app connects directly over TLS.
-- **[product-db-replica](product-db-replica/)**: DR replica cluster; continuously recovers from product-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
+- **[product-db-replica](product-db-replica/)**: DR replica cluster; continuously recovers from product-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local` and `apps-local`, so it is the last wave).
 
 ### DR replica troubleshooting
 

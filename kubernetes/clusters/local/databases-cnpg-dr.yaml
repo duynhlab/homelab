@@ -20,9 +20,12 @@ spec:
   prune: false
   wait: true
 
+  # Last wave: the DR replica restores from product-db's base backup, and
+  # nothing waits on it, so it starts only once the apps are up.
   dependsOn:
     - name: databases-local
     - name: secrets-local
+    - name: apps-local
 
   healthChecks:
     - apiVersion: postgresql.cnpg.io/v1

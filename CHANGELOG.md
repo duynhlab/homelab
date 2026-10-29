@@ -107,6 +107,11 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **The DR replica deploys last.** `databases-cnpg-dr-local` now also
+  depends on `apps-local`, so a bring-up starts `product-db-replica` only after
+  the apps are up and product-db's first base backup exists. Nothing waits on
+  the DR wave, so no other wave moves.
+
 - **Real CDC replaces the Kind fixture** (RFC-0030 phases 5–6, ADR-066). The
   `cdc-local` wave now runs `peerdb-bootstrap` (peers + the three mirrors,
   admitted one source at a time on heartbeat and row counts) and

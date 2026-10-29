@@ -38,13 +38,13 @@ kubectl port-forward -n rustfs svc/rustfs-svc 9000:9000 9001:9001
 The setup Job (`job-setup-buckets.yaml`, run once at bring-up) and the
 `setup-pg-backup-buckets` CronJob (every 30 min) create the buckets **and** one
 IAM user per consumer, each bound to a canned policy scoped to its bucket only.
-The root key is used by the scripts and, until its freeze lifts, by ClickHouse.
+The root key is used only by the scripts.
 
 | IAM user | Bucket | Consumer | OpenBAO path |
 |----------|--------|----------|--------------|
 | `cnpgbackup` | `pg-backups-cnpg` | CloudNativePG Barman | `secret/local/infra/rustfs/cnpg` |
 | `pyroscope` | `pyroscope-profiles` | Pyroscope | `secret/local/infra/rustfs/pyroscope` |
-| `clickhouse` | `clickhouse-otel` | ClickHouse cold tier (provisioned; pod still on root) | `secret/local/infra/rustfs/clickhouse` |
+| `clickhouse` | `clickhouse-otel` | ClickHouse cold tier | `secret/local/infra/rustfs/clickhouse` |
 | `peerdb` | `analytics-service-cdc` | PeerDB staging | `secret/local/infra/rustfs/peerdb` |
 
 Each policy allows `s3:ListBucket`, `s3:GetBucketLocation` and

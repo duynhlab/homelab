@@ -1,0 +1,28 @@
+# GitOps folder tree: GitOps (Kyverno) → Flux (Flux boards). Fixed UIDs so
+# dashboards point at the folder by folderRef instead of matching by title.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: gitops
+  namespace: monitoring
+spec:
+  title: GitOps
+  uid: gitops
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: flux
+  namespace: monitoring
+spec:
+  title: Flux
+  uid: flux
+  parentFolderRef: gitops
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"

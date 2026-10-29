@@ -66,11 +66,25 @@ spec:
       root_url: https://grafana.duynh.me
     users:
       default_theme: dark
+  # Grafana's SQLite DB lives on this PVC, not an emptyDir: a pod restart
+  # otherwise wipes the folders and boards that GrafanaManifests never
+  # re-apply (#1456). The operator names the claim <name>-pvc.
+  persistentVolumeClaim:
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
   deployment:
     spec:
       replicas: 1
       template:
         spec:
+          volumes:
+          - name: grafana-data
+            persistentVolumeClaim:
+              claimName: grafana-pvc
           containers:
           - image: grafana/grafana:13.3.0
             imagePullPolicy: IfNotPresent

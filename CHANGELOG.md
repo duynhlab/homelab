@@ -890,11 +890,12 @@ Skeleton (copy what you need):
 
 #### CI
 
-- **Manual cleanup of finished Actions runs.** `delete-workflow-runs.yml`
+- **Daily cleanup of finished Actions runs.** `delete-workflow-runs.yml`
   calls the shared `delete-workflow-runs` reusable workflow in
-  `gha-workflows`: dry-run by default, `retain_days` (30) decides what is
-  kept, the executing run is never deleted. The repository carried 4,854
-  runs when the caller was added.
+  `gha-workflows` every day at 02:17 ICT and deletes finished runs older
+  than 7 days (schedule only, no manual trigger). Running runs and the
+  executing run are never deleted. The repository carried 4,854 runs when
+  the caller was added.
 
 ### Bugfix
 

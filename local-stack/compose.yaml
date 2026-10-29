@@ -410,7 +410,7 @@ services:
   # the collector fans logs+traces here too. otel_logs/otel_traces auto-created by
   # the exporter (create_schema). Dev: default user, no password.
   clickhouse:
-    image: clickhouse/clickhouse-server:26.9
+    image: clickhouse/clickhouse-server:26.10
     mem_limit: 1536m
     environment:
       CLICKHOUSE_DB: otel
@@ -1057,7 +1057,7 @@ services:
   # the three source heartbeats every 30 s (local-stack/analytics/fixture/).
   # Stop the heartbeat container to drive the stale/unavailable states.
   analytics-fixture:
-    image: clickhouse/clickhouse-server:26.9
+    image: clickhouse/clickhouse-server:26.10
     mem_limit: *oneshot-mem
     entrypoint: ["sh", "-c"]
     command:
@@ -1070,7 +1070,7 @@ services:
       clickhouse: { condition: service_healthy }
 
   analytics-heartbeat:
-    image: clickhouse/clickhouse-server:26.9
+    image: clickhouse/clickhouse-server:26.10
     mem_limit: 64m
     entrypoint: ["sh", "/fixture/heartbeat.sh"]
     environment:

@@ -639,6 +639,12 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Postgres logs name the session** (#1403). `log_line_prefix` is now
+  `%m [%p] %q%u@%d app=%a client=%h`, and connection and disconnection logging
+  is on like the CNPG clusters, so a raw log line in VictoriaLogs names the
+  service that caused it. Set in `postgres/init.sql` with `ALTER SYSTEM`,
+  because `compose.analytics.yaml` replaces the postgres `command`.
+
 - **Kind-safe analytics drills and fixture** (#1360). The fixture heartbeat
   versions rows by millisecond timestamp (a counter restarting at 1 per process
   left the pre-restart row visible and the service never recovered); the Kind

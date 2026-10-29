@@ -74,3 +74,12 @@ GRANT CONNECT ON DATABASE cart TO cart_runtime, cart_migrator;
 GRANT CONNECT ON DATABASE "order" TO order_runtime, order_migrator;
 GRANT CONNECT ON DATABASE checkout TO checkout_runtime, checkout_migrator;
 GRANT CONNECT ON DATABASE payment TO payment_runtime, payment_migrator;
+
+-- Log identity on every session line (#1403): user@db, application_name
+-- (each service sets PGAPPNAME) and client host; %q keeps background
+-- processes to time and PID. Connection logging matches the CNPG clusters.
+-- ALTER SYSTEM, not compose `command:`: compose.analytics.yaml replaces the
+-- postgres command, which would silently drop flags set there.
+ALTER SYSTEM SET log_line_prefix = '%m [%p] %q%u@%d app=%a client=%h ';
+ALTER SYSTEM SET log_connections = 'on';
+ALTER SYSTEM SET log_disconnections = 'on';

@@ -208,9 +208,13 @@ Three consequences for anyone running the procedures below:
      WHERE trace_type = 'CPU'
        AND query_id = 'probe-1'
        AND event_date >= today() - 1
+     FORMAT TSVRaw
      SETTINGS allow_introspection_functions = 1" \
      | ./FlameGraph/flamegraph.pl --title 'probe-1 CPU' > probe-1-cpu.svg
    ```
+
+   `FORMAT TSVRaw` matters: plain `TSV` escapes the `'` in C++ names such as
+   `'lambda'`, which splits one frame into two labels.
 
    Swap `'CPU'` for `'Real'` to include time spent waiting: a graph that is
    wide in `Real` and narrow in `CPU` is a query bound by IO, locks, or the
@@ -238,6 +242,7 @@ clickhouse-client --user="$CH_USER" --ask-password -q "
   FROM system.trace_log
   WHERE trace_type = 'Memory'
     AND event_time > now() - INTERVAL 2 MINUTE
+  FORMAT TSVRaw
   SETTINGS allow_introspection_functions = 1" \
   | ./FlameGraph/flamegraph.pl --countname=bytes --colors=mem \
       --title 'allocations, last 2 min, this replica' > mem-2min.svg
@@ -360,6 +365,9 @@ upstream docs listed below.
 
 ## Related
 
+- [Slow query or memory failure → flame graph](../runbooks/clickhouse/slow-query-flame-graph.md)
+  is the on-call workflow built on this guide: find the `query_id`, export,
+  draw, and map the widest bar to a fix.
 - [ClickHouse platform hub — the engine's own log tables](README.md#the-engines-own-log-tables)
   owns the retention table and the `trace_log` size story.
 - [Query pipeline](internals/02-query-pipeline.md) owns `system.query_log` and

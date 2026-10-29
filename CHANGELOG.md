@@ -961,6 +961,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Grafana keeps its boards across a pod restart** (#1456). `grafana-data` is a
+  2Gi PVC instead of an `emptyDir`. grafana-operator v5.25.0 never re-applies a
+  `GrafanaManifest` after the instance loses its DB, so the dashboards-as-code
+  folders and boards used to vanish on every Grafana restart while still
+  reporting `ApplySuccessful`.
+
 - **The analytics alert and dashboard candidates match the stored state
   label.** `docs/observability/analytics/` matched and grouped on
   `analytics_source_state_ratio="…"`, but only the metric name takes the

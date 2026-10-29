@@ -76,7 +76,7 @@ spec:
           # Same tag as the CHI: the server image ships clickhouse-client, so
           # the client is never older than the server it talks to, and the
           # logs DDL's keyValuePairs text index needs 26.9+.
-          image: clickhouse/clickhouse-server:26.9
+          image: clickhouse/clickhouse-server:26.10
           env:
             # Must equal spec.configuration.clusters[0].layout.replicasCount in
             # configs/clickhouse/clickhouseinstallation.yaml. Duplicated on

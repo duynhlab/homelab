@@ -112,7 +112,7 @@ Every manifest applied to the cluster must satisfy admission:
   cert-manager → {envoy-gateway (also after gateway-api-crds),
   cnpg-barman-plugin}
   databases (after secrets + monitoring + cnpg-barman-plugin + pgroles-operator +
-  storage + network-policies) → {databases-cnpg-dr, keycloak, temporal}
+  storage + network-policies) → {keycloak, temporal}
   envoy-gateway-config (after envoy-gateway + cert-manager + keycloak)
   openbao-oidc-config (after secrets + envoy-gateway-config) — ADR-062
   flux-web (after secrets + cert-manager) — Flux web UI SSO objects
@@ -124,6 +124,7 @@ Every manifest applied to the cluster must satisfy admission:
   PeerDB, RFC-0030; must NOT depend on apps-local (analytics /ready reads its views)
   kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal-config + keda)
+  databases-cnpg-dr (after databases + secrets + apps-local) — the DR replica comes last
   ```
   (Re-counted 2026-10-26: 32 Kustomization CRs are declared in `clusters/local/`;
   `mcp-local` has been commented out of its kustomization since 2026-08-21, so 31

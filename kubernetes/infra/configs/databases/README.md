@@ -73,7 +73,7 @@ preload-only; `sync_replication_slots` is a PostgreSQL setting, not an extension
 |------|--------------------|----------|
 | `controllers/databases/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
 | `configs/databases` | `databases-local` | CNPG clusters — `platform-db`, `product-db` (+ PgBouncer/PgDog poolers, backups, on-demand `*-initial` Backups) |
-| `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `product-db-replica` only; `dependsOn: databases-local` |
+| `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `product-db-replica` only; `dependsOn: databases-local`, `secrets-local`, `apps-local` (last wave) |
 
 ## Related Documentation
 

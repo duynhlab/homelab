@@ -95,6 +95,7 @@ owned elsewhere.
 | Part lifecycle, merge pressure, partitions, and TTL | [Parts, merges, partitions, and TTL](../parts-merges-and-ttl.md) |
 | Deployed trace-ID materialized view | [Materialized views](../materialized-views.md) |
 | Symptom-first day-2 procedures | [ClickHouse operations](../operations.md) and [alert runbooks](../../runbooks/clickhouse/README.md) |
+| The sampling profiler, `system.trace_log`, and flame graphs | [Profiling ClickHouse](../profiling.md) |
 | Timestamped runtime proof | [ClickHouse runtime audits](../audits/README.md) |
 
 Chapter 11 explains failure propagation and diagnosis order. It does not copy

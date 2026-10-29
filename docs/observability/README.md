@@ -343,6 +343,7 @@ docs/observability/
 │   ├── materialized-views.md      # Trace-id lookup materialized view
 │   ├── parts-merges-and-ttl.md    # Part lifecycle, merge debt, TTL, cold tier
 │   ├── operations.md             # Symptom-first day-2 diagnosis and recovery
+│   ├── profiling.md              # The built-in sampling profiler: system.trace_log → flame graphs
 │   └── audits/                   # Dated, sanitized Kind evidence
 │
 ├── grafana/                      # Visualization layer
@@ -535,3 +536,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [ClickHouse schema and queries](clickhouse/schema-and-queries.md) -- ORDER BY → EXPLAIN granules → codecs
 - [ClickHouse materialized views](clickhouse/materialized-views.md) -- incremental `TO` trace-id table
 - [Grafana on ClickHouse](clickhouse/README.md#grafana) -- datasource OTel mapping, Explore + trace-log linking, dashboard grammar, and the standard suite (Overview → Logs Explorer → Trace Explorer with in-dashboard waterfall)
+- [Profiling ClickHouse](clickhouse/profiling.md) -- the server's own sampling profiler, `system.trace_log`, and CPU/memory flame graphs with `flameGraph()` + `flamegraph.pl`

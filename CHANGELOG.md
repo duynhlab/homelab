@@ -645,6 +645,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Profiling ClickHouse guide** — `docs/observability/clickhouse/profiling.md`
+  explains the sampling profiler the server has been running since day one
+  (1 Hz CPU and wall-clock timers per query thread, a 4 MiB memory step, the
+  `symbols` column) and how to render CPU and memory flame graphs from
+  `system.trace_log` with `flameGraph()` and `flamegraph.pl`. Everything is a
+  per-query `SETTINGS`, including the `allow_introspection_functions = 1` that
+  `flameGraph()` requires; nothing changes in the shared profile. Records why a
+  Pyroscope eBPF agent is the wrong tool for this binary (needs `hostPID`, CPU
+  only, no `query_id`). Verified on Kind with ClickHouse 26.10.
+
 - **homelab-troubleshooting 0.1.0 knows the field traps.** Seven domain
   references gain a *Known traps* list (22 traps met on this platform, each
   re-checked and linked to its owning doc) and the skill gains six evals.

@@ -11,7 +11,7 @@ dedicated source tails the proxy pods again for their **runtime lines only**.
 
 | | |
 |---|---|
-| **Deployment** | Helm chart `vector` `0.58.0`, `role: Agent` (DaemonSet), ns `kube-system` |
+| **Deployment** | Helm chart `vector` `0.60.0` (Vector 0.60.0), `role: Agent` (DaemonSet), ns `kube-system` |
 | **Sources** | `kubernetes_logs` (`extra_label_selector: platform.duynhlab.dev/otlp-logs!=true`) + `envoy_proxy_logs` (ADR-061: proxy pods only, runtime lines only) |
 | **Sinks** | 3 × VictoriaLogs jsonline (`all`, `pg_plans`, `pg_parse_failures`) + `otel_clickhouse` (OTLP → collector `:4319` → ClickHouse `otel_logs`) + `prometheus_exporter` `:9090` |
 | **Resources** | requests `20m` / `32Mi`, limits `200m` / `256Mi` |
@@ -102,6 +102,16 @@ rather than blocking the agent. Headers (stream identity per sink) are owned by
 | `victorialogs_pg_plans` | `parse_pg_auto_explain` | 100 / 5s | 1000 |
 | `victorialogs_pg_parse_failures` | `parse_pg_auto_explain.dropped` | 100 / 10s | 500 |
 | `otel_clickhouse` | `to_otlp` | sink default | 10000 |
+
+**`victorialogs_all` sends the whole event**, so every field the
+`kubernetes_logs` source attaches reaches VictoriaLogs. Since Vector 0.60 that
+includes `kubernetes.namespace_annotations.*`, the annotations of the pod's
+Namespace, alongside `kubernetes.pod_labels.*` and `kubernetes.namespace_labels.*`.
+The repository declares no Namespace annotations, so the field is empty until a
+controller (Flux, Helm, Kyverno) or an operator adds one; it is kept on purpose
+(#1262, decision 2) so logs can be filtered by namespace annotation.
+`to_otlp` rebuilds its record and `victorialogs_pg_plans` keeps only listed
+fields, so neither the ClickHouse leg nor the plan stream carries it.
 
 **The ClickHouse leg goes through the collector, on a receiver of its own.**
 `otel_clickhouse` posts OTLP to the collector's `otlp/vector` receiver

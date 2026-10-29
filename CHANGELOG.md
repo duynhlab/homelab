@@ -1174,6 +1174,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Vector chart and image 0.59.0 → 0.60.0** (cluster and Compose). The
+  `kubernetes_logs` source now attaches `kubernetes.namespace_annotations.*`;
+  `victorialogs_all` ships whole events, so the field reaches VictoriaLogs and
+  is kept on purpose for filtering by namespace annotation (#1262, decision 2).
+  The two breaking changes (datadog_metrics series v1, influxdb `version`) are
+  not used; the OTLP leg to ClickHouse and the plan stream are unchanged.
 - **Grafana 13.2.3 → 13.3.0** (cluster and Compose). The one breaking change
   renames the `[marketplace]` ini section, which is not set; the pinned plugins
   accept 13.3. VictoriaLogs datasource 0.32.0 → 0.33.1 (Drilldown drawer,

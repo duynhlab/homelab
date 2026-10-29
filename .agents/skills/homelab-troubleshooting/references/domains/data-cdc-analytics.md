@@ -42,3 +42,13 @@ scripts/analytics/cdc-drills.sh
 CDC alerts live in the alert catalog (§ CDC) and the `postgresql`/`clickhouse`
 runbook folders, not a dedicated `cdc/` runbook tree — route accordingly and
 report that split as a gap if it blocks you.
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- A mirror reports `STATUS_RUNNING` while disconnected; judge by slot `active` and heartbeat age. After a switchover, drop the demoted primary's non-synced slots — [CDC § Operations](../../../../../docs/databases/cdc/README.md#operations).
+- ClickHouse users are config (`CREATE USER` fails), and a `Replicated` database still needs `Replicated*` table engines — [CDC § Operations](../../../../../docs/databases/cdc/README.md#operations), [§ Platform behavior](../../../../../docs/databases/cdc/README.md#platform-behavior).
+- `--` inside an XML comment in CHI `configuration.files` crash-loops ClickHouse — [ClickHouse config](../../../../../docs/observability/clickhouse/README.md#writing-this-config-xml-forbids----inside-a-comment).
+- `system.*_log` tables are created on first write; audit the declared `<*_log>` sections, not `system.tables` — [ClickHouse log tables](../../../../../docs/observability/clickhouse/README.md#the-engines-own-log-tables).

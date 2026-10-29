@@ -48,3 +48,13 @@ Failover, promotion, PITR, and live `Cluster` edits are **incident-only, IC
 go/no-go** ([triage-and-safety](../triage-and-safety.md#approval-gates)). The
 manifests are Flux-owned: commit, or `flux suspend` the DR Kustomization before
 a live edit and reconcile the commit after.
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- Keep Cluster `enablePodMonitor: false`: `cnpg_io_cluster` comes only from the repo PodMonitor, and a custom query named like a built-in shadows it — [built-in metrics § Operations](../../../../../docs/observability/metrics/postgresql/builtin-metrics.md#operations).
+- A verify-full PgBouncer Pooler needs `clientTLSSecret` with the pooler SAN — [poolers § TLS](../../../../../docs/databases/poolers.md#tls).
+- pg_stat_ch decodes LZ4 only, rollup views need `SQL SECURITY DEFINER`, and rejected inserts are lost silently — [query telemetry](../../../../../docs/observability/metrics/postgresql/query-telemetry.md#why-the-pieces-are-shaped-this-way).
+- `CNPGWALArchiveFailing` pages about 5 min after archiving stops; check `pg_wal` space first — [runbook § Meaning](../../../../../docs/observability/runbooks/postgresql/CNPGWALArchiveFailing.md#meaning).

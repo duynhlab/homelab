@@ -41,3 +41,12 @@ make e2e-observability   # datasources, dashboards, panel path, scrape targets (
 
 Changing instrumentation is a service-repo change (`pkg/obsx`), not an incident
 mitigation. Fix the pipeline here; route code changes to the owning repo.
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- Collector self-metrics have no `_total` suffix, and a failure series appears only after the first failure — [collector § Operations](../../../../../docs/observability/opentelemetry/collector.md#operations).
+- Keep Grafana `preinstall_auto_update: "false"`: on a read-only root FS the plugin self-update unregisters the bundled datasources — [Grafana § Plugins](../../../../../docs/observability/grafana/README.md#plugins).
+- On Kind the Grafana operator creates but cannot update dashboards, datasources or rule groups (#1273) — [Grafana § Dashboards as code](../../../../../docs/observability/grafana/README.md#dashboards-as-code).

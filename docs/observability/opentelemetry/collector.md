@@ -261,6 +261,9 @@ Health: liveness/readiness probe the `health_check` extension on `:13133`.
 Self-metrics on `:8888` feed the
 [`OtelMetricsPipelineExportFailures`](../runbooks/microservices/OtelMetricsPipelineExportFailures.md)
 alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_*`.
+These self-metrics carry **no `_total` suffix** (for example
+`otelcol_exporter_send_failed_metric_points`), and a failure series appears
+only after the first failure, so a query that adds `_total` matches nothing.
 
 ### Runbook — common failures
 

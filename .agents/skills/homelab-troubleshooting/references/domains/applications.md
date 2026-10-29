@@ -46,3 +46,10 @@ panel.
 Handler/business-logic fixes are service-repo changes, not homelab mitigations.
 From homelab you can scale, roll, or route; code and unit tests belong to the
 owning `*-service` repo. `docs/api/` is the contract truth.
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- A fresh Kind cluster has no demo data: checkout confirm fails closed with 503 until `make seed`; restock with `make e2e-restock` — [setup § Seed data](../../../../../docs/platform/setup.md#seed-data--demo-accounts), [k6 § Operations](../../../../../docs/testing/k6.md#operations).

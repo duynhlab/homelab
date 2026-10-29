@@ -89,6 +89,18 @@ For a counter, use `rate` or `increase` over a window. For a gauge, do not apply
 `rate` merely because the value changes. Aggregate only after deciding which
 labels identify independent failure domains.
 
+Three counter traps have each produced an alert that could not fire:
+
+- **Count-once events need `increase`.** A series born by the event it counts
+  has no earlier sample, so `rate()` reads 0 forever. Use
+  `sum(increase(x[15m])) > 0` with `for: 0m`, or a `for` well under the window.
+- **A re-born series counts from zero.** When a pod restart changes `instance`,
+  VictoriaMetrics `increase()` counts a persisted counter's whole value as new.
+  Prefer timestamp or age gauges, or aggregate the `instance` away.
+- **A new label value changes every rule on the metric.** It can blind a rule
+  that matches values by name and dilute a ratio that matches everything.
+  Check each numerator and denominator, and name the label sets a ratio uses.
+
 ### 3. Test the query in layers
 
 Evaluate in this order:
@@ -242,6 +254,10 @@ For each deployed rule, the audit checks:
 - Commands query the current component names and namespaces.
 - Current/planned/historical wording matches manifests and design records.
 - Kind evidence supports the declared validation level.
+- Every metric the expression references exists. Diff the names in
+  `/api/v1/rules` against `/api/v1/label/__name__/values` on a cluster that has
+  run long enough to emit them; a missing name is a rule that can never fire
+  while it still reports `health=ok`.
 
 Manual workflows without an alert remain valid, but their index row must say
 `manual` rather than inflating deployed alert coverage.

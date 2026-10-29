@@ -602,6 +602,11 @@ Skeleton (copy what you need):
 
 #### Secrets
 
+- **ClickHouse's cold tier uses its own RustFS key.** `clickhouse-rustfs` reads
+  the `clickhouse` IAM user (scoped to `clickhouse-otel`) instead of the RustFS
+  root key, which only the bucket scripts use now. A running cluster picks the
+  key up on the next ClickHouse pod restart.
+
 - **Each RustFS consumer has its own identity.** The bucket setup Job and
   CronJob now also create one IAM user per bucket (`cnpgbackup`, `pyroscope`,
   `clickhouse`, `peerdb`) bound to a policy scoped to that bucket, through

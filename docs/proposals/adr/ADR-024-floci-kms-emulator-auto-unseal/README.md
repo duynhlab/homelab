@@ -127,6 +127,36 @@ commit, so every fresh bring-up crash-looped on `unknown wrapper: awskms`.
 Details and the measured behaviour: [`docs/secrets/openbao.md` § The awskms seal
 is a plugin](../../../secrets/openbao.md#the-awskms-seal-is-a-plugin-openbao-27).
 
+
+## Amendment 2026-10-29 — floci 2.x encrypts for real
+
+Upgrading floci from 1.7.0 to 2.3.0 (Renovate #1225, audit #1262) changes one
+consequence above. Under 1.7.0 a KMS "ciphertext" was the plaintext in a
+text envelope, so decryption was not bound to the key. Since floci 2.1
+([floci#3544](https://github.com/floci-io/floci/pull/3544)) Encrypt returns an
+AES-256-GCM envelope under a per-key backing key that floci generates on first
+use and stores, in plaintext, in `kms-keys.json` on the `floci-data` volume.
+
+- **Losing `floci-data` now bricks unseal** for any OpenBAO data written by
+  2.x, exactly as the consequence above warned in principle. A re-created key
+  cannot decrypt the old envelope; recovery is the break-glass recovery key or
+  restoring the volume. Kind is unaffected because `make up` rebuilds both
+  volumes together.
+- **Envelopes written by 1.7.0 still decrypt** on 2.x (legacy blobs are
+  decrypt-only), and OpenBAO's awskms seal sends only the `CiphertextBlob`.
+  OpenBAO rewraps its stored keys only if the key ID returned by Encrypt
+  changes, and floci returns the same key ARN in both versions, so an upgraded
+  volume keeps its legacy envelopes until a rekey or re-init.
+- **Rollback is by volume restore, not by image tag**: 1.7.0 cannot read a 2.x
+  envelope and drops the backing keys from `kms-keys.json` on its next write.
+- Unchanged: zero-auth, NetworkPolicy fence, UID 1001, `/app/data`, port 4566,
+  the init Job's AWS-JSON calls. floci 2.2 binds `127.0.0.1` unless the image's
+  default command flags are kept, so the Deployment must not override
+  `command`/`args`.
+
+The emulator is still a parity tool, not a security boundary: the backing key
+sits next to the data it protects.
+
 ## Related
 
 - [RFC-0008](../../rfc/RFC-0008/) · [research.md](../../rfc/RFC-0008/research.md) (auto-unseal spine + PoC)

@@ -89,7 +89,16 @@ sequenceDiagram
    If the `alias/openbao-unseal` KMS alias itself is suspect (fresh cluster,
    TTL-reaped init Job), check the `floci-kms-init` Job in
    `kubernetes/infra/controllers/secrets/floci/floci-kms-init.yaml` — it is
-   idempotent and re-creates the alias.
+   idempotent: it does nothing while the alias resolves, and creates a key and
+   the alias only when DescribeKey fails.
+
+   > **Do not let it create a new key under existing OpenBAO data.** Since
+   > floci 2.1 the seal's wrapped key is AES-GCM under a backing key stored in
+   > `floci-data`. A *new* key cannot decrypt it, so if the alias is missing
+   > while the `data-openbao-*` volumes still hold a cluster, restore the
+   > `floci-data` volume (or unseal with the recovery key) instead of re-running
+   > the Job. On Kind, `make down` / `make up` rebuilds both volumes together,
+   > which is the only case where a fresh key is correct.
 
 3. **Check the OpenBAO pod logs for seal errors**
 

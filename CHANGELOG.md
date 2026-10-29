@@ -186,6 +186,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Pyroscope runs without the chart's Alloy.** `alloy.enabled: false`: every
+  service already pushes profiles through its SDK, so Alloy only profiled
+  Pyroscope and itself, for about 110Mi of memory. Application profiles are
+  unchanged; `monitoring/pyroscope` and `monitoring/alloy` leave the
+  `service_name` list.
+
 - **`system.*` log tables are watched and bounded.** `ClickHouseSystemTablesLarge`
   (warning) fires when a replica's `system` database passes 2 GiB, 20 % of its
   10Gi data volume, with a runbook for finding a log without a TTL and for

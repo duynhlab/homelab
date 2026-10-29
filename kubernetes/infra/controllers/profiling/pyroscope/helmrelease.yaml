@@ -101,3 +101,7 @@ spec:
       enabled: true
     minio:
       enabled: false
+    # Off: every service pushes profiles through its SDK, so the chart's Alloy
+    # only ever scraped Pyroscope and itself (2026-10-29).
+    alloy:
+      enabled: false

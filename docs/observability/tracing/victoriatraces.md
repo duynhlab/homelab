@@ -98,12 +98,21 @@ exporters:
   endpoint answered `200` with an empty list, which reads exactly like "no
   dependencies" ([ADR-059](../../proposals/adr/ADR-059-retire-tempo/)).
 - **UI / API** — exposed at `victoriatraces.duynh.me` (the `victoriatraces` HTTPRoute → `:10428`).
+  Since v0.12.0 the built-in UI is **VTUI**, a trace explorer; the earlier
+  log-style UI is gone, and raw spans are read through LogsQL below.
 - **LogsQL** (advanced, traces-as-logs) — `POST /select/logsql/query`, e.g.:
 
   ```bash
   curl -X POST "http://localhost:10428/select/logsql/query" \
-    --data-urlencode 'query=resource.service.name:product' --data-urlencode 'limit=50'
+    --data-urlencode 'query=resource.service.name:product' --data-urlencode 'limit=50' \
+    --data-urlencode 'disable_latency_offset=true'
   ```
+
+  Since v0.12.0 most LogsQL endpoints hide the last 30 s (`-search.latencyOffset`,
+  the same offset the Jaeger API always had), so a span written a moment ago is
+  missing unless the query sets `disable_latency_offset=true`. Live tailing is
+  exempt. The maintenance endpoints (`/internal/force_merge`, `force_flush`,
+  `/delete/run_task`, …) accept `POST` only; nothing in this repository calls them.
 
   *(LogsQL field names map from OTLP attributes; verify the exact field syntax against your own
   trace data — the Jaeger datasource is the primary query path in Grafana.)*

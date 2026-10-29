@@ -158,6 +158,16 @@ of truth for their conventions. For creating, using, or cleaning up worktrees
   `Co-Authored-By: duynebot <bot@duynh.me>` trailer; **`gh auth switch --user duynhne`**
   for PRs. See [git-commits](.agents/skills/git-commits/SKILL.md).
 
+### Skill versioning
+
+Each repository skill carries a semver `metadata.version` in its `SKILL.md`
+frontmatter (the portable Agent Skills field; no Git tags) and a
+`CHANGELOG.md` beside it. Bump it in the PR that changes the skill's
+behaviour: **patch** for wording, a link or a corrected route; **minor** for a
+new reference, trap, eval or mode; **major** for a changed contract, entry
+mode or required input. A lesson found mid-task goes under `## [Unreleased]`
+in that skill's changelog, so the next PR can release it.
+
 ### Issue naming
 
 Use one bracketed prefix and an English title when creating or renaming issues:

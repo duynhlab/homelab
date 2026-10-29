@@ -3,6 +3,8 @@ name: git-commits
 description: >-
   Write and review homelab commit messages, squash commit messages,
   and branch names using the repository's contribution conventions.
+metadata:
+  version: "1.0.0"
 ---
 
 # Git commits

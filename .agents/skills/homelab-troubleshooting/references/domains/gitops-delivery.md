@@ -49,3 +49,12 @@ kubectl get kustomization -n flux-system <name> \
   `make flux-push` → `flux reconcile ks <name> -n flux-system --with-source`.
 - `Unknown`/progressing states do not page and a cold bring-up retries by
   design — see [triage-and-safety § Flux traps](../triage-and-safety.md#flux-specific-traps).
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- Merging is not deploying: Flux serves what `make flux-push` built from the working tree. Read the live object back — [setup § Step 2](../../../../../docs/platform/setup.md#step-2-publish-manifests-to-the-oci-registry).
+- A reconcile re-runs nothing unchanged; `force: enabled` recreates a Job only on an immutable-field failure — [application-delivery §8.2](../../../../../docs/platform/application-delivery.md#82-debug-checklist-kustomization-failure).
+- Changing a HelmRelease's chart name uninstalls and reinstalls it unless `chartNameChangeStrategy: InPlaceUpdate` — [application-delivery §4.3](../../../../../docs/platform/application-delivery.md#43-chart-value-shapes).

@@ -12,7 +12,7 @@ description: >-
   docs. Not for application code (owned by service repos) or new runbook alerts
   without a backing rule.
 metadata:
-  version: "0.0.1"
+  version: "0.1.0"
 ---
 
 # Homelab troubleshooting
@@ -58,7 +58,9 @@ is the API source of truth.
 ## Domain routing
 
 One incident has one primary domain. Open the matching file for authoritative
-docs, manifests, safe commands, and the escalation boundary.
+docs, manifests, safe commands, the escalation boundary, and its **Known
+traps**: failure modes already met on this platform, each linked to the doc
+that owns it. Check them before forming a new hypothesis.
 
 | Domain | Entry signals | Routing file |
 |--------|---------------|--------------|

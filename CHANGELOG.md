@@ -618,6 +618,17 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **homelab-troubleshooting 0.1.0 knows the field traps.** Seven domain
+  references gain a *Known traps* list (22 traps met on this platform, each
+  re-checked and linked to its owning doc) and the skill gains six evals.
+  Traps no doc owned were written into their home first: ZFS-host prerequisites
+  and "merging is not deploying" in `docs/platform/setup.md`, Flux `force` and
+  `cpu: null` in `application-delivery.md`, three counter traps and a
+  metric-existence audit in the alert lifecycle guide, the Grafana operator's
+  create-only behaviour on Kind, the Collector's missing `_total` suffix and
+  ClickHouse's read-only user storage. The setup guide's seed section now
+  describes the `seed` subcommand and `make seed` instead of seed migrations.
+
 - **Repository skills carry a version.** Each of the five skills under
   `.agents/skills/` declares a semver `metadata.version` and keeps a
   `CHANGELOG.md`; AGENTS.md § Skill versioning sets the bump rules.

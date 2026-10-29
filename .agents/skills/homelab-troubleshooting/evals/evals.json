@@ -66,6 +66,78 @@
         {"id": "scoped", "text": "Stays scoped to the requested database docs and does not open a repo-wide rewrite"},
         {"id": "report_drift", "text": "Reports index drift and deferred candidates separately rather than silently correcting them"}
       ]
+    },
+    {
+      "id": 5,
+      "name": "merged-but-not-live",
+      "prompt": "I merged a PR that changes a Temporal worker's env, but the pods on Kind still run the old value an hour later. What's wrong?",
+      "expected_output": "Routes to gitops-delivery, explains that Flux serves the artifact make flux-push built from the working tree (merging is not deploying), and verifies by reading the live object after make sync from an up-to-date tree; never kubectl apply over Flux.",
+      "files": [],
+      "assertions": [
+        {"id": "merge_not_deploy", "text": "States that merging to main does not deploy on Kind: Flux serves what make flux-push built from the working tree"},
+        {"id": "sync_then_verify", "text": "Fixes with make sync / make flux-push from a tree containing the change, then reads the live object back"},
+        {"id": "no_live_edit", "text": "Does not kubectl apply or kubectl set env over Flux"}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "down-alert-silent",
+      "prompt": "A Deployment's metrics endpoint disappeared after a bad rollout, but its 'X is down' alert built on up == 0 never fired. Why?",
+      "expected_output": "Routes to observability-alerts, explains that up == 0 matches nothing once the target vanishes, and recommends an absent() half; verifies the signal exists before tuning thresholds.",
+      "files": [],
+      "assertions": [
+        {"id": "vanished_target", "text": "Explains that up == 0 cannot match a target that is no longer scraped"},
+        {"id": "absent_half", "text": "Recommends adding an absent(up{...}) or absent(<signature metric>) half"},
+        {"id": "owning_doc", "text": "Points at docs/platform/worker-autoscaling.md §4 or the alert lifecycle guide rather than inventing a procedure"}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "count-once-alert-never-fires",
+      "prompt": "Our new alert uses rate(checkout_failures_total[5m]) > 0 for a rare event, and it never fires even when the event happens. Why?",
+      "expected_output": "Routes to observability-alerts and the signal contract: a series born by the event has no earlier sample so rate() reads 0; use sum(increase(x[15m])) > 0 with for: 0m.",
+      "files": [],
+      "assertions": [
+        {"id": "born_series", "text": "Explains that a series created by the event has no prior sample, so rate() stays 0"},
+        {"id": "increase_fix", "text": "Recommends increase() over a window with for: 0m or a short for"},
+        {"id": "signal_contract", "text": "Links docs/observability/alerting/alert-lifecycle-and-runbooks.md#2-define-the-signal-contract"}
+      ]
+    },
+    {
+      "id": 8,
+      "name": "cdc-mirror-running-but-stale",
+      "prompt": "PeerDB shows every mirror as STATUS_RUNNING but the analytics page says data is stale. How do I tell what is wrong?",
+      "expected_output": "Routes to data-cdc-analytics, does not trust mirror status, checks pg_replication_slots.active and heartbeat age, and considers a recent primary restart or switchover (stale non-synced slots on the demoted primary).",
+      "files": [],
+      "assertions": [
+        {"id": "status_lies", "text": "States that mirrors report STATUS_RUNNING even while disconnected"},
+        {"id": "slot_heartbeat", "text": "Judges health by pg_replication_slots.active and heartbeat age"},
+        {"id": "switchover_slots", "text": "Mentions the demoted-primary stale-slot case after a switchover and routes to the CDC hub, read-only first"}
+      ]
+    },
+    {
+      "id": 9,
+      "name": "kind-bringup-zfs-host",
+      "prompt": "make up on my workstation hangs: kubelet crash-loops with 'failed to get rootfs info' and the host starts swapping. Where do I look?",
+      "expected_output": "Routes to kubernetes-infra and setup prerequisites: the ZFS Docker root breaks kubelet 1.36/1.37 (keep the 1.35.8 pin) and an uncapped ZFS ARC starves Kind; asks the owner before any root-level change.",
+      "files": [],
+      "assertions": [
+        {"id": "zfs_kubelet", "text": "Identifies the kubelet 1.36/1.37 rootfs crash on a ZFS Docker root and the 1.35.8 pin"},
+        {"id": "arc_cap", "text": "Checks zfs_arc_max / ARC size as the memory cause"},
+        {"id": "approval_root", "text": "Treats the ARC cap as a host change needing the owner's approval (root)"}
+      ]
+    },
+    {
+      "id": 10,
+      "name": "checkout-503-fresh-kind",
+      "prompt": "On a freshly brought-up Kind cluster, every checkout confirm returns 503. Services are healthy. What should I check?",
+      "expected_output": "Routes to applications and the seed docs: a fresh Kind cluster has no demo data, so checkout fails closed; run make seed once, and make e2e-restock after load runs.",
+      "files": [],
+      "assertions": [
+        {"id": "no_seed", "text": "Explains that Kind is not seeded automatically, so product/inventory rows are missing"},
+        {"id": "make_seed", "text": "Recommends make seed (Kind-only guard) and make e2e-restock after load runs"},
+        {"id": "fail_closed", "text": "Recognises 503 as checkout failing closed, not a service outage"}
+      ]
     }
   ]
 }

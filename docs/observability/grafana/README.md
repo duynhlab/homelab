@@ -165,6 +165,13 @@ Dashboard documentation:
 - [Dashboard Reference](dashboard-reference.md) -- per-panel queries and what they measure
 - [Variables](variables.md) -- `$app`, `$namespace`, `$rate` and regex patterns
 
+**On Kind the operator creates but cannot update.** Since 2026-10-16 every
+GrafanaManifest re-apply reports `ApplyFailed: not allowed to update resource`,
+and datasource and alert-rule-group updates get 403 (#1273, cause still open).
+A fresh `make up` looks green because the first create works, so a bumped
+`grafana-dashboards-as-code-oci` does not land on a running cluster. Verify a
+dashboard change on a fresh bring-up, or under a new uid.
+
 ## Alerting UI
 
 Grafana's **Alerting > Alert rules** page shows two types of rules:

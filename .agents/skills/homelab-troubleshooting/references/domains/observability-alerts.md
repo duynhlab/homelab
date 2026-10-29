@@ -42,3 +42,14 @@ page onto a RED alert file.
   and report the gap; do not invent steps.
 - Verify the signal is live and labels are current before tuning a threshold
   ([evidence-correlation](../evidence-correlation.md)).
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- `up == 0` matches nothing once the target is gone; every "X is down" rule needs an `absent()` half — [worker-autoscaling §4](../../../../../docs/platform/worker-autoscaling.md#4-up--0-cannot-see-a-target-that-disappeared).
+- Count-once alerts need `increase()`, a re-born series counts from zero, and a new label value changes every rule on its metric — [signal contract](../../../../../docs/observability/alerting/alert-lifecycle-and-runbooks.md#2-define-the-signal-contract).
+- A rule whose metric never appears reports `health=ok` and cannot fire; diff rule metrics against `__name__` — [alert-to-runbook audit](../../../../../docs/observability/alerting/alert-lifecycle-and-runbooks.md#alert-to-runbook-audit).
+- A test shorter than the scrape interval cannot measure a scraped metric; check sampling before doubting the query — [worker-autoscaling §5](../../../../../docs/platform/worker-autoscaling.md#5-two-ways-a-counter-can-lie).
+- A mockpay restart empties its ledger and fires `PaymentReconciliationDiscrepancy` for about an hour; expected, not a regression — [runbook § Prevention](../../../../../docs/observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md#prevention).

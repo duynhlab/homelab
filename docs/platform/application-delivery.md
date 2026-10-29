@@ -242,6 +242,12 @@ Kind that meant about 10–15 s of downtime per service and recreated Services.
 Set `spec.upgrade.chartNameChangeStrategy: InPlaceUpdate` on the HelmRelease for
 the swap to upgrade in place instead.
 
+**`cpu: null` only removes a limit the chart sets.** Helm deletes a key set to
+`null` from the chart's defaults. On a chart whose `resources` default is `{}`
+there is nothing to delete, and the value renders as a CPU limit of 0 that the
+API server rejects. Omit the key there instead (see the comment in
+`kubernetes/apps/mockpay.yaml`).
+
 ### 4.4 InputProvider Concatenation Behavior
 
 `inputsFrom` with label selectors **discovers** all matching `ResourceSetInputProvider` objects in the same namespace. Each provider's `defaultValues` becomes one input set. The ResourceSet iterates the template once per input set.
@@ -494,6 +500,11 @@ kubectl describe kustomization apps-local -n flux-system | grep -A3 "Message:"
 flux reconcile source oci apps-oci -n flux-system
 flux reconcile kustomization apps-local -n flux-system
 ```
+
+A reconcile re-runs nothing that is unchanged. On a Job,
+`kustomize.toolkit.fluxcd.io/force: enabled` recreates it only when an apply
+fails on an immutable field; to run an unchanged Job again, delete it (or
+change its template or image digest) and reconcile.
 
 ### 8.3 Operability Metrics
 

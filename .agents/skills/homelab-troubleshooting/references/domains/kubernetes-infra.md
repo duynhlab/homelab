@@ -34,3 +34,11 @@ kubectl top pods -n <ns>                     # if metrics-server is up
 The substrate rarely has a one-command fix that is safe on prod. Scaling,
 cordoning, and PVC deletion change state — get approval and route a persistent
 cause to its owning domain (image/app, storage, policy).
+
+## Known traps
+
+Verified against the repo on 2026-10-29. Each line points at the doc that
+owns the detail.
+
+- On a ZFS Docker root, kubelet 1.36/1.37 crash-loops and an uncapped ARC starves Kind of RAM — [setup § Prerequisites](../../../../../docs/platform/setup.md#prerequisites).
+- `cpu: null` on a chart whose `resources` default is `{}` renders a CPU limit of 0 that the API rejects — [application-delivery §4.3](../../../../../docs/platform/application-delivery.md#43-chart-value-shapes).

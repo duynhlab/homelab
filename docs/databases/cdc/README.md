@@ -311,6 +311,10 @@ at a time:
 
 **Traps learned the hard way (Kind, 2026-10-23):**
 
+- ClickHouse users are configuration: `CREATE USER` on the operator-managed
+  cluster fails with `ACCESS_STORAGE_READONLY`. Declare users and grants in
+  the CHI `users:` block, as `analytics_view_owner` is.
+
 - `cron.schedule_in_database(…, username)` from a non-superuser fails even
   when the name is the caller's own (pg_cron 1.6.8) — schedule without it.
 - Without `replicated: true` PeerDB creates plain `ReplacingMergeTree` tables

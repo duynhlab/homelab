@@ -141,6 +141,17 @@ On **local Kind** that is enough: `envoy-gateway-config.yaml` in the `clusters/l
 
 ---
 
+**On a ZFS Docker root** (this repo's main dev host) two host traps break a
+bring-up before any manifest is involved:
+
+- kubelet 1.36/1.37 crash-loops with `failed to get rootfs info` on ZFS
+  (kind#4229), so `scripts/kind-up.sh` pins `kindest/node:v1.35.8`. Keep that
+  pin until cAdvisor ships the fix ([RFC-0032](../proposals/rfc/RFC-0032/README.md)).
+- An uncapped ZFS ARC can hold ~11 GB and push the host into swap mid-bring-up.
+  Check `/sys/module/zfs/parameters/zfs_arc_max` first; a 4 GB cap
+  (`options zfs zfs_arc_max=4294967296` in `/etc/modprobe.d/zfs.conf`) left
+  ~20 GB free for Kind (measured 2026-10-18). Setting it needs root.
+
 ### Step 1: Provision Kind Cluster
 
 ```bash
@@ -177,6 +188,12 @@ make flux-push
 ```bash
 docker ps | grep homelab-registry   # registry serving the pushed artifacts
 ```
+
+> **Merging is not deploying.** Flux serves the artifacts this step builds
+> from your **working tree**, not from `main`. A merged PR reaches the cluster
+> only after `make flux-push` (or `make sync`) from a tree that contains it, and
+> uncommitted edits ship too. Confirm a change landed by reading the live
+> object back, not by the merge.
 
 ---
 
@@ -293,7 +310,16 @@ This table is a selection — the full host inventory (17 hostnames, one per HTT
 
 ### Overview
 
-All services include seed data via golang-migrate `000002_*.up.sql` migrations for immediate demo/local/dev functionality. Seed data is automatically loaded during database initialization.
+Demo data is not part of the schema. Each service has a `seed` subcommand
+that runs its embedded `db/seed/sql/*.up.sql` against its database and refuses
+to run when `ENV=production`. Nothing runs it automatically on the cluster:
+
+- **local-stack** runs eight one-shot `seed` services (`command: ["seed"]` in
+  `compose.yaml`).
+- **Kind** has none, because a seed is a one-time act rather than desired
+  state. Run `make seed` once after `make up` (`scripts/kind-seed.sh`, which
+  refuses any non-`kind-*` context). Without it, checkout confirm fails closed
+  with 503 for lack of product and inventory rows.
 
 ### Demo Users
 
@@ -404,30 +430,30 @@ flowchart TD
 
 ### Idempotency
 
-All seed migrations use `ON CONFLICT DO NOTHING` to safely handle:
-- Pod restarts
-- Re-running migrations
-- Multiple deployments
-
-**Safe to restart services** - Seed data won't be inserted twice.
+Every seed statement uses `ON CONFLICT DO NOTHING`, so re-running
+`make seed` (or a local-stack seed service) never inserts a row twice. The
+same rule means a seed cannot top stock back up after load runs consume it:
+use `make e2e-restock` for that.
 
 ### Environment Configuration
 
-**Local/Dev/Demo**: ✅ Seed data enabled (default)  
-**UAT**: ⚠️ Optional (configure via golang-migrate target version)  
-**Production**: ❌ Disabled (use golang-migrate target or separate migration path)
+The `seed` subcommand refuses `ENV=production` ("seed refused in production —
+demo data is dev-only"). The cluster runs services with `ENV=production`, so
+`scripts/kind-seed.sh` sets `ENV=development` on its one-off Jobs; its Kind-only
+context guard is what keeps that override off a real cluster.
 
 ### Migration Files
 
-Seed data located in each service:
+Schema and seed live apart in each service:
 
 ```
-{service}-service/db/migrations/sql/
-├── 000001_init_schema.up.sql   # Schema creation
-└── 000002_seed_{service}.up.sql # Demo data
+{service}-service/db/
+├── migrations/sql/000001_init_schema.up.sql   # schema, applied by `migrate`
+└── seed/sql/000001_seed_*.up.sql              # demo data, applied by `seed`
 ```
 
-**golang-migrate Execution**: 000001 → 000002 (automatic via the `migrate` subcommand, no manual intervention)
+The seed does not use golang-migrate, so it never touches the
+`schema_migrations` version table.
 
 ### Verification
 

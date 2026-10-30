@@ -1108,6 +1108,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The alert catalog counts what Flux deploys** (#1384). The Summary said 278
+  hand-written rules; 272 are applied, because six chart replication-lag files
+  sit outside the kustomization. The domain table now sums to that total:
+  Microservices 21, PostgreSQL 62 (with the pooler and role guard), RFC-0021 32
+  (stock and payment doubt), and a new ClickHouse row of 24. Kind-inert rules
+  are seven, not six. `scripts/alert-catalog-counts.sh` renders the rule
+  kustomizations, prints the counts and fails when a deployed alert has no row.
+
 - **Draw.io product boxes carry their logos.** PgBouncer and PeerDB join the
   homelab-drawio icon catalogue, and the CDC, database, TLS, network-policy,
   signal-flow and ClickHouse diagrams now show the PgBouncer, PeerDB, Valkey,

@@ -28,46 +28,39 @@ prove every expression matched data.
 
 ## Summary
 
-**268 statically defined alerts** exist in `.yaml` files under
-`prometheusrules/**`. Re-derive that number rather than incrementing it:
+**272 hand-written alert rules are deployed**: 260 from `prometheusrules/**`
+and 12 Temporal rules in `configs/temporal/prometheusrule.yaml`. Derive the
+numbers from what Flux applies rather than incrementing them:
 
 ```bash
-rg '^\s*- alert:' \
-  kubernetes/infra/configs/observability/metrics/prometheusrules \
-  -g '*.yaml' | wc -l
+./scripts/alert-catalog-counts.sh
 ```
 
-The 2026-10-26 breakdown is: postgres 74 (seven CDC rules, [§4d](#4d-cdc-and-analytics-rfc-0030)),
-microservices 58 (five analytics rules), victoriametrics 31, kubernetes 29,
-observability 27, envoy-gateway 16, gitops 9, valkey 7, keycloak 5, kyverno 4,
-keda 4, pooler 3, and one root watchdog. The glob excludes retired `.yaml.bak`
-files. Two CNPG topology rules are gated and therefore not applied, leaving
-**266 deployed rules** from this tree.
+The script renders both kustomizations, prints the alert rules of every
+`PrometheusRule` object with the totals, and exits non-zero when a deployed
+alert name has no row on this page. Grepping the rule files instead finds 268
+in the main tree: it also counts eight files the kustomization leaves out, the
+two gated CNPG topology rules and the six chart replication-lag rules that
+`replication-health.yaml` replaced ([§4](#4-postgresql--cloudnativepg)).
 
-The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **278
-hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **322**. Of the 266 deployed entries from
-the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **260**. The inert
-rules and both gated rules are marked inline rather than presented as working
-coverage.
+The SLO burn-rate rules add **44 entries** for 22 SLOs, bringing the cluster
+total to **316**. Of the 260 deployed rules from the main tree, seven are inert
+on Kind because the local-path/kubelet signals they need do not exist
+([list](#alerts-that-are-inert-on-kind-and-why-they-are-kept)); effective Kind
+coverage for that tree is **253**. The inert rules and both gated rules are
+marked inline rather than presented as working coverage.
 
-Re-deriving on 2026-08-28 also found two offsetting
-per-domain errors that had left the total right for the wrong reasons: postgres
-was 54, not 53, and observability was 14, not 15. The page had said **202** with `observability 3`,
-while that directory holds **15**: the ClickHouse and tracing rules of §8/§8b
-landed without the Summary being re-derived. This change adds 4 (§6b Kyverno),
-and the honest total is **218**, not 206. Incrementing would have carried the
-error forward a fourth time.
+Each domain row below equals the deployed rules its sections document, and the
+rows sum to the 272. A rule deployed once per CNPG cluster counts twice, while
+its catalog row appears once.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
-| [Microservices (RED)](#1-microservices-red-metrics) | 19 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
+| [Microservices (RED)](#1-microservices-red-metrics) | 21 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
 | [Envoy Gateway edge](#2-envoy-gateway-edge) | 16 | The single API ingress for the whole platform — proxy fleet + control plane + the cert it actually serves |
 | [Keycloak identity](#2b-keycloak-identity) | 5 | The identity provider — new logins and token refreshes, and the DB pool + token endpoint behind them |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
-| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 53 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
+| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 62 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts + the PgDog pooler + the role-membership guard |
 | [CDC and analytics](#4d-cdc-and-analytics-rfc-0030) | 12 | The PeerDB slots on product-db, the three mirrors, and the analytics freshness they feed (RFC-0030) |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
@@ -75,7 +68,9 @@ error forward a fourth time.
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
 | [KEDA autoscaling](#8c-keda-autoscaling) | 4 | The autoscaler that sizes the Temporal workers — operator scrape, **external-metrics adapter scrape**, scaler errors, ScaledObject errors (ADR-055) |
 | [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 16 | Tracing, workflows, worker capacity (ADR-055), profiling, dead-man's-switch, OTLP collector |
-| [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
+| [ClickHouse](#8b-clickhouse-otel-olap-engine) | 24 | The OTel OLAP engine behind logs and traces: replication, merges, inserts, Keeper, disks and the cold tier |
+| [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) + [payment doubt](#9b-rfc-0021-phase-6-payment-doubt) | 32 | The saga's stock path (start outbox, commit lag, reconciler; **steady state** since phase 4) and the bounded payment doubt of phase 6 |
+| **Hand-written total** | **272** | |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 44 (generated) | Error-budget burn: **9** HTTP services × 2 SLOs (availability, latency; the `slo` chart) + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs = 22 SLOs, two burn-rate alerts each. Counted 68 until 2026-09-05, which assumed 10 HTTP services — `inventory` serves **no HTTP** (`rpc_server_*` only), so it has the gRPC pair and nothing more |
 
 ---
@@ -251,7 +246,7 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 
 > 💤 **Inactive on this homelab** — logical replication has no subscriptions configured, so `cnpg_pg_stat_subscription_*` has no series; these arm automatically once a subscription exists.
 
-### 4c. PgDog pooler (product-db)
+### 4a. PgDog pooler (product-db)
 
 `prometheusrules/pooler/pgdog-alerts.yaml`, from PgDog's OpenMetrics (`pgdog_*`, labels `user`/`database`/`role`). The client side of the same hop is `PgxPoolConnectFailures` (§1).
 

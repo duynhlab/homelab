@@ -43,7 +43,7 @@ spec:
           # The AWS CLI speaks the same S3 API to RustFS and ECR Public needs no auth.
           # Keep in step with job-setup-buckets.yaml.
           repository: public.ecr.aws/aws-cli/aws-cli
-          tag: "2.39.0"
+          tag: "2.39.3"
           imagePullPolicy: IfNotPresent
         schedule: "*/30 * * * *"
         failedJobsHistoryLimit: 1

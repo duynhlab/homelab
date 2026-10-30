@@ -55,7 +55,7 @@ spec:
                     containers:
                       - name: tls-reload
                         # PgDog's own image: it ships sh, sha256sum, pidof and kill.
-                        image: ghcr.io/pgdogdev/pgdog:v0.1.61
+                        image: ghcr.io/pgdogdev/pgdog:0.1.62
                         command:
                           - sh
                           - -c

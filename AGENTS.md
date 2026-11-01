@@ -12,7 +12,9 @@ messages and branch names, follow the skill routing in
 [Contribution workflow](#contribution-workflow).
 
 Repository skills live under `.agents/skills/`; Claude Code discovers them
-through matching `.claude/skills/` symlinks. Keep one source per skill.
+through matching `.claude/skills/` symlinks. Repository sub-agents live
+under `.agents/agents/` with matching `.claude/agents/` symlinks, a path
+Cursor also reads. Keep one source per skill or sub-agent.
 Generic IDE skills supplement these instructions; repository conventions
 take precedence when they differ.
 
@@ -328,6 +330,7 @@ reference style.
 | Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
 | Worktree lifecycle and cleanup | [git-worktrees](.agents/skills/git-worktrees/SKILL.md) |
 | RFC / ADR authoring lifecycle | [homelab-proposals](.agents/skills/homelab-proposals/SKILL.md) |
+| RFC research phase | [proposals-researcher](.agents/agents/proposals-researcher.md) sub-agent |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

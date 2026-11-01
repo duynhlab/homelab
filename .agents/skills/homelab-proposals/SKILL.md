@@ -37,8 +37,8 @@ linked file, and do what that file's gate requires before moving down.
 
 | On disk | Next legal step | Open |
 |---------|-----------------|------|
-| No RFC folder | Owner approves the number (`max + 1`, no backfill), then copy `research.md` only and add an index row at `researching` | [`rfc/README.md`](../../../docs/proposals/rfc/README.md) § Process step 1 |
-| Only `research.md`, status `researching` | Iterate research; run the review gate; get owner **ready for RFC** before copying `README.md` | [`RFC-0000/research.md`](../../../docs/proposals/rfc/RFC-0000/research.md) + its [review gate](../../../docs/proposals/rfc/RFC-0000/research.md#research-review-gate) |
+| No RFC folder | Owner approves the number (`max + 1`, no backfill), then copy `research.md` only and add an index row at `researching`; the sub-agent below fills the file | [`rfc/README.md`](../../../docs/proposals/rfc/README.md) § Process step 1 |
+| Only `research.md`, status `researching` | Delegate to the [`proposals-researcher`](../../agents/proposals-researcher.md) sub-agent (see [Delegate research](#delegate-research)); review its report, keep the index row, get owner **ready for RFC** before copying `README.md` | [`RFC-0000/research.md`](../../../docs/proposals/rfc/RFC-0000/research.md) + its [review gate](../../../docs/proposals/rfc/RFC-0000/research.md#research-review-gate) |
 | `README.md` at `provisional` | Fill the RFC from research (do not re-teach the mechanism); split independent decisions into one ADR each at `Proposed` | [`RFC-0000/README.md`](../../../docs/proposals/rfc/RFC-0000/README.md) + [`adr/README.md`](../../../docs/proposals/adr/README.md#process) § Process |
 | RFC approved | Move RFC and its ADRs to `Accepted`, Adoption `Not started`; open one tracking issue per ADR, one sub-issue per obligation | [`adr/README.md`](../../../docs/proposals/adr/README.md#status-and-adoption) + [`.github/ISSUE_TEMPLATE/adr-tracking.yml`](../../../.github/ISSUE_TEMPLATE/adr-tracking.yml) |
 | ADR `Accepted`, work landing | Append-only edits only; log unsettled tradeoffs on the tracking issue, not in the ADR | [`adr/README.md`](../../../docs/proposals/adr/README.md#append-only-rules) § Append-only rules + § Working log |
@@ -46,7 +46,7 @@ linked file, and do what that file's gate requires before moving down.
 
 ```mermaid
 flowchart LR
-  reserve["Reserve RFC-NNNN<br/>owner OK"] --> research["research.md<br/>researching"]
+  reserve["Reserve RFC-NNNN<br/>owner OK"] --> research["research.md<br/>proposals-researcher"]
   research --> gate{"Research<br/>review gate"}
   gate --> rfc["README.md<br/>provisional"]
   rfc --> adrs["ADRs<br/>Proposed"]
@@ -54,6 +54,16 @@ flowchart LR
   accepted --> track["Tracking issue<br/>+ sub-issues"]
   standalone["Small standalone<br/>decision"] --> track
 ```
+
+## Delegate research
+
+Research is the Context7-heavy phase, so it runs in its own context: spawn the
+[`proposals-researcher`](../../agents/proposals-researcher.md) sub-agent
+(`.agents/agents/`, symlinked into `.claude/agents/`) with the owner-approved
+number, the topic, the scope and any pointers. It writes or iterates
+`RFC-NNNN/research.md` only, runs the Context7 audit, ticks the gate boxes the
+file earns and reports the open questions. You keep the index row, the commit,
+the PR and the owner's **ready for RFC**; it never runs `git`.
 
 ## What the templates and statuses are for
 

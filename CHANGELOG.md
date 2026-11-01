@@ -673,7 +673,11 @@ Skeleton (copy what you need):
   pointer and the IDE skills map replaces the RFC and ADR rows (which sent
   authoring to `spec-driven-development`, `planning-and-task-breakdown` and
   `documentation-and-adrs`, whose templates and paths do not match this repo)
-  with one row. Routed from `AGENTS.md`.
+  with one row. Routed from `AGENTS.md`. The research phase is delegated to
+  the `proposals-researcher` sub-agent (`.agents/agents/`, symlinked into
+  `.claude/agents/`, which Cursor reads too): it writes `research.md` and runs
+  the Context7 audit in its own context, never git or a manifest. It is an IDE
+  helper a person invokes, not the RFC-0033 runtime, which stays uninstalled.
 
 - **Runbook: slow ClickHouse query → flame graph.**
   `runbooks/clickhouse/slow-query-flame-graph.md` walks on-call from a slow

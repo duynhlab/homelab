@@ -12,3 +12,5 @@ Newest first.
   (reserve a number, research gate, RFC, one-per-ADR split, acceptance, tracking
   issue) without copying the templates or process. Split from platform-engineer,
   which stays the dispatcher.
+- Delegate the research phase to the `proposals-researcher` sub-agent
+  (`.agents/agents/`); the skill keeps the index row, commit and owner gate.

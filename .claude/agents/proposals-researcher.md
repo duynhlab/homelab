@@ -1,0 +1,1 @@
+../../.agents/agents/proposals-researcher.md

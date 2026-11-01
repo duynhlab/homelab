@@ -21,6 +21,8 @@
 > telemetry transparently, at the cost of a control plane and a data-plane hop.
 > Read both together — adopting a mesh could **supersede the in-process mTLS** of RFC-0020.
 
+Implementation tracking: [#1497](https://github.com/duynhlab/homelab/issues/1497). This work item does not change the record's design status.
+
 ## Summary
 
 Evaluate whether the platform should adopt a service mesh, and if so which —

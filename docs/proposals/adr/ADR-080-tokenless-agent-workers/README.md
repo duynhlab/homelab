@@ -17,7 +17,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0033/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0033 Phases 0–1; unattended publishing is deferred |
+| **Implementation tracking** | [#1501](https://github.com/duynhlab/homelab/issues/1501) — current obligations, blockers, and gate evidence |
 | **Adoption** | Not started |
 
 ## Context

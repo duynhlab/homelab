@@ -17,7 +17,7 @@
 | **Related research** | —; existing RFC-0011 predates the research-first workflow |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | [RFC-0011 rollout gates](../../rfc/RFC-0011/#rollout-and-rollback-gates) |
+| **Implementation tracking** | [#1499](https://github.com/duynhlab/homelab/issues/1499) — current obligations, blockers, and gate evidence |
 | **Adoption** | Not started |
 
 ## Context

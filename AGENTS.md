@@ -156,9 +156,10 @@ the source of truth for their conventions. For creating, using, or cleaning up w
 - **PR body** follows `.github/pull_request_template.md` (how to write it:
   [git-pr § Pull requests](.agents/skills/git-pr/SKILL.md#pull-requests)): `Part of #<sub-issue>`
   (or `Closes #N`), the tradeoffs made, and the gate evidence as counts. Work
-  under an ADR hangs off that ADR's tracking issue (issue type `adr`, one
-  sub-issue per obligation); tradeoffs the ADR did not settle go on that
-  issue, not only in the PR
+  under a design record links its owning initiative or independent ADR tracker;
+  independently verifiable outcomes become native sub-issues. Follow
+  [work tracking](docs/platform/work-tracking.md) for intake, priorities, and
+  completion. Tradeoffs the ADR did not settle go on that issue, not only in the PR
   ([`docs/proposals/adr/README.md` § Working log](docs/proposals/adr/README.md#working-log)).
 - Author every commit as `duynhne <108656040+duynhne@users.noreply.github.com>`
   (set `--author` explicitly — agent machines default to the bot identity) with a
@@ -184,7 +185,7 @@ Use one bracketed prefix and an English title when creating or renaming issues:
 | Failure | `[Bug] <component and symptom>` | `Bug` |
 | Implementation, operations or audit | `[Task] <action and outcome>` | `Task` |
 | Documentation or research | `[Docs] <action and subject>` | `Task` |
-| Accepted ADR implementation tracker | `[ADR-NNN] <decision title>` | `adr` |
+| Independent accepted ADR implementation tracker | `[ADR-NNN] <decision title>` | `adr` |
 | RFC implementation index | `[RFC-NNNN] <tracking purpose>` | `Task` |
 
 Use the matching [issue form](.github/ISSUE_TEMPLATE/); its title is a default,
@@ -194,10 +195,12 @@ ADR documentation obligations remain native `Task` sub-issues with the `[Docs]`
 prefix and the task form's acceptance and verification sections.
 
 The prefix helps readers scan titles; the native type supports filtering.
-Labels describe affected areas and other attributes. Retain existing workflow
-labels (`bug`, `task`, `documentation`, `area/adr`); add relevant `area/*` labels
-without stacking more title prefixes. Track dependencies with native parent,
-sub-issue and blocked-by relationships rather than status flags in titles.
+Labels describe affected areas and other attributes. Preserve automation-owned
+labels. Native issue types classify work; `area/*` labels identify domains and one
+`priority/*` label ranks triaged work. Existing legacy labels remain compatible;
+new usage follows the [label policy](docs/platform/work-tracking.md#labels).
+Track dependencies with native parent, sub-issue and blocked-by relationships
+rather than status flags in titles.
 
 ## Docs conventions
 
@@ -331,6 +334,7 @@ reference style.
 
 | Topic | Start here |
 |-------|-----------|
+| Work intake, Project views, labels, and completion | [Track platform work](docs/platform/work-tracking.md) |
 | Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
 | Incident troubleshooting / debug-note cleanup | [homelab-troubleshooting](.agents/skills/homelab-troubleshooting/SKILL.md) |
 | Branch names, commits, PR titles and descriptions | [git-pr](.agents/skills/git-pr/SKILL.md) |

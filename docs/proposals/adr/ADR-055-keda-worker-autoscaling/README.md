@@ -23,7 +23,7 @@
 | **Related research** | [RFC-0026 research](../../rfc/RFC-0026/research.md) — § Scaling and the signals we already have; KEDA scaler fields via Context7 `/websites/keda_sh` |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0026 § Implementation History; ADR-054 Adoption `Complete` (2026-08-22) unblocked it |
+| **Implementation tracking** | [#1504](https://github.com/duynhlab/homelab/issues/1504) — current obligations, blockers, and gate evidence |
 | **Adoption** | **Partial** — merged 2026-09-05 in #996; **11 of 12 Kind rows verified** on a from-scratch cluster the same day. One row left: the drained-version delete, which needs a `drainedSince + 1h` wait and is armed on the cluster now. Complete on its evidence |
 
 ## Context

@@ -11,6 +11,8 @@ Move the platform onto durable hardware with verified recovery before migrating 
 > direction is recorded in [ADR-087](../../adr/ADR-087-homelab-private-and-web-access/)
 > at **Proposed / Not started**. This RFC is not a purchase order or a deployment runbook.
 
+Implementation tracking: [#1499](https://github.com/duynhlab/homelab/issues/1499). This work item does not change the record's design status.
+
 ## Summary
 
 Replace the disposable Kind substrate with a persistent mini-PC cluster, starting

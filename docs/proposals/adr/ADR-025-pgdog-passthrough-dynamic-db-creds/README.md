@@ -22,6 +22,8 @@ rotation mechanics, and human/DBA access. It supersedes the original narrow ADR-
 
 ---
 
+Implementation tracking: [#1498](https://github.com/duynhlab/homelab/issues/1498). This work item does not change the record's design status.
+
 ## 1. Context & scope
 
 Today every service authenticates to PostgreSQL with a **static password** that lives, in

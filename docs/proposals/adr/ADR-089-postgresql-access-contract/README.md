@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [#1283](https://github.com/duynhlab/homelab/issues/1283) (issue type `ADR`; #1269 and #1280 hold the RFC-0029 refactor and close history) |
-| **Adoption** | Partial: `application_name` and PgDog primary-only (2026-10-16); `verify-full` on every application, migration and pooler hop (2026-10-18); automatic rotation of all ten runtime passwords (2026-10-19). Open: [#1304](https://github.com/duynhlab/homelab/issues/1304), [#1305](https://github.com/duynhlab/homelab/issues/1305), [#1306](https://github.com/duynhlab/homelab/issues/1306), [#1296](https://github.com/duynhlab/homelab/issues/1296) |
+| **Adoption** | Partial: `application_name` and PgDog primary-only (2026-10-16); `verify-full` on every application, migration and pooler hop (2026-10-18); automatic rotation of all ten runtime passwords (2026-10-19). Remaining obligations and their current state: [#1283](https://github.com/duynhlab/homelab/issues/1283). The replica and CDC tasks (#1304, #1305) are closed; their evidence remains on those issues |
 
 ## Context
 

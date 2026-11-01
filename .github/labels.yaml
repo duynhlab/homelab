@@ -86,3 +86,29 @@
 - name: area/adr
   description: Architecture Decision Records
   color: '#9c36b5'
+
+# Work selection uses one priority label; execution state lives in Projects.
+- name: epic
+  description: A bounded initiative with native sub-issues and an outcome gate
+  color: '#c45dac'
+- name: priority/critical
+  description: Immediate attention; active incident or release-blocking failure
+  color: '#b60205'
+- name: priority/high
+  description: Address before normal backlog; concrete impact or prerequisite
+  color: '#d93f0b'
+- name: priority/normal
+  description: Normal planned work after higher-priority obligations
+  color: '#fbca04'
+- name: priority/low
+  description: Optional improvement or work awaiting a demonstrated need
+  color: '#c2e0c6'
+- name: blocked/decision
+  description: Waiting for a named owner decision recorded in the issue
+  color: '#ff8c00'
+- name: blocked/hardware
+  description: Waiting for hardware or an environment required by the gate
+  color: '#ff5700'
+- name: regression
+  description: Previously working behavior has failed after a change
+  color: '#d93f0b'

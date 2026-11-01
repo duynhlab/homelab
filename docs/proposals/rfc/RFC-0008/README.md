@@ -9,6 +9,8 @@
 > is exercisable on Kind via a KMS emulator (floci) / SoftHSM. That finding is folded
 > into the parity matrix below (auto-unseal control flow is now **rehearsable on Kind**).
 
+Implementation tracking: [#1498](https://github.com/duynhlab/homelab/issues/1498). This work item does not change the record's design status.
+
 ## Summary
 
 The platform's secrets stack (OpenBAO HA + External Secrets Operator) runs on a

@@ -6,6 +6,11 @@ Newest first.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-01
+
+- Tie closing keywords to complete issue acceptance evidence; partial deliveries
+  retain their verification work.
+
 ## [2.0.0] - 2026-11-01
 
 - Renamed from `git-commits`: the skill now owns PR titles and descriptions

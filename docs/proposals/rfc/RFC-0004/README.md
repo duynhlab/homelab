@@ -11,6 +11,8 @@
 > [`docs/caching/README.md`](../../../caching/README.md). The operational reference for the
 > existing product cache stays in that doc; this RFC owns the *cross-service rules* and the *why*.
 
+Implementation tracking: [#1496](https://github.com/duynhlab/homelab/issues/1496). This work item does not change the record's design status.
+
 ## Summary
 
 Caching today is **ad-hoc and product-only**: product-service runs a Valkey Cache-Aside

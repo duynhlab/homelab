@@ -9,6 +9,8 @@
 > one more thing that can expire. The rejected alternatives and the drawbacks are recorded
 > below and in [research § Alternatives](./research.md#alternatives).
 
+Implementation tracking: [#1500](https://github.com/duynhlab/homelab/issues/1500). This work item does not change the record's design status.
+
 ## Prerequisites
 
 - [x] [./research.md](./research.md) merged (#576); [research review gate](./research.md#research-review-gate) ticked (2026-07-22)

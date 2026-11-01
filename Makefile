@@ -95,6 +95,10 @@ validate: ## Validate Kubernetes manifests (Kustomize)
 docs-check: ## Check Markdown changed against origin/main (links, fences, Mermaid, inbound links)
 	./scripts/docs-check.sh
 
+.PHONY: proposals-check
+proposals-check: ## Check RFC and ADR index status against their records
+	python3 scripts/proposal-status.py
+
 ##@ End-to-end assertions
 
 # GATE selects the target preset (compose | kind); every script reads it. These

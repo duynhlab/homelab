@@ -1,14 +1,16 @@
 name: ADR implementation tracking
-description: Open the one tracking issue for an accepted ADR. Each obligation becomes a sub-issue; tradeoffs met along the way are logged here as comments.
+description: Track an accepted ADR with an independent delivery boundary. Shared initiatives can cover several ADRs.
 title: "[ADR-NNN] "
 type: adr
 labels:
   - area/adr
+projects:
+  - duynhlab/1
 body:
   - type: markdown
     attributes:
       value: |
-        One issue per ADR, opened when the ADR reaches **Accepted**. Set the issue type to **adr** (`gh issue create --type adr`) and link it from the ADR's `Implementation tracking` row. The ADR keeps the decision; this issue keeps the working log. Process: `docs/proposals/adr/README.md` § Process.
+        Use this form when an accepted ADR needs an independent tracker; otherwise link the shared initiative. Set the issue type to **adr** (`gh issue create --type adr`) and link it from the ADR's `Implementation tracking` row. The ADR keeps the decision; this issue keeps the working log. Process: `docs/proposals/adr/README.md` § Process.
   - type: input
     id: adr
     attributes:
@@ -28,7 +30,7 @@ body:
     id: obligations
     attributes:
       label: Obligations
-      description: Every piece of work the ADR needs before Adoption can be Complete. After opening, create one sub-issue per row (`gh issue create --parent <this issue> --type Task`) and replace the row with its link. Deferred work gets a sub-issue too, labelled as debt, so nothing is lost in a comment.
+      description: Map every adoption obligation to a verifiable task. Use native sub-issues for independently deliverable outcomes; related checks can share a task. Deferred commitments need a revisit trigger.
       placeholder: |
         | Obligation | Depends on | Gate |
         |---|---|---|

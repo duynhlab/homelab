@@ -79,6 +79,11 @@ jobs:
       - name: Check changed docs pages
         run: ./scripts/docs-check.sh --no-mermaid
 
+      - name: Check proposal metadata consistency
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_proposal_status.py
+          make proposals-check
+
   # 4. Final Status Notification
   notify:
     if: always()

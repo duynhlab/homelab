@@ -4,6 +4,8 @@
 |--------|-------|----------|---------|--------------|
 | Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-09-28 | 2026-09-28 | 2026-10-01 |
 
+Implementation tracking: [#1501](https://github.com/duynhlab/homelab/issues/1501). This work item does not change the record's design status.
+
 ## Prerequisites
 
 - [x] [`research.md`](./research.md) merged; [research review gate](./research.md#research-review-gate) passed

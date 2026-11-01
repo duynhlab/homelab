@@ -4,6 +4,8 @@ title: "[Docs] "
 type: Task
 labels:
   - documentation
+projects:
+  - duynhlab/1
 body:
   - type: markdown
     attributes:

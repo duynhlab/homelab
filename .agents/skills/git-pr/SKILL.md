@@ -6,7 +6,7 @@ description: >-
   contribution conventions. Use when naming a branch, committing, opening or
   updating a PR, or summarizing a branch for reviewers.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
 ---
 
 # Git commits and pull requests
@@ -123,6 +123,29 @@ Write the description to a file in the scratchpad, then publish it with
 `gh pr create --body-file <file>` or `gh pr edit --body-file <file>`. Before
 you publish, confirm that the Summary leads with why the change is needed.
 
+## Squash merge
+
+With more than one commit on a PR, GitHub's default squash message lists
+every commit as `* subject`, keeps each commit's trailer, and then appends
+its own `Co-authored-by: duynebot` after a `---------` line. The result
+carries the trailer two or more times.
+
+- Keep a PR at one commit. Fold a review fix into it with
+  `git commit --amend` and `git push --force-with-lease` on your own
+  branch; GitHub's default squash text is then already correct.
+- When a PR has several commits, write the squash message yourself: the PR
+  title, one coherent body, and exactly one `Co-Authored-By: duynebot
+  <bot@duynh.me>`. An agent merge passes it explicitly:
+
+  ```bash
+  gh pr merge <N> --squash --subject "<PR title> (#<N>)" --body-file <file>
+  ```
+
+  In the web UI, delete the `* commit` list and the `---------` block before
+  confirming.
+- After the merge, `git log -1 --format=%B <sha> | grep -ci duynebot` prints
+  `1`. Never rewrite `main` to fix an old squash.
+
 ## Write or review
 
 1. Inspect the actual diff for the requested change. When preparing a commit,
@@ -136,8 +159,8 @@ you publish, confirm that the Summary leads with why the change is needed.
 3. Check the subject, body, PR title, PR description and branch name against
    the rules above — including the `type(scope): description` format, the
    explicit `duynhne` author, a single `Co-Authored-By: duynebot
-   <bot@duynh.me>` trailer with no tool-injected co-author left behind, and
-   no closing keyword in a commit. When reviewing, report concrete violations
+   <bot@duynh.me>` trailer with no tool-injected co-author left behind (a
+   squash message included), and no closing keyword in a commit. When reviewing, report concrete violations
    and provide corrected text. Leave compliant text unchanged unless
    rewriting was requested.
 

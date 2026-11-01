@@ -403,10 +403,14 @@ Architecture review accepted these independent decisions on 2026-10-01. Adoption
 | Tokenless workers, human-first publishing, and the future GitHub App boundary | [ADR-080](../../adr/ADR-080-tokenless-agent-workers/) | Accepted / Not started |
 | Trigger, lease, reconciliation, heartbeat, and dead-letter semantics | [ADR-081](../../adr/ADR-081-agent-leases-and-reconciliation/) | Accepted / Not started |
 | Evaluation metrics and trust-ladder promotion gates | [ADR-082](../../adr/ADR-082-agent-evaluation-gates/) | Accepted / Not started |
-| Documentation Steward contracts and executable-example policy | [ADR-083](../../adr/ADR-083-documentation-steward/) | Accepted / Not started |
+| Documentation Steward contracts and executable-example policy | [ADR-083](../../adr/ADR-083-documentation-steward/) | Accepted / Partial — partly superseded by [ADR-090](../../adr/ADR-090-homelab-docs-skill/) |
 
 ## Implementation History
 
+- **2026-11-01 — ADR-090 accepted:** the owner accepted
+  [ADR-090](../../adr/ADR-090-homelab-docs-skill/); ADR-083's "no second
+  documentation skill" clause is superseded, its templates exist under
+  `docs/_templates/`, and its Adoption is Partial (tracking: #1477).
 - **2026-11-01 — ADR-090 proposed:** the `homelab-docs` project skill shipped
   in #1474, against ADR-083's "no second project documentation skill" clause.
   [ADR-090](../../adr/ADR-090-homelab-docs-skill/) proposes the partial

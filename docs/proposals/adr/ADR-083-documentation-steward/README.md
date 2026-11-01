@@ -6,6 +6,12 @@
 > independent review, and example classification in exchange for documentation
 > that can teach and remain trustworthy from junior to platform owner.
 
+> **Amended 2026-11-01.** The clause "Homelab will not create a second project
+> documentation skill" is superseded by
+> [ADR-090](../ADR-090-homelab-docs-skill/): the docs procedure lives in the
+> `homelab-docs` skill. The reader contracts, the review split, and the
+> example policy below are unchanged and still in force. See § Amendments.
+
 | Attribute | Value |
 |-----------|-------|
 | **Status** | Accepted |
@@ -17,7 +23,7 @@
 | **Related RFC** | [RFC-0033](../../rfc/RFC-0033/) |
 | **Related research** | [research.md](../../rfc/RFC-0033/research.md) |
 | **Supersedes** | — |
-| **Superseded by** | — |
+| **Superseded by** | [ADR-090](../ADR-090-homelab-docs-skill/), in part — the "no second documentation skill" clause only |
 | **Implementation tracking** | RFC-0033 Phase 0 documentation evals and the observability pilot |
 | **Adoption** | Partial — the four templates exist under `docs/_templates/`; navigation and example-safety checks run in `scripts/docs-check.sh` (links, inbound links, Mermaid); the example-policy marker is documented, not enforced; the observability pilot has not started |
 
@@ -181,10 +187,23 @@ preventing drift, or executable examples cannot be isolated safely.
 - [Documentation index](../../../README.md)
 - [Platform-engineer skill](../../../../.agents/skills/platform-engineer/SKILL.md)
 
+## Amendments
+
+### 2026-11-01 — the docs procedure moved to its own skill
+
+§ Decision says the `platform-engineer` skill will point to the templates and
+that Homelab will not create a second project documentation skill. Since
+#1472 and #1473 that skill is a dispatcher (proposals and Git text have their
+own skills), so #1474 added `homelab-docs` and [ADR-090](../ADR-090-homelab-docs-skill/)
+records the change. The obligation "Point `platform-engineer` to the
+templates" is met by `homelab-docs` pointing to `docs/_templates/` (#1476);
+`platform-engineer` routes to that skill. Nothing else in § Decision changes.
+
 ## History
 
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted the four content contracts, review split, and safe-example policy |
+| 2026-11-01 | Accepted / Partial | ADR-090 accepted: the "no second documentation skill" clause is superseded (§ Amendments); tracking issue #1477 |
 | 2026-11-01 | Accepted / Partial | The four templates land under `docs/_templates/`, pointed to by the `homelab-docs` skill per ADR-090; `scripts/docs-check.sh` runs the navigation checks on changed pages in CI |
 | 2026-11-01 | Accepted / Not started | [ADR-090](../ADR-090-homelab-docs-skill/) (Proposed) would partly supersede the "no second project documentation skill" clause: `homelab-docs` shipped in #1474. The contracts, review split and example policy are unchanged |

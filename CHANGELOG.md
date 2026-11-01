@@ -901,6 +901,11 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-090 accepted.** The docs procedure stays in the `homelab-docs`
+  skill; ADR-083 gains § Amendments and a `Superseded by` row for its "no
+  second documentation skill" clause, and the index shows both. Tracking
+  issue #1477 records that every obligation had already shipped.
+
 - **ADR-083 Adoption → Partial, ADR-090 Adoption → Complete.** The templates
   the Steward decision obligated exist, the docs skill points to them, and
   the navigation checks run in CI. The example-policy marker is documented

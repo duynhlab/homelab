@@ -70,15 +70,21 @@ work. A link alone does not establish a native relationship.
 | Needs triage | Newly captured or evidence is uncertain | Confirm scope, owner, and current evidence |
 | Backlog | Valid retained work, not selected | Review when capacity or need changes |
 | Ready | Scope and acceptance clear; no unmet prerequisite | Assign and start |
-| In progress | Implementation or research actively underway | Keep the next action current |
-| Review | A concrete change awaits review | Review the PR or design artifact |
+| Analysis | Research, sizing, or comparison actively underway | Gather evidence and prepare a concrete recommendation |
+| In progress | Implementation, operations, or procurement actively underway | Keep the next action current |
+| Review | A concrete proposal or change awaits owner review | Review the design, purchase recommendation, or PR |
 | Verification | Implementation exists; required evidence remains | Run the named gate or locate valid evidence |
 | Waiting | Named blocker or revisit trigger | Revisit when that condition changes |
 | Done | Issue closed with a recorded disposition | Read closure reason and evidence |
 
-Keep at most two leaf tasks In progress per accountable owner. Parent initiatives
-summarize child progress and do not consume this limit. Owner instructions can
+Keep at most two leaf tasks across Analysis and In progress per accountable owner.
+Parent initiatives summarize child progress and do not consume this limit. Owner instructions can
 explicitly select a different work limit.
+
+Use Analysis for active investigation; Needs triage only establishes scope and
+evidence quality. Skip stages that do not apply to the task. A hardware-selection
+task can move from Analysis to Review and close after the owner selects a qualified
+option. Purchasing and commissioning remain separate outcomes.
 
 Use one `priority/*` label after triage: `critical` for immediate incidents or
 release blockers, `high` for concrete impact or prerequisites, `normal` for planned
@@ -117,14 +123,15 @@ for issue scheduling, use Waiting with the blocker written beside its next actio
 
 | View | Selection |
 |---|---|
+| Kanban board | First view; all Project items grouped by Status, including initiatives and Done |
+| Work items | Complete Project inventory in a table |
 | Inbox | Open work with Status Needs triage |
 | Roadmap | Open parent initiatives labelled epic |
 | Ready | Ready leaf work |
-| Doing | In progress and Review leaf work |
+| Doing | Analysis, In progress, and Review leaf work |
 | Verification | Leaf work missing completion evidence |
 | Waiting | Work with an explicit blocker or trigger |
 | Recently completed | Closed items from the last 30 days, including their closure reason |
-| All work | Complete Project inventory, including Backlog |
 
 The Project retains its default private visibility. Repository issues keep their
 own visibility. Adding a public issue does not publish the Project.
@@ -166,7 +173,7 @@ does not certify runtime adoption.
 
 | Symptom | Action |
 |---|---|
-| A task is absent from every view | Check Project membership and All work; set Status after confirming the issue |
+| A task is absent from every view | Check Project membership and Work items; set Status after confirming the issue |
 | A merged PR left a task open | Read its acceptance criteria; preserve Verification when runtime evidence is missing |
 | An index disagrees with its record | Check the original completion evidence; align the index without inventing new adoption |
 | A waiting task has no next action | Name the blocker and observable resume trigger before leaving it Waiting |

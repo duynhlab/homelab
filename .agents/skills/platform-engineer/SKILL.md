@@ -8,7 +8,7 @@ description: >-
   incidents to homelab-troubleshooting, and application code and shared CI to
   their owning repositories.
 metadata:
-  version: "3.0.0"
+  version: "3.1.0"
 ---
 
 # Platform engineer (homelab)
@@ -91,6 +91,8 @@ and respect the Flux dependency chain (see [AGENTS.md](../../../AGENTS.md) Gotch
    only when the request includes implementation. Before starting or resuming
    tracked work, read [work tracking](../../../docs/platform/work-tracking.md):
    find the existing issue, its next action, blockers, and completion evidence.
+   Select Analysis for active research or In progress for execution, following
+   the shared work limit in that procedure.
 2. For a change, choose one primary domain and read its hub plus the relevant
    code, manifests, or runbook. Check deployed reality before changing topology
    docs. Cross-domain work states ownership and rollout order, including Flux

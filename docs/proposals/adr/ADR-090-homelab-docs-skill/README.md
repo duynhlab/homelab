@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-11-01 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Where the homelab documentation procedure lives among the project skills |
@@ -19,7 +19,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0033/research.md) |
 | **Supersedes** | [ADR-083](../ADR-083-documentation-steward/) in part: only the clause "Homelab will not create a second project documentation skill" |
 | **Superseded by** | — |
-| **Implementation tracking** | Opened when the owner accepts this ADR |
+| **Implementation tracking** | [#1477](https://github.com/duynhlab/homelab/issues/1477) — every obligation had shipped before acceptance, so the issue records evidence and closes with the acceptance PR |
 | **Adoption** | Complete — the skill shipped in #1474 and points to `docs/_templates/` since 2026-11-01 |
 
 ## Context
@@ -119,7 +119,7 @@ does not split authority.
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
 | Ship `homelab-docs` and route to it from `platform-engineer` | `duynhne` | #1474 | Done |
-| On acceptance, record the partial supersede in ADR-083 (Superseded by row, § Amendments) and in the ADR index | `duynhne` | Tracking issue | ADR-083 points to this ADR |
+| On acceptance, record the partial supersede in ADR-083 (Superseded by row, § Amendments) and in the ADR index | `duynhne` | [#1477](https://github.com/duynhlab/homelab/issues/1477), done 2026-11-01 | ADR-083 points to this ADR |
 | Point `homelab-docs` to `docs/_templates/` when ADR-083 adds them | `duynhne` | Done 2026-11-01 | `homelab-docs` links each template |
 
 ## Validation and compliance
@@ -150,3 +150,4 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-11-01 | Proposed / Partial | Records the `homelab-docs` skill shipped in #1474 as a partial supersede of ADR-083 |
 | 2026-11-01 | Proposed / Complete | `docs/_templates/` exists and homelab-docs 1.2.0 routes every shape to its template |
+| 2026-11-01 | Accepted / Complete | Owner accepted the decision; ADR-083 records the partial supersede; tracking issue #1477 opened |

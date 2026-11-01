@@ -664,6 +664,21 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **New `homelab-proposals` skill.** [`.agents/skills/homelab-proposals/`](.agents/skills/homelab-proposals/SKILL.md)
+  (with its `.claude/skills` symlink) routes the RFC/ADR authoring lifecycle —
+  reserve a number, `research.md` and its review gate, the RFC, the one-per-ADR
+  split, acceptance, and the tracking issue — to the owning files in
+  `docs/proposals/` without copying the templates or process. platform-engineer
+  (bumped to 1.1.0) stays the dispatcher: its § RFC / ADR gate collapses to a
+  pointer and the IDE skills map replaces the RFC and ADR rows (which sent
+  authoring to `spec-driven-development`, `planning-and-task-breakdown` and
+  `documentation-and-adrs`, whose templates and paths do not match this repo)
+  with one row. Routed from `AGENTS.md`. The research phase is delegated to
+  the `proposals-researcher` sub-agent (`.agents/agents/`, symlinked into
+  `.claude/agents/`, which Cursor reads too): it writes `research.md` and runs
+  the Context7 audit in its own context, never git or a manifest. It is an IDE
+  helper a person invokes, not the RFC-0033 runtime, which stays uninstalled.
+
 - **Runbook: slow ClickHouse query → flame graph.**
   `runbooks/clickhouse/slow-query-flame-graph.md` walks on-call from a slow
   panel or a `MEMORY_LIMIT_EXCEEDED` to the `query_id` and its replica, checks

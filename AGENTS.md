@@ -5,12 +5,16 @@ agents need in homelab: layout, build commands, admission rules, Flux gotchas,
 documentation conventions, PR workflow and Git/GitHub identity.
 
 Read [platform-engineer](.agents/skills/platform-engineer/SKILL.md) before any
-non-trivial task for operating procedure, API trust, domain routing and
-RFC/ADR decisions. For commit messages and branch names, follow the skill
-routing in [Contribution workflow](#contribution-workflow).
+non-trivial task for operating procedure, API trust, and domain routing. When a
+design record is the gate, authoring the RFC/ADR lifecycle follows
+[homelab-proposals](.agents/skills/homelab-proposals/SKILL.md). For commit
+messages and branch names, follow the skill routing in
+[Contribution workflow](#contribution-workflow).
 
 Repository skills live under `.agents/skills/`; Claude Code discovers them
-through matching `.claude/skills/` symlinks. Keep one source per skill.
+through matching `.claude/skills/` symlinks. Repository sub-agents live
+under `.agents/agents/` with matching `.claude/agents/` symlinks, a path
+Cursor also reads. Keep one source per skill or sub-agent.
 Generic IDE skills supplement these instructions; repository conventions
 take precedence when they differ.
 
@@ -325,6 +329,8 @@ reference style.
 | Incident troubleshooting / debug-note cleanup | [homelab-troubleshooting](.agents/skills/homelab-troubleshooting/SKILL.md) |
 | Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
 | Worktree lifecycle and cleanup | [git-worktrees](.agents/skills/git-worktrees/SKILL.md) |
+| RFC / ADR authoring lifecycle | [homelab-proposals](.agents/skills/homelab-proposals/SKILL.md) |
+| RFC research phase | [proposals-researcher](.agents/agents/proposals-researcher.md) sub-agent |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

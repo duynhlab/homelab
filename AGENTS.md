@@ -200,7 +200,10 @@ sub-issue and blocked-by relationships rather than status flags in titles.
 
 ## Docs conventions
 
-Docs are a first-class deliverable in this repo. When writing or refactoring them:
+Docs are a first-class deliverable in this repo. Write, edit and review them
+with the [homelab-docs](.agents/skills/homelab-docs/SKILL.md) skill, which
+routes to the rules below and owns verification, page shapes and prose. When
+writing or refactoring them:
 - **English only**; **Mermaid is the default** for diagrams (never ASCII art — see Platform architecture). Reach for **Draw.io** only when it is asked for by name or an existing `.drawio` is being edited → [`homelab-drawio` skill](.agents/skills/homelab-drawio/SKILL.md).
 - Architecture guides use the house shape (model: [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)): hook → quick facts → concept → architecture → platform behavior → operations → references. Adapt to the reader's task: hubs prioritize navigation, runbooks prerequisites/actions/expected results/recovery, and references lookup. Include diagrams where they answer a useful question.
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
@@ -330,6 +333,7 @@ reference style.
 | Incident troubleshooting / debug-note cleanup | [homelab-troubleshooting](.agents/skills/homelab-troubleshooting/SKILL.md) |
 | Branch names, commits, PR titles and descriptions | [git-pr](.agents/skills/git-pr/SKILL.md) |
 | Worktree lifecycle and cleanup | [git-worktrees](.agents/skills/git-worktrees/SKILL.md) |
+| Writing, editing and reviewing docs | [homelab-docs](.agents/skills/homelab-docs/SKILL.md) |
 | RFC / ADR authoring lifecycle | [homelab-proposals](.agents/skills/homelab-proposals/SKILL.md) |
 | RFC research phase | [proposals-researcher](.agents/agents/proposals-researcher.md) sub-agent |
 | Docs index | [`docs/README.md`](docs/README.md) |

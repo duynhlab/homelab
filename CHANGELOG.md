@@ -664,6 +664,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **New `homelab-docs` skill.** [`.agents/skills/homelab-docs/`](.agents/skills/homelab-docs/SKILL.md)
+  owns how a page under `docs/` is written, verified, edited and reviewed. It
+  routes to the AGENTS.md docs conventions instead of repeating them, and adds
+  what they lacked: a verification order (manifests and cluster first, records
+  by status, Context7 for upstream), page shapes mapped to Diátaxis, a homelab
+  term table with the planned and reference labels, an editing triage, a
+  five-pass review with blockers, and a prose pass that names the AI patterns
+  and ease claims to remove. platform-engineer (1.2.0) routes docs work to it;
+  the prose sweep of existing pages is a follow-up.
+
 - **`git-commits` is now `git-pr`, and it writes PR descriptions.** The
   skill owned commits and branch names, while PR descriptions had no guide.
   It now covers the PR title, which becomes the squash subject, and the

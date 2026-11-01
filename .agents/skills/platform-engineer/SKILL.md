@@ -6,7 +6,7 @@ description: >-
   Use for non-trivial work in this repo; route application code and shared CI
   to their owning repositories.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Platform engineer (homelab)
@@ -102,25 +102,13 @@ and respect the Flux dependency chain (see [AGENTS.md](../../../AGENTS.md) Gotch
 
 ## RFC / ADR gate
 
-Design **before** building when the change is substantial or contested.
-
-- **Research** (`docs/proposals/rfc/RFC-NNNN/research.md`) — real-world problem,
-  Context7 audit, homelab proof. **Owner approves RFC number** first. Status
-  **`researching`** until review gate passes.
-- **RFC** (`RFC-NNNN/README.md`) — after research gate + owner **ready for RFC**.
-  Template: [`RFC-0000/`](../../../docs/proposals/rfc/RFC-0000/). Status →
-  **`Accepted`** when architecture approved.
-- **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) — one decision each; **`Proposed`**
-  during RFC review, **`Accepted`** with the RFC. Template:
-  [`ADR-0000-template/`](../../../docs/proposals/adr/ADR-0000-template/).
-- **Tracking** — an `Accepted` ADR gets one issue of type `ADR` (template
-  *ADR implementation tracking*), linked from its `Implementation tracking`
-  row; each obligation is a sub-issue (`gh issue create --parent`). PRs say
-  `Part of #<sub-issue>`; tradeoffs the ADR did not settle are comments on
-  the tracking issue ([`adr/README.md` § Working log](../../../docs/proposals/adr/README.md#working-log)).
-- A small standalone decision may go directly to an ADR. Bugs, cleanups,
-  dependency bumps, and narrow documentation corrections use a focused PR.
-- Hub: [`docs/proposals/`](../../../docs/proposals/), [`adr/README.md`](../../../docs/proposals/adr/README.md).
+Design **before** building when the change is substantial or contested; a bug,
+cleanup, dependency bump, or narrow documentation correction uses a focused PR.
+When a design record is the gate, read
+[homelab-proposals](../homelab-proposals/SKILL.md) — it routes the RFC/ADR
+lifecycle to its owning files. When to write an RFC at all:
+[`rfc/README.md` § When to write an RFC](../../../docs/proposals/rfc/README.md).
+Hub: [`docs/proposals/`](../../../docs/proposals/).
 
 ## Verification and release
 
@@ -155,8 +143,7 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | Homelab work | IDE skill | Homelab gate |
 |--------------|-----------|--------------|
 | Unclear ask | `interview-me`, `idea-refine` | — |
-| RFC / substantial change | `spec-driven-development`, `planning-and-task-breakdown` | Owner OK RFC #, `research.md` |
-| ADR | `documentation-and-adrs` | `docs/proposals/adr/` |
+| Research, RFC, or ADR | [`homelab-proposals`](../homelab-proposals/SKILL.md) | Owner OK RFC #, `docs/proposals/` |
 | Manifest / GitOps | `incremental-implementation`, `source-driven-development` | `make validate`, Flux `dependsOn` |
 | Secrets / high stakes | `doubt-driven-development`, `security-and-hardening` | Kyverno catalog |
 | Observability | `observability-and-instrumentation` | alert catalog + runbook |
@@ -170,5 +157,6 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | Rollout | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |
 
 **Homelab overrides** (win over generic skill defaults): RFC/ADR paths and owner
-gates → Proposals; commits → above; Kyverno/netpol/secrets → [AGENTS.md](../../../AGENTS.md);
-API truth → **`docs/api/`** whole tree.
+gates → [`homelab-proposals`](../homelab-proposals/SKILL.md); commits → above;
+Kyverno/netpol/secrets → [AGENTS.md](../../../AGENTS.md); API truth →
+**`docs/api/`** whole tree.

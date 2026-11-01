@@ -664,6 +664,15 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`git-commits` is now `git-pr`, and it writes PR descriptions.** The
+  skill owned commits and branch names, while PR descriptions had no guide.
+  It now covers the PR title, which becomes the squash subject, and the
+  description: a Summary that leads with why in about 100 words, no file
+  lists, and a Gate that names only the checks that ran. Commit bodies and PR
+  text follow the ASD-STE100 sentence rules. Closing keywords move from
+  commits to the PR description. Version 2.0.0; every live link follows the
+  rename.
+
 - **New `homelab-proposals` skill.** [`.agents/skills/homelab-proposals/`](.agents/skills/homelab-proposals/SKILL.md)
   (with its `.claude/skills` symlink) routes the RFC/ADR authoring lifecycle —
   reserve a number, `research.md` and its review gate, the RFC, the one-per-ADR

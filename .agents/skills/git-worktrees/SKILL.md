@@ -11,7 +11,7 @@ metadata:
 # Git worktrees
 
 This skill owns worktree lifecycle and cleanup hygiene for homelab. For commit
-messages and branch names, follow [git-commits](../git-commits/SKILL.md). For
+messages, branch names and PR text, follow [git-pr](../git-pr/SKILL.md). For
 the PR workflow and Git/GitHub identity, follow
 [AGENTS.md](../../../AGENTS.md#contribution-workflow).
 

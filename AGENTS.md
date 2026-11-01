@@ -145,14 +145,15 @@ Every manifest applied to the cluster must satisfy admission:
 
 ## Contribution workflow
 
-When writing or reviewing commit messages, squash messages, or branch names,
-read [the git-commits skill](.agents/skills/git-commits/SKILL.md), the source
-of truth for their conventions. For creating, using, or cleaning up worktrees
+When writing or reviewing branch names, commit messages, squash messages, or
+PR titles and descriptions, read [the git-pr skill](.agents/skills/git-pr/SKILL.md),
+the source of truth for their conventions. For creating, using, or cleaning up worktrees
 (including proving a squash-merged branch landed before deletion), read
 [the git-worktrees skill](.agents/skills/git-worktrees/SKILL.md).
 
 - **Never push to `main`.** Branch → PR → squash-merge.
-- **PR body** follows `.github/pull_request_template.md`: `Part of #<sub-issue>`
+- **PR body** follows `.github/pull_request_template.md` (how to write it:
+  [git-pr § Pull requests](.agents/skills/git-pr/SKILL.md#pull-requests)): `Part of #<sub-issue>`
   (or `Closes #N`), the tradeoffs made, and the gate evidence as counts. Work
   under an ADR hangs off that ADR's tracking issue (issue type `adr`, one
   sub-issue per obligation); tradeoffs the ADR did not settle go on that
@@ -161,7 +162,7 @@ of truth for their conventions. For creating, using, or cleaning up worktrees
 - Author every commit as `duynhne <108656040+duynhne@users.noreply.github.com>`
   (set `--author` explicitly — agent machines default to the bot identity) with a
   `Co-Authored-By: duynebot <bot@duynh.me>` trailer; **`gh auth switch --user duynhne`**
-  for PRs. See [git-commits](.agents/skills/git-commits/SKILL.md).
+  for PRs. See [git-pr](.agents/skills/git-pr/SKILL.md).
 
 ### Skill versioning
 
@@ -327,7 +328,7 @@ reference style.
 |-------|-----------|
 | Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
 | Incident troubleshooting / debug-note cleanup | [homelab-troubleshooting](.agents/skills/homelab-troubleshooting/SKILL.md) |
-| Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
+| Branch names, commits, PR titles and descriptions | [git-pr](.agents/skills/git-pr/SKILL.md) |
 | Worktree lifecycle and cleanup | [git-worktrees](.agents/skills/git-worktrees/SKILL.md) |
 | RFC / ADR authoring lifecycle | [homelab-proposals](.agents/skills/homelab-proposals/SKILL.md) |
 | RFC research phase | [proposals-researcher](.agents/agents/proposals-researcher.md) sub-agent |

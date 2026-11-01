@@ -1,7 +1,7 @@
 # Git Branching & Release Standard
 
-> **Working in homelab:** use the [git-commits skill](../../.agents/skills/git-commits/SKILL.md)
-> for commit messages and branch names, and [AGENTS.md](../../AGENTS.md#contribution-workflow)
+> **Working in homelab:** use the [git-pr skill](../../.agents/skills/git-pr/SKILL.md)
+> for branch names, commit messages and PR text, and [AGENTS.md](../../AGENTS.md#contribution-workflow)
 > for the current PR workflow. The `feature/` branches and Conventional Commits
 > examples below belong to the microservice target model, not homelab conventions.
 
@@ -642,7 +642,7 @@ EOF
 
 ## 8. Commit Message Convention
 
-For homelab, use [git-commits](../../.agents/skills/git-commits/SKILL.md).
+For homelab, use [git-pr](../../.agents/skills/git-pr/SKILL.md).
 
 The microservice **target model** uses Conventional Commits for automated
 changelog and version detection. The format and version impacts below describe

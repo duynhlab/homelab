@@ -72,8 +72,8 @@ the PR and the owner's **ready for RFC**; it never runs `git`.
 Use [work tracking](../../../docs/platform/work-tracking.md) when selecting an
 initiative, creating tasks, deferring work, or closing adoption. Several ADRs can
 share one initiative. Keep accepted decision text intact; update adoption evidence
-and link the tracker for current remaining work. Run `make proposals-check` after
-changing record or index metadata.
+and link the tracker for current remaining work. Compare record metadata with its index entry after
+changing either; resolve differences against the original evidence.
 
 ## What the templates and statuses are for
 

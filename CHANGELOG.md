@@ -104,8 +104,7 @@ Skeleton (copy what you need):
 
 #### Proposals
 
-- Align 17 ADR index adoption entries with their existing completion records and
-  add `make proposals-check` to detect future status drift.
+- Align 17 ADR index adoption entries with their existing completion records.
 
 ### Breaking Change
 

@@ -1,5 +1,7 @@
 # Track platform work
 
+<!-- Private Project requires organization access; verified through authenticated gh. -->
+<!-- markdown-link-check-disable-next-line -->
 Use [Platform work](https://github.com/orgs/duynhlab/projects/1) to find the next task,
 remaining verification, and deferred work across duynhlab.
 
@@ -10,7 +12,7 @@ remaining verification, and deferred work across duynhlab.
 | **Prerequisites** | Repository access; Projects access for board updates |
 | **Environment** | GitHub organization `duynhlab`; no cluster mutation |
 | **Changes state** | Issues, relationships, labels, and Project fields |
-| **Evidence context** | Project and issue inventory inspected 2026-11-01; [reconciliation record](../proposals/work-audit-2026-11-01.md) |
+| **Evidence context** | Project and issue inventory inspected 2026-11-01; see linked trackers for current work |
 | **This page owns** | Work intake, selection, progress, and completion |
 | **Not this page** | [Design approval](../proposals/README.md), [release gates](../../AGENTS.md#build-test-deploy), or [PR text](../../.agents/skills/git-pr/SKILL.md) |
 
@@ -155,15 +157,10 @@ issues must explicitly select the Project; check membership after creation.
 External contributors without Project write access need maintainer triage. No
 repository auto-add job is configured.
 
-Check proposal index consistency before pushing changes to proposal metadata:
-
-```bash
-make proposals-check
-```
-
-The check compares opening record metadata with index entries. Historical ADRs
-without an Adoption field retain the index as their source. This detects metadata
-drift; it does not certify runtime adoption or inspect GitHub issue state.
+Compare proposal index entries with opening record metadata before pushing
+metadata changes. Historical ADRs without an Adoption field retain the index as
+their source. Resolve differences against completion evidence; metadata alignment
+does not certify runtime adoption.
 
 ## If something goes wrong
 

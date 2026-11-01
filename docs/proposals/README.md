@@ -16,8 +16,6 @@ picks the next legal step; the research phase runs in the
 [proposals-researcher](../../.agents/agents/proposals-researcher.md) sub-agent.
 
 Operational progress lives in [Platform work](../platform/work-tracking.md).
-The [2026-11-01 reconciliation](work-audit-2026-11-01.md) records the initial inventory
-and metadata discrepancies; it is a historical snapshot, not another backlog.
 
 ## How they fit together
 

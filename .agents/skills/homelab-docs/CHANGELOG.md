@@ -6,6 +6,15 @@ Newest first.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-01
+
+- Runbook shape follows `docs/observability/runbooks/_TEMPLATE.md` (adds
+  Safety, Recovery validation, Escalation) instead of restating the older
+  five-section order.
+- Route the optional RFC domain doc (RFC process step 4) here.
+- Link ADR-090, which partly supersedes ADR-083's "no second documentation
+  skill" clause.
+
 ## [1.0.0] - 2026-11-01
 
 - Baseline: a router over the homelab docs conventions with five references:

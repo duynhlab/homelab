@@ -10,6 +10,11 @@ split by artifact type:
   per ADR (template v2). Process, vocabulary, and index:
   [`adr/README.md`](adr/README.md). Copy source: [`ADR-0000-template/`](adr/ADR-0000-template/).
 
+Agents author these records with the
+[homelab-proposals](../../.agents/skills/homelab-proposals/SKILL.md) skill, which
+picks the next legal step; the research phase runs in the
+[proposals-researcher](../../.agents/agents/proposals-researcher.md) sub-agent.
+
 ## How they fit together
 
 ```mermaid

@@ -186,3 +186,4 @@ preventing drift, or executable examples cannot be isolated safely.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted the four content contracts, review split, and safe-example policy |
+| 2026-11-01 | Accepted / Not started | [ADR-090](../ADR-090-homelab-docs-skill/) (Proposed) would partly supersede the "no second project documentation skill" clause: `homelab-docs` shipped in #1474. The contracts, review split and example policy are unchanged |

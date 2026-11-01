@@ -5,7 +5,7 @@ description: >-
   or leaking stale checkouts. Use when starting a task in a worktree, deleting a
   branch or worktree, or recovering a locked or orphaned checkout.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Git worktrees

@@ -7,7 +7,7 @@ description: >-
   page clearer, shorter, or less AI-sounding, while verifying every claim
   against the manifests, the running cluster, and the owning record.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Homelab docs
@@ -16,7 +16,9 @@ Write accurate, task-focused documentation for the platform. The readers are
 operators, service authors and AI agents: each section must scan in seconds,
 stand on its own when retrieved, and leave no unstated context.
 
-This skill owns how a page is written, edited and reviewed. The repository
+This skill owns how a page is written, edited and reviewed;
+[ADR-090](../../../docs/proposals/adr/ADR-090-homelab-docs-skill/README.md)
+records why it is a skill of its own. The repository
 conventions it builds on stay in their owners and are not restated here:
 
 - [AGENTS.md § Docs conventions](../../../AGENTS.md#docs-conventions): English,

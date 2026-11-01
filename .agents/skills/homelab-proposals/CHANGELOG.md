@@ -6,7 +6,16 @@ Newest first.
 
 ## [Unreleased]
 
-## [0.1.0]
+## [0.2.0] - 2026-11-01
+
+- Add the optional domain-doc step (RFC process step 4) to the phase table,
+  routed to homelab-docs, so the page no longer falls between the two skills.
+- The `proposals-researcher` sub-agent no longer preloads this skill: the
+  skill tells its reader to spawn that sub-agent, so the researcher was
+  reading an instruction to delegate to itself. It links the research
+  template and gate directly.
+
+## [0.1.0] - 2026-11-01
 
 - Baseline: route the RFC/ADR lifecycle to its owning files in `docs/proposals/`
   (reserve a number, research gate, RFC, one-per-ADR split, acceptance, tracking

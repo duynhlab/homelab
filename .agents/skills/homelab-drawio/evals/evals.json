@@ -4,13 +4,13 @@
     {
       "id": 0,
       "name": "platform-overview",
-      "prompt": "In the homelab repo, make me a Draw.io (.drawio) architecture diagram that puts the whole duynhlab platform on one page: the Envoy Gateway edge, the Go microservices, the datastores (PostgreSQL via CloudNativePG, Valkey, ClickHouse), the observability stack (VictoriaMetrics/Logs/Traces, Grafana, Pyroscope), and the control-plane controllers (Flux, KEDA, Kyverno, cert-manager, External Secrets, OpenBao, Temporal). Save it as docs/architecture/platform-overview.drawio. It's a Draw.io file specifically, not Mermaid.",
+      "prompt": "In the homelab repo, make me a Draw.io (.drawio) architecture diagram that puts the whole duynhlab platform on one page: the Envoy Gateway edge, the Go microservices, the datastores (PostgreSQL via CloudNativePG, Valkey, ClickHouse), the observability stack (VictoriaMetrics/Logs/Traces, Grafana, Pyroscope), and the control-plane controllers (Flux, KEDA, Kyverno, cert-manager, External Secrets, OpenBao, Temporal). Save it as docs/architecture/platform/platform-overview.drawio. It's a Draw.io file specifically, not Mermaid.",
       "expected_output": "A native (uncompressed) .drawio with domain-grouped boxes in the homelab semantic palette, embedded PNG logos on the deployed products, a legend, and clean layout. validate_house.py passes.",
       "files": [],
       "assertions": [
         {"id": "native_xml", "text": "Output file exists and contains <mxGraphModel> (native, uncompressed .drawio)"},
         {"id": "house_valid", "text": "scripts/validate_house.py on the file exits 0 with no ERROR lines"},
-        {"id": "palette", "text": "Uses the homelab palette fills (service #06B6D4, data #22C55E, and at least one platform #7C3AED)"},
+        {"id": "palette", "text": "Uses the homelab v2 palette from assets/homelab.json (service fill #CFFAFE, data fill #DCFCE7, and at least one platform box with fill #EDE9FE / stroke #7C3AED)"},
         {"id": "logos_comma", "text": "Embeds at least three logos as image=data:image/png, (comma form, never ;base64,)"},
         {"id": "legend", "text": "Contains a legend cell"},
         {"id": "domains", "text": "Groups nodes into domain frames (edge, services, data, observability, control-plane) rather than a flat list"}
@@ -19,7 +19,7 @@
     {
       "id": 1,
       "name": "flux-dependency-tree",
-      "prompt": "Draw me the Flux Kustomization dependency chain for the local cluster as a Draw.io .drawio file: the dependsOn edges from flux-system through controllers-local and the infra waves (secrets, monitoring, databases, keda, temporal) down to apps-local. Nodes named exactly as the Kustomizations. Save it as docs/architecture/flux-dependency-tree.drawio.",
+      "prompt": "Draw me the Flux Kustomization dependency chain for the local cluster as a Draw.io .drawio file: the dependsOn edges from flux-system through controllers-local and the infra waves (secrets, monitoring, databases, keda, temporal) down to apps-local. Nodes named exactly as the Kustomizations. Save it as docs/architecture/platform/flux-dependency-tree.drawio.",
       "expected_output": "A native .drawio directed graph of Kustomizations with dependsOn edges, house palette (platform role for controllers), a legend, planned nodes dashed if any. validate_house.py passes.",
       "files": [],
       "assertions": [
@@ -33,7 +33,7 @@
     {
       "id": 2,
       "name": "observability-signal-path",
-      "prompt": "I need a Draw.io diagram (save under docs/architecture/) showing how the four observability signals flow through the homelab platform: metrics, logs, traces and profiles leaving the services, through the collectors (Vector, OpenTelemetry), into the VictoriaMetrics / VictoriaLogs / VictoriaTraces / Pyroscope backends, and surfaced in Grafana. Use the signal colours.",
+      "prompt": "I need a Draw.io diagram (save under docs/architecture/observability/) showing how the four observability signals flow through the homelab platform: metrics, logs, traces and profiles leaving the services, through the collectors (Vector, OpenTelemetry), into the VictoriaMetrics / VictoriaLogs / VictoriaTraces / Pyroscope backends, and surfaced in Grafana. Use the signal colours.",
       "expected_output": "A native .drawio request-path diagram using the four observability signal roles (metric/log/trace/profile) with correct fills, collector and backend boxes with logos, Grafana as the sink, a legend. validate_house.py passes.",
       "files": [],
       "assertions": [

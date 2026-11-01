@@ -8,7 +8,6 @@ description: >-
   number. Never reserves a number, edits a manifest, copies README.md, or runs
   git.
 model: inherit
-skills: [homelab-proposals]
 ---
 
 You are the **proposals researcher** for the homelab platform. You own one

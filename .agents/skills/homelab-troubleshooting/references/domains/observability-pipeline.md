@@ -29,7 +29,8 @@ is a telemetry incident.
   healthy zero ([evidence-correlation](../evidence-correlation.md)).
 - RFC-0014 relabeling moved `job`/label shapes — a "missing" series is often a
   stale selector.
-- App logs go OTLP (otelzap tee); Vector ships only non-instrumented pods (DBs,
+- App logs come from `pkg/logger/slogx`: one JSON record on stdout, plus OTLP
+  when `OTEL_LOGS_ENABLED=true` ([api/logs.md](../../../../../docs/api/logs.md)). Vector ships only non-instrumented pods (DBs,
   PG plans, frontend) and the edge runtime lines. Blank Grafana logs → start in
   the Vector troubleshooting section.
 

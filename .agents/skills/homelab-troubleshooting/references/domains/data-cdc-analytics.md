@@ -18,7 +18,8 @@ feeds, and the Valkey cache.
 ## Manifests
 
 - CDC: `kubernetes/infra/configs/cdc/` (PeerDB, CDC pooler, pg_cron heartbeats).
-- ClickHouse: `kubernetes/infra/configs/observability/` (Keeper, schema DDL Job).
+- ClickHouse: `kubernetes/infra/configs/clickhouse/` (the installation),
+  `clickhouse-keeper/` (Keeper) and `clickhouse-schema/` (DDL bootstrap Job).
 
 ## Diagnose
 

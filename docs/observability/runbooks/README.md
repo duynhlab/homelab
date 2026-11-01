@@ -49,6 +49,7 @@ Domain-specific rows and diagnosis dialects live in each folder README's
 
 ## Related Documentation
 
+- [homelab-troubleshooting skill](../../../.agents/skills/homelab-troubleshooting/SKILL.md) — how agents route an alert to these runbooks and diagnose read-only first
 - [Alert lifecycle and runbook engineering](../alerting/alert-lifecycle-and-runbooks.md) — signal and runbook validation contract
 - [Alerting Strategy](../alerting/README.md) -- 2-layer alerting architecture
 - [SLO System](../slo/README.md) -- SLO definitions and burn-rate alerts

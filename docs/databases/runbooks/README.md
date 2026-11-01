@@ -27,6 +27,7 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 
 ## Related
 
+- [homelab-troubleshooting skill](../../../.agents/skills/homelab-troubleshooting/SKILL.md) — how agents route a database incident here; state changes need approval
 - [Database hub](../README.md)
 - [Emergency recovery](./emergency-recovery.md) — start here when a cluster is down
 - [PostgreSQL alert runbooks](../../observability/runbooks/postgresql/README.md) — per-alert on-call guides

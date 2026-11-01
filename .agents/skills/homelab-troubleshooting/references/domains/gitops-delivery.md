@@ -8,7 +8,11 @@ downstream via `dependsOn`. Find the head, not a symptom.
 - Per-alert: [FluxKustomizationNotReady](../../../../../docs/observability/runbooks/gitops/FluxKustomizationNotReady.md),
   [FluxSourceNotReady](../../../../../docs/observability/runbooks/gitops/FluxSourceNotReady.md),
   [FluxReconciliationFailure](../../../../../docs/observability/runbooks/gitops/FluxReconciliationFailure.md),
-  [FluxSuspendedResource](../../../../../docs/observability/runbooks/gitops/FluxSuspendedResource.md).
+  [FluxSuspendedResource](../../../../../docs/observability/runbooks/gitops/FluxSuspendedResource.md),
+  [FluxHelmReleaseNotReady](../../../../../docs/observability/runbooks/gitops/FluxHelmReleaseNotReady.md),
+  [FluxReconcileDurationHigh](../../../../../docs/observability/runbooks/gitops/FluxReconcileDurationHigh.md).
+- `CertManager*` runbooks also sit in `runbooks/gitops/`, but route them as
+  [Secrets / TLS](secrets-tls.md).
 - Dependency graph + bring-up gotchas: [platform/setup.md](../../../../../docs/platform/setup.md)
   and [AGENTS.md § Gotchas](../../../../../AGENTS.md#gotchas--non-obvious-rules).
 - Delivery model: [platform/application-delivery.md](../../../../../docs/platform/application-delivery.md).

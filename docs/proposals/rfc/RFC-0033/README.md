@@ -407,6 +407,10 @@ Architecture review accepted these independent decisions on 2026-10-01. Adoption
 
 ## Implementation History
 
+- **2026-11-01 — ADR-090 proposed:** the `homelab-docs` project skill shipped
+  in #1474, against ADR-083's "no second project documentation skill" clause.
+  [ADR-090](../../adr/ADR-090-homelab-docs-skill/) proposes the partial
+  supersede; ADR-083's contracts and review split are unchanged.
 - **2026-10-01 — Accepted:** architecture review selected bounded jobs plus the
   GitHub ledger, accepted ADR-079 through ADR-083 at Adoption `Not started`, and
   kept publishing human-operated for Phases 0–1. No runtime, workflow, schema,

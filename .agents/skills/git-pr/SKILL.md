@@ -6,7 +6,7 @@ description: >-
   contribution conventions. Use when naming a branch, committing, opening or
   updating a PR, or summarizing a branch for reviewers.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # Git commits and pull requests
@@ -106,6 +106,8 @@ Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_templ
 
 - **Summary.** Start with the issue line: `Closes #N`, `Part of
   #<sub-issue> (ADR-NNN)`, or one line that says there is no tracking issue.
+  Use `Closes` only when the PR proves every issue acceptance criterion;
+  otherwise use `Part of` and retain the outstanding verification task.
   Do not open an issue only for a PR. Then write one paragraph of about 100
   words. Lead with the problem, need, or decision, then the change in
   behavior. Do not list files or narrate commits.

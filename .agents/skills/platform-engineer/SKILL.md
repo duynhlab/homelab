@@ -8,7 +8,7 @@ description: >-
   incidents to homelab-troubleshooting, and application code and shared CI to
   their owning repositories.
 metadata:
-  version: "2.0.0"
+  version: "3.0.0"
 ---
 
 # Platform engineer (homelab)
@@ -88,7 +88,9 @@ and respect the Flux dependency chain (see [AGENTS.md](../../../AGENTS.md) Gotch
 
 1. Identify the request type and owning repository. For an answer, review, or
    diagnosis, inspect the relevant sources and report evidence; change files
-   only when the request includes implementation.
+   only when the request includes implementation. Before starting or resuming
+   tracked work, read [work tracking](../../../docs/platform/work-tracking.md):
+   find the existing issue, its next action, blockers, and completion evidence.
 2. For a change, choose one primary domain and read its hub plus the relevant
    code, manifests, or runbook. Check deployed reality before changing topology
    docs. Cross-domain work states ownership and rollout order, including Flux
@@ -154,6 +156,11 @@ lifecycle to its owning files. When to write an RFC at all:
 Hub: [`docs/proposals/`](../../../docs/proposals/).
 
 ## Verification and release
+
+- Before ending tracked work, update the existing issue with evidence, remaining
+  work, and the next action. Set Project Status using
+  [work tracking](../../../docs/platform/work-tracking.md#complete-and-resume-work).
+  Keep Verification open when implementation landed but its gate did not pass.
 
 - Before completing a change, apply [AGENTS.md's documentation and comment
   conventions](../../../AGENTS.md#docs-conventions) to the touched sections.

@@ -4,12 +4,13 @@ description: >-
   Author and advance homelab design records through the RFC and ADR lifecycle:
   reserve an RFC number, write research.md, pass the research review gate,
   write the RFC, split decisions into one-per-ADR, move both to Accepted, and
-  open the ADR tracking issue. Use when starting or continuing an RFC or ADR,
+  link outcome-based implementation tracking. Use when starting or continuing
+  an RFC or ADR,
   reserving a number, writing research.md, splitting a decision into an ADR, or
   recording that a design was accepted. Not for bug fixes, cleanups, dependency
   bumps, or narrow documentation corrections — those ship in a focused PR.
 metadata:
-  version: "0.2.0"
+  version: "1.0.0"
 ---
 
 # Homelab proposals (RFC / ADR)
@@ -41,7 +42,7 @@ linked file, and do what that file's gate requires before moving down.
 | Only `research.md`, status `researching` | Delegate to the [`proposals-researcher`](../../agents/proposals-researcher.md) sub-agent (see [Delegate research](#delegate-research)); review its report, keep the index row, get owner **ready for RFC** before copying `README.md` | [`RFC-0000/research.md`](../../../docs/proposals/rfc/RFC-0000/research.md) + its [review gate](../../../docs/proposals/rfc/RFC-0000/research.md#research-review-gate) |
 | `README.md` at `provisional` | Fill the RFC from research (do not re-teach the mechanism); split independent decisions into one ADR each at `Proposed` | [`RFC-0000/README.md`](../../../docs/proposals/rfc/RFC-0000/README.md) + [`adr/README.md`](../../../docs/proposals/adr/README.md#process) § Process |
 | RFC filled, owner wants an area guide | Optional domain doc `docs/<area>/<topic>/README.md` distilled from research; write it with [homelab-docs](../homelab-docs/SKILL.md) and link it from the RFC | [`rfc/README.md`](../../../docs/proposals/rfc/README.md) § Process step 4 |
-| RFC approved | Move RFC and its ADRs to `Accepted`, Adoption `Not started`; open one tracking issue per ADR, one sub-issue per obligation | [`adr/README.md`](../../../docs/proposals/adr/README.md#status-and-adoption) + [`.github/ISSUE_TEMPLATE/adr-tracking.yml`](../../../.github/ISSUE_TEMPLATE/adr-tracking.yml) |
+| RFC approved | Move RFC and its ADRs to `Accepted`, Adoption `Not started`; link an initiative or independent ADR tracker with verifiable task outcomes | [`adr/README.md`](../../../docs/proposals/adr/README.md#status-and-adoption) + [`.github/ISSUE_TEMPLATE/adr-tracking.yml`](../../../.github/ISSUE_TEMPLATE/adr-tracking.yml) |
 | ADR `Accepted`, work landing | Append-only edits only; log unsettled tradeoffs on the tracking issue, not in the ADR | [`adr/README.md`](../../../docs/proposals/adr/README.md#append-only-rules) § Append-only rules + § Working log |
 | Small, clear, few alternatives | Skip the RFC; write one standalone ADR | [`adr/README.md`](../../../docs/proposals/adr/README.md#when-to-create-an-adr) § When to create an ADR |
 
@@ -65,6 +66,14 @@ number, the topic, the scope and any pointers. It writes or iterates
 `RFC-NNNN/research.md` only, runs the Context7 audit, ticks the gate boxes the
 file earns and reports the open questions. You keep the index row, the commit,
 the PR and the owner's **ready for RFC**; it never runs `git`.
+
+## Track delivery
+
+Use [work tracking](../../../docs/platform/work-tracking.md) when selecting an
+initiative, creating tasks, deferring work, or closing adoption. Several ADRs can
+share one initiative. Keep accepted decision text intact; update adoption evidence
+and link the tracker for current remaining work. Compare record metadata with its index entry after
+changing either; resolve differences against the original evidence.
 
 ## What the templates and statuses are for
 

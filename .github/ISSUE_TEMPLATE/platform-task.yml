@@ -2,8 +2,8 @@ name: Platform task or small change
 description: Propose bounded maintenance, operational work, or a small platform change that does not need an RFC.
 title: "[Task] "
 type: Task
-labels:
-  - task
+projects:
+  - duynhlab/1
 body:
   - type: markdown
     attributes:
@@ -13,7 +13,7 @@ body:
     id: parent
     attributes:
       label: Parent decision
-      description: The ADR tracking issue this task belongs to, if any. Open the task as a sub-issue of it (`gh issue create --parent <issue>`) so progress shows on the parent.
+      description: The owning initiative or independent ADR tracker, if any. Use a native sub-issue relationship and link governing RFCs or ADRs.
       placeholder: "ADR-NNN · #issue"
     validations:
       required: false

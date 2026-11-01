@@ -15,6 +15,8 @@
 
 ---
 
+Implementation tracking: [#1502](https://github.com/duynhlab/homelab/issues/1502). This work item does not change the record's design status.
+
 ## Table of contents
 
 1. [Problem statement](#problem-statement)

@@ -26,11 +26,11 @@ Avoid:
 | **Deciders** | `{people or architecture group that accepts the decision}` |
 | **Scope** | `{bounded scope of this decision}` |
 | **Affected components** | `{services, workers, databases, frontend, platform}` |
-| **Related RFC** | [RFC-NNNN](../../rfc/RFC-NNNN/) or — |
-| **Related research** | [research.md](../../rfc/RFC-NNNN/research.md) or — |
+| **Related RFC** | `RFC-NNNN` (link the owning RFC) or — |
+| **Related research** | `RFC-NNNN/research.md` (link the owning research) or — |
 | **Supersedes** | ADR-NNN or — |
 | **Superseded by** | ADR-NNN or — |
-| **Implementation tracking** | `#NNN` — the ADR tracking issue (issue type `ADR`; one sub-issue per obligation) |
+| **Implementation tracking** | `#NNN` — owning initiative or independent ADR tracker; tasks map the adoption obligations |
 | **Adoption** | Not started / Partial / Complete |
 
 <!--
@@ -249,8 +249,8 @@ requires a new ADR that supersedes this one.
 
 ## References
 
-- [RFC-NNNN](../../rfc/RFC-NNNN/)
-- [RFC-NNNN research](../../rfc/RFC-NNNN/research.md)
+- `RFC-NNNN` (link the owning RFC)
+- `RFC-NNNN/research.md` (link the owning research)
 - [{Service} contract](../../../api/{service}.md)
 - [{Related workflow}](../../../api/workflows.md)
 - [{Planning document}]({link})

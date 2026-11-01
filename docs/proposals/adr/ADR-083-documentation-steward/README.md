@@ -24,7 +24,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0033/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | [ADR-090](../ADR-090-homelab-docs-skill/), in part — the "no second documentation skill" clause only |
-| **Implementation tracking** | RFC-0033 Phase 0 documentation evals and the observability pilot |
+| **Implementation tracking** | [#1501](https://github.com/duynhlab/homelab/issues/1501) — current obligations, blockers, and gate evidence |
 | **Adoption** | Partial — the four templates exist under `docs/_templates/`; navigation and example-safety checks run in `scripts/docs-check.sh` (links, inbound links, Mermaid); the example-policy marker is documented, not enforced; the observability pilot has not started |
 
 ## Context

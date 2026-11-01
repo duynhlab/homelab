@@ -15,6 +15,8 @@ Agents author these records with the
 picks the next legal step; the research phase runs in the
 [proposals-researcher](../../.agents/agents/proposals-researcher.md) sub-agent.
 
+Operational progress lives in [Platform work](../platform/work-tracking.md).
+
 ## How they fit together
 
 ```mermaid

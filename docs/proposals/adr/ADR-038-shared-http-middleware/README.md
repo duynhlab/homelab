@@ -19,7 +19,7 @@
 | **Related RFC** | [RFC-0014](../../rfc/RFC-0014/) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | `pkg` merged and tagged `httpmw/v0.1.0` + `obsx/v0.37.1`; `inventory-service` merged; the nine HTTP services have open pull requests awaiting the compose end-to-end gate |
+| **Implementation tracking** | [#1503](https://github.com/duynhlab/homelab/issues/1503) — current obligations, blockers, and gate evidence |
 | **Adoption** | Partial |
 
 ## Context

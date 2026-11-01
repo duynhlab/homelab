@@ -6,6 +6,11 @@ Newest first.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
+- Replace mandatory per-ADR trackers with outcome-based initiatives and optional
+  independent ADR trackers. Require index consistency checks on metadata changes.
+
 ## [0.2.0] - 2026-11-01
 
 - Add the optional domain-doc step (RFC process step 4) to the phase table,

@@ -1,0 +1,37 @@
+name: Initiative or workstream
+description: Track a bounded outcome spanning several verifiable tasks or decisions.
+title: "[Task] "
+type: Task
+labels:
+  - epic
+projects:
+  - duynhlab/1
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and scope
+      description: State the result, affected repositories, and explicit non-goals.
+    validations:
+      required: true
+  - type: textarea
+    id: records
+    attributes:
+      label: Governing records and existing work
+      description: Link RFCs, ADRs, issues, and PRs. An initiative does not approve a proposed design.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: State the evidence needed to close the whole initiative; add native sub-issues for independent outcomes.
+    validations:
+      required: true
+  - type: textarea
+    id: next
+    attributes:
+      label: Next action and blockers
+      description: Name the next action, owner, dependency, or observable revisit trigger.
+    validations:
+      required: true

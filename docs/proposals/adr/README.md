@@ -42,7 +42,7 @@ Each document type answers one question. Do not merge responsibilities.
 | [`research.md`](../rfc/RFC-0000/research.md) | How does this mechanism, product, or pattern work? |
 | [RFC](../rfc/) | What change do we **propose** for the system? |
 | **ADR** (this directory) | What did we **decide**, and which trade-offs did we accept? |
-| Planning (RFC rollout, epic, optional `RFC-NNNN/implementation.md`) | How do we **schedule** implementation phases and PRs? |
+| [Issues and Project](../../platform/work-tracking.md) | What remains, what is ready, and what evidence closes the work? |
 | [`docs/api/{service}.md`](../../api/README.md) | How does the system **run today** (as-built)? |
 | Runbook | When something fails or drifts, how do we **operate** it? |
 
@@ -120,19 +120,21 @@ flowchart LR
 3. During RFC review, identify **independent** architectural decisions.
 4. Create one ADR per decision at **`Proposed`** (copy [`ADR-0000-template/`](ADR-0000-template/)).
 5. On architecture approval: RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**
-   (Adoption stays **`Not started`** until code lands). Open the ADR's
-   **tracking issue** (issue type `adr`, template *ADR implementation
-   tracking*) and link it from the ADR's `Implementation tracking` row. Every
-   obligation becomes a **sub-issue** (`gh issue create --parent <issue>`);
-   work that is deferred becomes a sub-issue too, so debt has a number.
+   (Adoption stays **`Not started`** until code lands). Link the owning initiative
+   or independent ADR tracker from `Implementation tracking`. Several ADRs can
+   share an initiative. Map obligations to independently verifiable sub-issues;
+   use a dedicated `adr` tracker when the decision has its own delivery boundary.
+   Retain deferred commitments with an issue and revisit trigger. Follow
+   [work tracking](../../platform/work-tracking.md#group-work-by-outcome).
 6. Implement code and tests. Each PR names its sub-issue (`Part of #N`, or
    `Closes #N` when it finishes it), and a tradeoff the ADR did not settle is
    logged as a comment on the tracking issue (see [Working log](#working-log)).
 7. Update [`docs/api/`](../../api/README.md) to as-built (API-touching decisions).
-8. Update ADR **Adoption** and **History** (one line per PR, with its link);
-   append RFC **Implementation History**. When Adoption reaches **Complete**,
-   close the tracking issue; while it stays **Partial**, the open sub-issues
-   are the list of what remains.
+8. Update ADR **Adoption** and **History** at meaningful delivery milestones,
+   linking PR and gate evidence. Append RFC **Implementation History** when its
+   scope ships. Close a tracker only when all its acceptance criteria are proven;
+   a shared initiative can remain open after one ADR reaches **Complete**.
+   Link the tracker for remaining work instead of copying its open-issue list.
 9. Add or update **runbooks** when the topic has meaningful operational failure
    modes (observability, databases, or other area — not a single root path).
 
@@ -145,8 +147,8 @@ The three records do not repeat each other:
 
 | Record | Holds | Changes |
 |---|---|---|
-| ADR | the decision, its alternatives and consequences | rarely; one History line per landed PR |
-| Tracking issue (type `adr`) + sub-issues | obligations, blockers, owner-only steps, the **tradeoff log** | throughout implementation |
+| ADR | the decision, its alternatives, consequences, and adoption evidence | at decision or delivery milestones |
+| Initiative or independent ADR tracker + sub-issues | obligations, blockers, owner-only steps, the **tradeoff log** | throughout implementation |
 | PR | the diff, its gate evidence, the tradeoffs made in that PR | once |
 
 A tradeoff log entry is a comment on the tracking issue:
@@ -154,7 +156,7 @@ A tradeoff log entry is a comment on the tracking issue:
 `**Tradeoff — <topic>** · chose X over Y · because … · evidence: <PR / gate row>`
 
 The PR links the comment; the ADR's History row links the PR. Dependencies
-between sub-issues use GitHub's *blocked by* relationship
+between issues use GitHub's *blocked by* relationship
 (`gh issue edit <issue> --add-blocked-by <other>`), not prose.
 
 **docs/api sync (API-touching):** when Adoption reaches **Complete**, owning service
@@ -447,22 +449,22 @@ and extend Adoption instead.
 | [ADR-038](ADR-038-shared-http-middleware/) | Promote the HTTP tracing and logging middleware into `pkg/httpmw` | Accepted | Partial | [RFC-0014](../rfc/RFC-0014/) |
 | [ADR-039](ADR-039-local-stack-temporal-server-postgres/) | Run local-stack Temporal as `temporalio/server` on Postgres with admin-tools | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-040](ADR-040-tempo-community-helm-chart/) | Deliver Tempo through the `grafana-community/tempo` Helm chart | Withdrawn (superseded by [ADR-059](ADR-059-retire-tempo/)) | Partial, then reverted | [RFC-0027](../rfc/RFC-0027/) |
-| [ADR-041](ADR-041-keycloak-platform-idp/) | Adopt Keycloak as the platform identity provider and retire auth-service | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) |
-| [ADR-042](ADR-042-oidc-sub-as-user-id/) | Use the OIDC subject as the application `user_id`, as a string, fleet-wide | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) |
-| [ADR-043](ADR-043-oidc-browser-workload-trust/) | Authenticate browsers via OIDC; keep east-west trust workload-level | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) |
-| [ADR-044](ADR-044-envoy-gateway-platform-edge/) | Make Envoy Gateway the platform edge on the Gateway API | Accepted | Partial | [RFC-0024](../rfc/RFC-0024/) |
-| [ADR-045](ADR-045-local-first-edge-rate-limiting/) | Rate-limit at the edge with local token buckets, not a global RLS | Accepted | Partial | [RFC-0024](../rfc/RFC-0024/) |
+| [ADR-041](ADR-041-keycloak-platform-idp/) | Adopt Keycloak as the platform identity provider and retire auth-service | Accepted | Complete | [RFC-0022](../rfc/RFC-0022/) |
+| [ADR-042](ADR-042-oidc-sub-as-user-id/) | Use the OIDC subject as the application `user_id`, as a string, fleet-wide | Accepted | Complete | [RFC-0022](../rfc/RFC-0022/) |
+| [ADR-043](ADR-043-oidc-browser-workload-trust/) | Authenticate browsers via OIDC; keep east-west trust workload-level | Accepted | Complete | [RFC-0022](../rfc/RFC-0022/) |
+| [ADR-044](ADR-044-envoy-gateway-platform-edge/) | Make Envoy Gateway the platform edge on the Gateway API | Accepted | Complete | [RFC-0024](../rfc/RFC-0024/) |
+| [ADR-045](ADR-045-local-first-edge-rate-limiting/) | Rate-limit at the edge with local token buckets, not a global RLS | Accepted | Complete | [RFC-0024](../rfc/RFC-0024/) |
 | [ADR-046](ADR-046-e2e-gate-kind-fallback/) | Move the E2E release-audit gate to Kind if compose cannot carry the edge | Accepted | Complete | [RFC-0024](../rfc/RFC-0024/) |
 | [ADR-047](ADR-047-protected-apis-on-owning-services/) | Expose administrative commands through role-gated protected APIs on owning services | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
-| [ADR-048](ADR-048-admin-portal-no-bff/) | Call owning services directly from the Admin Portal; defer an admin BFF | Accepted | Partial | [RFC-0023](../rfc/RFC-0023/) |
-| [ADR-049](ADR-049-admin-portal-tanstack-spa/) | Build the Admin Portal as a separate React SPA on the TanStack stack | Accepted | Partial | [RFC-0023](../rfc/RFC-0023/) |
-| [ADR-050](ADR-050-separate-staff-identity-realm/) | Separate workforce identity from customer identity in a staff realm | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) / [RFC-0023](../rfc/RFC-0023/) |
+| [ADR-048](ADR-048-admin-portal-no-bff/) | Call owning services directly from the Admin Portal; defer an admin BFF | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
+| [ADR-049](ADR-049-admin-portal-tanstack-spa/) | Build the Admin Portal as a separate React SPA on the TanStack stack | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
+| [ADR-050](ADR-050-separate-staff-identity-realm/) | Separate workforce identity from customer identity in a staff realm | Accepted | Complete | [RFC-0022](../rfc/RFC-0022/) / [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-051](ADR-051-trusted-operator-resolution/) | Trust the operator and make the audit trail the control | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-052](ADR-052-converge-the-customer-spa-on-the-portal-stack/) | Converge the customer SPA on the Admin Portal's stack | Accepted | Complete | [RFC-0025](../rfc/RFC-0025/) |
-| [ADR-053](ADR-053-untracked-sku-operator-data-not-outage/) | Treat the untracked SKU as operator data, not an outage | Accepted | Partial | — |
+| [ADR-053](ADR-053-untracked-sku-operator-data-not-outage/) | Treat the untracked SKU as operator data, not an outage | Accepted | Complete | — |
 | [ADR-054](ADR-054-temporal-worker-controller/) | Give the versioned-worker lifecycle to the Temporal Worker Controller | Accepted | Complete | [RFC-0026](../rfc/RFC-0026/) |
 | [ADR-055](ADR-055-keda-worker-autoscaling/) | Scale versioned workers from task-queue backlog with KEDA | Accepted | Partial | [RFC-0026](../rfc/RFC-0026/) |
-| [ADR-056](ADR-056-k6-e2e-assertion-layer/) | Assert the E2E gates with k6 instead of reading curl by eye | Accepted | Partial — Kind rows converted and proven; compose rows written and contract-verified, environment untested | — |
+| [ADR-056](ADR-056-k6-e2e-assertion-layer/) | Assert the E2E gates with k6 instead of reading curl by eye | Accepted | Complete | — |
 | [ADR-057](ADR-057-span-metrics-in-collector/) | Derive RED span metrics in the collector, not inside a trace backend | Accepted | **Complete** — series verified on Kind; `red-spanmetrics` + `otel-collector-health` now read them cluster-side and gate row K5.5 asserts the leg | [RFC-0027](../rfc/RFC-0027/) |
 | [ADR-058](ADR-058-retire-jaeger/) | Retire Jaeger, keeping the Jaeger query API as VictoriaTraces' interface | Accepted | **Complete** | [RFC-0027](../rfc/RFC-0027/) |
 | [ADR-059](ADR-059-retire-tempo/) | Retire both Tempo installs and take service graphs from VictoriaTraces | Accepted | **Complete** — 31 service-graph edges measured | [RFC-0027](../rfc/RFC-0027/) |
@@ -476,13 +478,13 @@ and extend Adoption instead.
 | [ADR-067](ADR-067-constrain-commerce-cdc-source-allowlist/) | Constrain Commerce CDC to an Explicit Source Allowlist | Accepted | Complete | [RFC-0030](../rfc/RFC-0030/) |
 | [ADR-068](ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Schedule CDC Freshness Heartbeats with pg_cron | Accepted | Complete | [RFC-0030](../rfc/RFC-0030/) |
 | [ADR-069](ADR-069-serve-commerce-analytics-through-read-only-service/) | Serve Commerce Analytics through a Read-Only Service | Accepted | Complete — live on real CDC (2026-10-23), admin 0.5.2 released (2026-10-24); 90-day funnel over the 500 ms bar accepted as a known limit | [RFC-0030](../rfc/RFC-0030/) |
-| [ADR-070](ADR-070-logging-facade-and-event-catalog/) | Log through One Shared slog Facade with a Reviewed Event Catalog | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
-| [ADR-071](ADR-071-telemetry-event-data-contract/) | Fix One Canonical Event, Access and Privacy Data Contract | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
-| [ADR-072](ADR-072-telemetry-clean-cutover/) | Cut the Fleet Over in One Release with No Migration Mechanism | Accepted | Partial | [RFC-0031](../rfc/RFC-0031/) |
-| [ADR-073](ADR-073-application-metrics-contract/) | Bound Application Metrics by Instrument, Cardinality and Replay Rules | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
-| [ADR-074](ADR-074-continuous-profiling-contract/) | Govern Continuous Profiling Identity, Labels and Overhead | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
-| [ADR-075](ADR-075-application-tracing-contract/) | Sample at the Edge and Govern Spans and Baggage from the Shared Package | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
-| [ADR-076](ADR-076-semantic-convention-registry/) | Declare Platform Telemetry Names in a Registry and Keep Bare Namespaces as Registered Exceptions | Accepted | Not started | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-070](ADR-070-logging-facade-and-event-catalog/) | Log through One Shared slog Facade with a Reviewed Event Catalog | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-071](ADR-071-telemetry-event-data-contract/) | Fix One Canonical Event, Access and Privacy Data Contract | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-072](ADR-072-telemetry-clean-cutover/) | Cut the Fleet Over in One Release with No Migration Mechanism | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-073](ADR-073-application-metrics-contract/) | Bound Application Metrics by Instrument, Cardinality and Replay Rules | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-074](ADR-074-continuous-profiling-contract/) | Govern Continuous Profiling Identity, Labels and Overhead | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-075](ADR-075-application-tracing-contract/) | Sample at the Edge and Govern Spans and Baggage from the Shared Package | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
+| [ADR-076](ADR-076-semantic-convention-registry/) | Declare Platform Telemetry Names in a Registry and Keep Bare Namespaces as Registered Exceptions | Accepted | Complete | [RFC-0031](../rfc/RFC-0031/) |
 | [ADR-077](ADR-077-image-volume-schema-delivery/) | Deliver Bootstrap DDL as Digest-Pinned OCI Image Volumes | Accepted | **Complete** — Kind gate 2026-09-29 (1.35.8) | [RFC-0032](../rfc/RFC-0032/) |
 | [ADR-078](ADR-078-migrate-kyverno-policies-to-cel-types/) | Migrate Kyverno Policies to the CEL Policy Types | Accepted | **Complete** — 2026-09-30, every Kyverno policy is a CEL type | — |
 | [ADR-079](ADR-079-version-agent-task-contracts/) | Version Agent Task Contracts in the GitHub Ledger | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |

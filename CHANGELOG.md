@@ -88,6 +88,24 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Feature
+
+#### Docs
+
+- Add the platform work-tracking procedure and a dated inventory of RFCs, ADRs,
+  issues, and outstanding verification. Agents preserve a next action at handoff.
+
+#### Proposals
+
+- Track delivery through outcome-based initiatives and independently verifiable
+  tasks; retain standalone ADR trackers when they own a separate delivery boundary.
+
+### Bugfix
+
+#### Proposals
+
+- Align 17 ADR index adoption entries with their existing completion records.
+
 ### Breaking Change
 
 #### Observability

@@ -97,6 +97,7 @@ specific Kustomization or run `make sync`.
 
 | Doc | When to read |
 |-----|----------------|
+| [Track platform work](work-tracking.md) | Issue intake, priorities, Project views, and evidence before completion |
 | [`setup.md`](setup.md) | First bring-up, Makefile commands, hosts, seed data, full Flux graph, project tree |
 | [`kind-e2e-audit.md`](kind-e2e-audit.md) | **The Kind cluster gate** — K0–K6 runbook proving Flux delivered the pinned images, admission, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../../local-stack/docs/e2e-audit.md) |
 | [`application-delivery.md`](application-delivery.md) | Add a service, ResourceSet contract, image pins, domain labels |

@@ -6,6 +6,11 @@ Newest first.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-01
+
+- Require an existing work-item check at task entry and an evidence/next-action
+  handoff at exit. Route work state to the shared tracking procedure.
+
 ## [2.0.0] - 2026-11-01
 
 - Add § Working with the owner: ten binding rules the owner set through

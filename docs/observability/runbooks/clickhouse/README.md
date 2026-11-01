@@ -37,6 +37,7 @@ alert name.
 | ClickHouseTooManyParts | warning | homelab | live-signal | [ClickHouseTooManyParts.md](ClickHouseTooManyParts.md) |
 | ClickHouseTooManyPartsPerPartition | warning | homelab | live-signal | [ClickHouseTooManyPartsPerPartition.md](ClickHouseTooManyPartsPerPartition.md) |
 | ClickHouseOtelTTLLagging | warning | homelab | live-signal | [ClickHouseOtelTTLLagging.md](ClickHouseOtelTTLLagging.md) |
+| ClickHouseSystemTablesLarge | warning | homelab | live-signal | [ClickHouseSystemTablesLarge.md](ClickHouseSystemTablesLarge.md) |
 | ClickHouseInsertsDelayed | info | homelab | live-signal | [ClickHouseInsertsDelayed.md](ClickHouseInsertsDelayed.md) |
 | ClickHouseInsertsRejected | warning | homelab + compose | predicate-exercised | [ClickHouseInsertsRejected.md](ClickHouseInsertsRejected.md) |
 | ClickHouseInsertsFailing | warning | homelab + compose | predicate-exercised | [ClickHouseInsertsFailing.md](ClickHouseInsertsFailing.md) |
@@ -112,6 +113,13 @@ an evidence label.
 
 Cross-alert procedures that no single rule owns. Each was exercised on the
 Kind cluster during the 2026-09-07 audit ([#1025](https://github.com/duynhlab/homelab/issues/1025)).
+
+### A query is slow or runs out of memory
+
+Its own page: [Slow query or memory failure → flame graph](slow-query-flame-graph.md).
+It finds the `query_id` in `system.query_log`, exports that query's samples
+from `system.trace_log`, draws a CPU or memory flame graph, and maps the widest
+bar to a fix for the `otel` tables. Verified on Kind 2026-10-29.
 
 ### Is TTL keeping up?
 

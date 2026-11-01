@@ -15,8 +15,8 @@
 
 A matching scrape target has returned `up == 0` for five minutes. Identify the
 actual target before diagnosing ingestion: Go services push profiles directly
-via their SDK; an Alloy scrape failure does not by itself prove those pushes
-stopped. Missing targets are not detected by this expression.
+via their SDK; a failed scrape of Pyroscope's own metrics does not by itself
+prove those pushes stopped. Missing targets are not detected by this expression.
 
 ## Impact
 

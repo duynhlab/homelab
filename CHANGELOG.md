@@ -186,6 +186,19 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Pyroscope runs without the chart's Alloy.** `alloy.enabled: false`: every
+  service already pushes profiles through its SDK, so Alloy only profiled
+  Pyroscope and itself, for about 110Mi of memory. Application profiles are
+  unchanged; `monitoring/pyroscope` and `monitoring/alloy` leave the
+  `service_name` list.
+
+- **`system.*` log tables are watched and bounded.** `ClickHouseSystemTablesLarge`
+  (warning) fires when a replica's `system` database passes 2 GiB, 20 % of its
+  10Gi data volume, with a runbook for finding a log without a TTL and for
+  dropping `*_N` upgrade leftovers. `system.opentelemetry_span_log`, born once
+  analytics queries began carrying trace context and shipped by upstream
+  without a TTL, now keeps 7 days.
+
 - **Flux dashboards sit under GitOps in Grafana.** Two `GrafanaFolder` CRs with
   fixed UIDs build the tree GitOps → Flux; the Flux boards use `folderRef:
   flux`, and a post-renderer pins the Kyverno chart board to `gitops`, since the
@@ -626,6 +639,12 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Postgres logs name the session** (#1403). `log_line_prefix` is now
+  `%m [%p] %q%u@%d app=%a client=%h`, and connection and disconnection logging
+  is on like the CNPG clusters, so a raw log line in VictoriaLogs names the
+  service that caused it. Set in `postgres/init.sql` with `ALTER SYSTEM`,
+  because `compose.analytics.yaml` replaces the postgres `command`.
+
 - **Kind-safe analytics drills and fixture** (#1360). The fixture heartbeat
   versions rows by millisecond timestamp (a counter restarting at 1 per process
   left the pre-restart row visible and the service never recovered); the Kind
@@ -655,6 +674,25 @@ Skeleton (copy what you need):
   authoring to `spec-driven-development`, `planning-and-task-breakdown` and
   `documentation-and-adrs`, whose templates and paths do not match this repo)
   with one row. Routed from `AGENTS.md`.
+
+- **Runbook: slow ClickHouse query → flame graph.**
+  `runbooks/clickhouse/slow-query-flame-graph.md` walks on-call from a slow
+  panel or a `MEMORY_LIMIT_EXCEEDED` to the `query_id` and its replica, checks
+  the sample count, re-runs a `SELECT` at 100 Hz when needed, exports the
+  stacks with `INTO OUTFILE … FORMAT TSVRaw` (the password stays at the
+  prompt), draws them with `flamegraph.pl`, and maps the widest bar to a fix
+  for the `otel` sorting keys and indexes. The profiling guide's commands now
+  use `FORMAT TSVRaw`, which keeps C++ names such as `'lambda'` intact.
+
+- **Profiling ClickHouse guide** — `docs/observability/clickhouse/profiling.md`
+  explains the sampling profiler the server has been running since day one
+  (1 Hz CPU and wall-clock timers per query thread, a 4 MiB memory step, the
+  `symbols` column) and how to render CPU and memory flame graphs from
+  `system.trace_log` with `flameGraph()` and `flamegraph.pl`. Everything is a
+  per-query `SETTINGS`, including the `allow_introspection_functions = 1` that
+  `flameGraph()` requires; nothing changes in the shared profile. Records why a
+  Pyroscope eBPF agent is the wrong tool for this binary (needs `hostPID`, CPU
+  only, no `query_id`). Verified on Kind with ClickHouse 26.10.
 
 - **homelab-troubleshooting 0.1.0 knows the field traps.** Seven domain
   references gain a *Known traps* list (22 traps met on this platform, each
@@ -1080,6 +1118,14 @@ Skeleton (copy what you need):
     stale claims: one role per database, edge logs through Vector, the VM pin.
 
 #### Docs
+
+- **The alert catalog counts what Flux deploys** (#1384). The Summary said 278
+  hand-written rules; 272 are applied, because six chart replication-lag files
+  sit outside the kustomization. The domain table now sums to that total:
+  Microservices 21, PostgreSQL 62 (with the pooler and role guard), RFC-0021 32
+  (stock and payment doubt), and a new ClickHouse row of 24. Kind-inert rules
+  are seven, not six. `scripts/alert-catalog-counts.sh` renders the rule
+  kustomizations, prints the counts and fails when a deployed alert has no row.
 
 - **Draw.io product boxes carry their logos.** PgBouncer and PeerDB join the
   homelab-drawio icon catalogue, and the CDC, database, TLS, network-policy,

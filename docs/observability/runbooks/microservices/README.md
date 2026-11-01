@@ -41,7 +41,7 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 ### RFC-0021 stock migration (write path)
 
 Rules: [`prometheusrules/microservices/rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) ·
-catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-overhaul-stock-migration)
+catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-order-side-stock)
 
 These cover a failure class the RED alerts above cannot see: an order and its stock
 can disagree while every service reports perfectly healthy.
@@ -80,7 +80,7 @@ reservation outcomes and gRPC surface directly.
 ### RFC-0021 phase 5 (order aggregate)
 
 Rules: [`prometheusrules/microservices/rfc0021-phase5.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase5.yaml) ·
-catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-overhaul-stock-migration)
+catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-order-side-stock)
 
 Two order states mean **somebody is owed work**, and neither is visible to a RED
 alert: the order is not erroring, it is waiting.

@@ -109,7 +109,8 @@ docs/
 │   │   ├── README.md             # Platform hub, architecture, and Grafana
 │   │   ├── internals/            # Engine learning path + chapter authoring contract
 │   │   ├── parts-merges-and-ttl.md # Storage lifecycle deep dive
-│   │   └── operations.md         # Day-2 diagnosis and recovery
+│   │   ├── operations.md         # Day-2 diagnosis and recovery
+│   │   └── profiling.md          # Sampling profiler: system.trace_log → flame graphs
 │   ├── grafana/                  # Visualization layer
 │   │   ├── README.md             # Grafana overview + plugins
 │   │   ├── rbac-multi-team.md    # Staff-SSO group→role mapping (ADR-062), Teams, folder permissions
@@ -315,6 +316,7 @@ Implementation evidence: **[Telemetry implementation audit (2026-10-23)](./obser
     - [Materialized views](./observability/clickhouse/materialized-views.md) - incremental `TO` trace-id table
     - [Parts, merges, and TTL](./observability/clickhouse/parts-merges-and-ttl.md) - insert lifecycle, merge debt, retention, and RustFS cold tier
     - [ClickHouse operations](./observability/clickhouse/operations.md) - symptom-first day-2 guide and alert evidence
+    - [Profiling ClickHouse](./observability/clickhouse/profiling.md) - the built-in sampling profiler, `system.trace_log`, and flame graphs by SQL
 10. **[Logging](./observability/logging/README.md)** - Hub: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
     - [VictoriaLogs store](./observability/logging/victorialogs.md) - streams model, VLSingle, ingest contracts, retention
     - [Vector pipeline](./observability/logging/vector.md) - DaemonSet, transforms, PG plans/pgaudit, self-monitoring
@@ -409,7 +411,7 @@ Implementation evidence: **[Telemetry implementation audit (2026-10-23)](./obser
 - [VictoriaTraces](./observability/tracing/victoriatraces.md) - the fast trace path (7d), via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
-- [ClickHouse internals learning path](./observability/clickhouse/internals/README.md) · [fundamentals](./observability/clickhouse/fundamentals.md) · [parts/merges/TTL](./observability/clickhouse/parts-merges-and-ttl.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md) · [operations](./observability/clickhouse/operations.md)
+- [ClickHouse internals learning path](./observability/clickhouse/internals/README.md) · [fundamentals](./observability/clickhouse/fundamentals.md) · [parts/merges/TTL](./observability/clickhouse/parts-merges-and-ttl.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md) · [operations](./observability/clickhouse/operations.md) · [profiling](./observability/clickhouse/profiling.md)
 - [Alert lifecycle and runbook engineering](./observability/alerting/alert-lifecycle-and-runbooks.md) - Rule validation and on-call runbook contract
 - [Logging (platform)](./observability/logging/README.md) - OTLP app logs + Vector for non-instrumented pods
 - [Application logging](./api/logs.md) - App-side logging contract (libraries, levels, JSON fields)

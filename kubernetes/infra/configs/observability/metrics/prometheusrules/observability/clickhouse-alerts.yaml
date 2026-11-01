@@ -292,6 +292,23 @@ spec:
             summary: "ClickHouse OTel TTL is not retiring partitions ({{ $labels.table }})"
             description: "The daily-partitioned otel.{{ $labels.table }} table has retained more than 93 active partitions for 6 hours despite its 90-day DELETE TTL. Ingestion can remain healthy while retention, TTL merges, or object-store access is stuck; verify partition ages and TTL merge errors before forcing any materialization."
 
+        # 2 GiB = 20% of the 10Gi data PVC. A system.* log without a TTL grows
+        # forever (opentelemetry_span_log was born with none); ~0.15 GiB on
+        # Kind 2026-10-29.
+        - alert: ClickHouseSystemTablesLarge
+          expr: |
+            sum by (hostname) (
+              chi_clickhouse_table_parts_bytes{database="system", active="1"}
+            ) > 2 * 1024 * 1024 * 1024
+          for: 1h
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseSystemTablesLarge.md"
+            summary: "ClickHouse system.* tables over 2 GiB on {{ $labels.hostname }}"
+            description: "The engine's own log tables use more than 2 GiB of this replica's 10Gi data volume. Usually one system.* log has no TTL (or a stale *_N leftover from a schema change); find it in system.parts before it competes with otel data for disk."
+
         # Event-counter names verified on the Kind cluster 2026-08-22, and THREE
         # of the four alerts that stood here were deleted because the series they
         # named do not exist. The exporter publishes 166 chi_clickhouse_event_*

@@ -72,9 +72,10 @@ or for the primary observability stack.
 4. **Trace-id lookup** — [materialized-views](materialized-views.md) (incremental `TO`, not a Postgres index)
 5. **Storage lifecycle** — [parts, merges, partitions, and TTL](parts-merges-and-ttl.md)
 6. **On call** — [operations](operations.md) → [alert runbooks](../runbooks/clickhouse/README.md)
-7. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
-8. **Hands-on** — [Playground](#playground--mergetree-by-hand)
-9. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
+7. **Profiler** — [profiling](profiling.md) (reading `system.trace_log`, CPU and memory flame graphs with `flameGraph()`)
+8. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
+9. **Hands-on** — [Playground](#playground--mergetree-by-hand)
+10. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
 Pair with the PostgreSQL [WAL and checkpoints chapter](../../databases/fundamentals/04-wal-and-checkpoints.md)
 if you already know Postgres heap / WAL / B-tree.
@@ -429,6 +430,10 @@ including `ORDER BY event_time`. **The cost of that override:** a future operato
 change to its own `trace_log` template is silently ignored here, so re-read that
 file on operator bumps.
 
+What those seven days of samples are good for — CPU and memory flame graphs of
+one query or of the merges, built with `flameGraph()` and `flamegraph.pl` from
+nothing but SQL — is in [Profiling ClickHouse](profiling.md).
+
 **Why the partition key moves with the TTL.** All five shipped monthly
 (`toYYYYMM`). A 7-day TTL on a monthly partition is the misaligned case in
 [Partitions and TTL](fundamentals.md#the-alignment-rule): at the default
@@ -480,7 +485,10 @@ Measured 2026-09-06: **24 declared, 13 born.** Of the eleven not yet created,
 `crash_log` is deliberately left alone — a crash record is the last thing to
 expire — and the rest (`backup_log`, `session_log`, `opentelemetry_span_log`,
 the lake-format logs, `instrumentation_trace_log`) belong to features this
-platform does not use. `query_metric_log` was in that list and then appeared on
+platform does not use. `opentelemetry_span_log` appeared once analytics queries
+began carrying trace context; found without a TTL on 2026-10-29, it now has a
+7-day one, and `ClickHouseSystemTablesLarge` watches the whole `system`
+database for the next such table. `query_metric_log` was in that list and then appeared on
 the 2026-09-07 audit as the seventh table with no TTL — it is now removed from
 the config outright. Revisit this list when one of them appears.
 

@@ -173,7 +173,7 @@ skill-creator format; they are a judgement aid, not a gate.
   so.
 - **Never assert a path without evidence.** A packet path, a pooler or a
   hostname comes from the manifests, not from how such platforms usually look.
-- **Commit messages and branch names** follow [git-commits](../git-commits/SKILL.md).
+- **Commit messages, branch names and PR text** follow [git-pr](../git-pr/SKILL.md).
   Follow [platform-engineer's validation gates](../platform-engineer/SKILL.md#verification-and-release),
   including `make validate` before every push. Commit the
   IR, the `.drawio` and its exports together. A source edit without a re-export

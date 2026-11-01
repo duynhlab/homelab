@@ -92,7 +92,7 @@ that owns it. Check them before forming a new hypothesis.
    evidence with its record ([docs-hygiene](references/docs-hygiene.md)).
 
 For a fix that edits manifests, follow [platform-engineer's gates](../platform-engineer/SKILL.md#verification-and-release)
-and [git-commits](../git-commits/SKILL.md). Diagrams stay Mermaid (AGENTS.md).
+and [git-pr](../git-pr/SKILL.md). Diagrams stay Mermaid (AGENTS.md).
 
 ## References
 

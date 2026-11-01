@@ -130,8 +130,8 @@ Hub: [`docs/proposals/`](../../../docs/proposals/).
 
 ## Contribution workflow
 
-When writing or reviewing commit messages, squash messages, or branch names,
-read [git-commits](../git-commits/SKILL.md). For worktree lifecycle and cleanup
+When writing or reviewing branch names, commit messages, squash messages, or
+PR titles and descriptions, read [git-pr](../git-pr/SKILL.md). For worktree lifecycle and cleanup
 (including proving a squash-merged branch landed before deletion), read
 [git-worktrees](../git-worktrees/SKILL.md). The PR workflow and Git/GitHub
 identity remain in [AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow).

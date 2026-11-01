@@ -664,6 +664,20 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Project skills review: the owner's rules move into platform-engineer.**
+  platform-engineer 2.0.0 adds § Working with the owner: ten binding rules
+  (gate → merge → tag → Kind, no green report mid-push, admin merge only on
+  green, named-path staging, evidence over memory, read the service code,
+  adoptable features hold a bump, pre-deployment contracts, an
+  Envoy-Gateway-native edge, explain the mechanism). It also fixes the chart
+  names (`duynh`, `slo`) and adds git-pr to the skills map.
+  homelab-troubleshooting 0.2.0 routes `CertManager*` alerts and corrects the
+  logging path (`slogx`), the ClickHouse manifest paths and the alert-count
+  command. homelab-docs 1.1.0 follows the runbook `_TEMPLATE.md`.
+  homelab-proposals 0.2.0 routes the optional RFC domain doc to homelab-docs.
+  homelab-drawio 1.0.1 asserts the v2 palette in its evals. The docs, proposals
+  and runbook hubs now link the skill that works on them.
+
 - **New `homelab-docs` skill.** [`.agents/skills/homelab-docs/`](.agents/skills/homelab-docs/SKILL.md)
   owns how a page under `docs/` is written, verified, edited and reviewed. It
   routes to the AGENTS.md docs conventions instead of repeating them, and adds
@@ -873,6 +887,12 @@ Skeleton (copy what you need):
   secrets diagrams.
 
 #### Proposals
+
+- **ADR-090 proposed: keep the docs procedure in `homelab-docs`.** It partly
+  supersedes ADR-083's "no second project documentation skill" clause, which
+  #1474 departed from without a record. ADR-083's reader contracts, Steward
+  split and example policy are unchanged; ADR-083 and RFC-0033 gain history
+  rows.
 
 - **RFC-0034 research expands with the `duynh` chart as-built.** Record that the
   chart already renders the `app.kubernetes.io/{name,instance,version,managed-by}`

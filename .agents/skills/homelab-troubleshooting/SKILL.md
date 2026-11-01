@@ -12,7 +12,7 @@ description: >-
   docs. Not for application code (owned by service repos) or new runbook alerts
   without a backing rule.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Homelab troubleshooting
@@ -52,7 +52,7 @@ is the API source of truth.
    recorded gap. Report it ([docs-hygiene](references/docs-hygiene.md)); do not
    fabricate steps.
 6. **Current vs historical.** Envoy Gateway and VictoriaTraces/ClickHouse are
-   current; Kong, Tempo, and Jaeger docs are historical — ignore them unless the
+   current; Kong, Loki, Tempo, and Jaeger docs are historical — ignore them unless the
    request is explicitly about migration history.
 
 ## Domain routing
@@ -71,7 +71,7 @@ that owns it. Check them before forming a new hypothesis.
 | Applications | `Microservice*`, 5xx, slow, saga/outbox | [references/domains/applications.md](references/domains/applications.md) |
 | PostgreSQL / CNPG | `CNPG*`, `PgDog*`, outage, corruption | [references/domains/data-postgresql.md](references/domains/data-postgresql.md) |
 | CDC / analytics / cache | CDC freshness, `Valkey*`, `ClickHouse*` | [references/domains/data-cdc-analytics.md](references/domains/data-cdc-analytics.md) |
-| Secrets / TLS | ExternalSecret NotReady, cert issuance | [references/domains/secrets-tls.md](references/domains/secrets-tls.md) |
+| Secrets / TLS | ExternalSecret NotReady, cert issuance, `CertManager*` | [references/domains/secrets-tls.md](references/domains/secrets-tls.md) |
 | Security / admission / net | `Kyverno*`, admission deny, blocked despite healthy pods | [references/domains/security-admission-net.md](references/domains/security-admission-net.md) |
 | Kubernetes substrate | `Kube*`, CrashLoop, OOM, PVC | [references/domains/kubernetes-infra.md](references/domains/kubernetes-infra.md) |
 | Temporal / KEDA | `Temporal*`, `Keda*`, stuck workflow | [references/domains/applications.md](references/domains/applications.md#temporal--keda) |
@@ -90,6 +90,8 @@ that owns it. Check them before forming a new hypothesis.
    user symptom gone (drain/replica/queue checks, not just an instantaneous 0).
 7. **Record** — put durable findings in their owning runbook/hub; keep dated
    evidence with its record ([docs-hygiene](references/docs-hygiene.md)).
+   Write or edit the page itself through [homelab-docs](../homelab-docs/SKILL.md),
+   which owns every doc edit (runbook shape, verification, review).
 
 For a fix that edits manifests, follow [platform-engineer's gates](../platform-engineer/SKILL.md#verification-and-release)
 and [git-pr](../git-pr/SKILL.md). Diagrams stay Mermaid (AGENTS.md).
@@ -97,6 +99,6 @@ and [git-pr](../git-pr/SKILL.md). Diagrams stay Mermaid (AGENTS.md).
 ## References
 
 - [references/triage-and-safety.md](references/triage-and-safety.md) — command classes, approval gates, SQL/Flux/DR guardrails.
-- [references/domain-routing.md](references/domain-routing.md) — the four entry modes in depth and how to choose.
+- [references/domain-routing.md](references/domain-routing.md) — the four incident entry modes in depth and how to choose (Cleanup lives in docs-hygiene).
 - [references/evidence-correlation.md](references/evidence-correlation.md) — metrics → traces → logs → profiles, the manual `trace_id` pivot.
 - [references/docs-hygiene.md](references/docs-hygiene.md) — retain / promote / move / remove disposition for debug notes.

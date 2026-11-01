@@ -13,6 +13,7 @@ content a page has; they are not a list of sections to fill.
 | Look up a fact | Reference | Catalog or contract | [Alert catalog](../../../../docs/observability/alerting/alert-catalog.md), [`docs/api/_template-service.md`](../../../../docs/api/_template-service.md) |
 | Learn a mechanism in depth | Tutorial or Explanation | Learning chapter | [`fundamentals/_template.md`](../../../../docs/databases/fundamentals/_template.md), [`internals/_template.md`](../../../../docs/observability/clickhouse/internals/_template.md) |
 | Decide or record a decision | — | Research, RFC, ADR | [homelab-proposals](../../homelab-proposals/SKILL.md) |
+| Promote accepted RFC research into an area guide (RFC process step 4) | Explanation | Domain doc, house shape | this skill; the RFC links it ([`rfc/README.md`](../../../../docs/proposals/rfc/README.md)) |
 
 ## Hub
 
@@ -41,16 +42,24 @@ platform behaviour → operations → references.
 
 ## Runbook
 
-The reader is on call and has the alert name. Keep the existing order:
+The reader is on call and has the alert name. Copy
+[`runbooks/_TEMPLATE.md`](../../../../docs/observability/runbooks/_TEMPLATE.md);
+it owns the section order (header table, Meaning, Impact, Safety, Diagnosis,
+Mitigation, Recovery validation, Escalation, Related). What each section must
+do:
 
-1. A header table: severity, the rule's manifest path, the dashboard.
-2. **Meaning**: what the expression measures and what state fires it, in
-   plain words. Say what does *not* fire it when that prevented noise before.
-3. **Impact**: link the alert catalog row instead of repeating it.
-4. **Diagnosis**: possible causes, then the commands and queries that
-   distinguish them. Every command was run on Kind or local-stack. Use
-   `$NAMESPACE`, `$APP` and `$POD_NAME` placeholders.
-5. **Mitigation**: numbered steps, one action each, keyed on the diagnosis.
+- **Meaning**: what the expression measures and what state fires it, in
+  plain words. Say what does *not* fire it when that prevented noise before.
+- **Impact**: link the alert catalog row instead of repeating it.
+- **Safety**: which steps change state and need approval
+  ([homelab-troubleshooting](../../homelab-troubleshooting/SKILL.md) owns the
+  approval gates).
+- **Diagnosis**: possible causes, then the commands and queries that
+  distinguish them. Every command was run on Kind or local-stack. Use
+  `$NAMESPACE`, `$APP` and `$POD_NAME` placeholders.
+- **Mitigation**: numbered steps, one action each, keyed on the diagnosis.
+- **Recovery validation**: the predicate false for two intervals and the user
+  symptom gone.
 
 A runbook names no cause the evidence does not support. When several causes
 share a symptom, say which check tells them apart.

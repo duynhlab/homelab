@@ -5,10 +5,11 @@ agents need in homelab: layout, build commands, admission rules, Flux gotchas,
 documentation conventions, PR workflow and Git/GitHub identity.
 
 Read [platform-engineer](.agents/skills/platform-engineer/SKILL.md) before any
-non-trivial task for operating procedure, API trust, and domain routing. When a
-design record is the gate, authoring the RFC/ADR lifecycle follows
+non-trivial task for operating procedure, the owner's working rules, API trust,
+and domain routing. When a design record is the gate, authoring the RFC/ADR
+lifecycle follows
 [homelab-proposals](.agents/skills/homelab-proposals/SKILL.md). For commit
-messages and branch names, follow the skill routing in
+messages, branch names and PR text, follow the skill routing in
 [Contribution workflow](#contribution-workflow).
 
 Repository skills live under `.agents/skills/`; Claude Code discovers them
@@ -336,6 +337,7 @@ reference style.
 | Writing, editing and reviewing docs | [homelab-docs](.agents/skills/homelab-docs/SKILL.md) |
 | RFC / ADR authoring lifecycle | [homelab-proposals](.agents/skills/homelab-proposals/SKILL.md) |
 | RFC research phase | [proposals-researcher](.agents/agents/proposals-researcher.md) sub-agent |
+| Draw.io diagrams (asked by name, or an existing `.drawio`) | [homelab-drawio](.agents/skills/homelab-drawio/SKILL.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

@@ -10,6 +10,10 @@ symptoms are "ExternalSecret NotReady" or "cert won't issue".
   (ESO sync failure, reviewer JWT ~1h post-bootstrap, dynamic-credentials debug,
   unseal, rotation, compromise revoke).
 - cert-manager + trust-manager CA bundle: [secrets/cert-manager.md](../../../../../docs/secrets/cert-manager.md).
+- `CertManager*` alerts (their runbooks live under `runbooks/gitops/`):
+  [CertManagerCertNotReady](../../../../../docs/observability/runbooks/gitops/CertManagerCertNotReady.md),
+  [CertManagerCertExpiringSoon](../../../../../docs/observability/runbooks/gitops/CertManagerCertExpiringSoon.md),
+  [CertManagerCertExpiryCritical](../../../../../docs/observability/runbooks/gitops/CertManagerCertExpiryCritical.md).
 - OpenBAO internals: [secrets/openbao.md](../../../../../docs/secrets/openbao.md).
 
 ## Manifests

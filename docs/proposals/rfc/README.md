@@ -6,7 +6,8 @@ Every substantial topic **reserves an RFC number first**, explores in **`researc
 then writes the decision in **`README.md`**.
 
 Overview and lifecycle diagram: [`docs/proposals/README.md`](../README.md). **Index and
-backlog live in this file.**
+backlog live in this file.** Agents follow this process through the
+[homelab-proposals](../../../.agents/skills/homelab-proposals/SKILL.md) skill.
 
 > **Don't forget: every decision is a tradeoff.** A good RFC states what the choice
 > *costs* (rejected alternatives + drawbacks + rollback), not just what it buys.

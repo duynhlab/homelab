@@ -27,7 +27,8 @@ per-alert runbook.
    Mitigation → Recovery validation → Escalation.
 3. Re-derive any count from the rules — the catalog Summary is **derived**, not
    a cached constant:
-   `rg -c '^\s*- alert:' kubernetes/infra/configs/observability/metrics/prometheusrules`.
+   `scripts/alert-catalog-counts.sh`. It renders what Flux applies, including
+   the Temporal rules, and fails when a deployed alert has no catalog row.
 
 ## SLO burn-rate exception
 

@@ -6,6 +6,18 @@ Newest first.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
+- Route `CertManager*` alerts to Secrets / TLS (their runbooks sit under
+  `runbooks/gitops/`) and list all nine gitops runbooks.
+- Correct three stale facts: services log through `pkg/logger/slogx`, not an
+  otelzap tee; ClickHouse manifests live in `configs/clickhouse*/`; alert
+  counts come from `scripts/alert-catalog-counts.sh`, which includes the
+  Temporal rules.
+- Loki joins the historical list; the keycloak runbook index gap is closed.
+- The Record step and Cleanup mode hand the page edit to homelab-docs.
+- Link to git-pr after the git-commits rename (#1473).
+
 ## [0.1.0] - 2026-10-29
 
 - Added a **Known traps** section to seven domain references (22 traps): merge

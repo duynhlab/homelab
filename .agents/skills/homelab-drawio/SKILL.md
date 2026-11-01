@@ -10,7 +10,7 @@ description: >-
   this skill only when Draw.io is asked for by name or a `.drawio` already
   exists. For a plain Mermaid diagram, do NOT use this skill.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # homelab-drawio

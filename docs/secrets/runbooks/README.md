@@ -31,6 +31,9 @@ governs **alert** runbooks only and does not apply here.
 
 ## Troubleshooting
 
+Agents reach these runbooks through the
+[homelab-troubleshooting skill](../../../.agents/skills/homelab-troubleshooting/SKILL.md).
+
 | When to use | Runbook |
 |---|---|
 | ExternalSecret or ClusterSecretStore is not ready | [ESO sync failure](./eso-sync-failure.md) |

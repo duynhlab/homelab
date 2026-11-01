@@ -3,7 +3,10 @@
 Cleanup mode consolidates stray debug/troubleshooting/known-issue scribbles into
 the one place that already owns them, **without erasing operational evidence**.
 Follow [AGENTS.md § Documentation history and evidence](../../../../AGENTS.md#documentation-history-and-evidence)
-and [§ Manifest comments](../../../../AGENTS.md#manifest-comments).
+and [§ Manifest comments](../../../../AGENTS.md#manifest-comments). The page
+edits themselves (runbook shape, verification, review pass) follow
+[homelab-docs](../../homelab-docs/SKILL.md); this file only decides where each
+note goes.
 
 ## Four-way disposition
 
@@ -40,8 +43,8 @@ option.
   summary rather than fixing them silently.
 - **Report index drift separately** — do not fold it into the cleanup diff.
   Known candidates to verify (not assume) at audit time:
-  - Runbook index rows absent for the `gitops/`, `victoriametrics/`,
-    `observability/`, and `keycloak/` folders in
+  - Runbook index rows absent for the `gitops/`, `victoriametrics/` and
+    `observability/` folders in
     [runbooks/README.md](../../../../docs/observability/runbooks/README.md).
   - The cert-manager "no `runbook_url`" note vs the gitops runbooks that now
     cover `CertManager*`.

@@ -562,6 +562,10 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 ## Additional Resources
 
 - **[AGENTS.md](../AGENTS.md)** - AI agent guide for navigating the codebase
+- **[Platform engineer](../.agents/skills/platform-engineer/SKILL.md)** - The owner's operating procedure and working rules; routes each task to the skill below that owns it
 - **[Git commits and PRs](../.agents/skills/git-pr/SKILL.md)** - Homelab branch names, commit and squash messages, PR titles and descriptions
 - **[Homelab docs](../.agents/skills/homelab-docs/SKILL.md)** - How a page here is written, verified, edited and reviewed: page shapes, style rules, prose pass
+- **[Homelab proposals](../.agents/skills/homelab-proposals/SKILL.md)** - RFC and ADR lifecycle; research runs in the [proposals-researcher](../.agents/agents/proposals-researcher.md) sub-agent
+- **[Homelab troubleshooting](../.agents/skills/homelab-troubleshooting/SKILL.md)** - Route an alert or symptom to its runbook, diagnose read-only first, tidy debug notes
+- **[Git worktrees](../.agents/skills/git-worktrees/SKILL.md)** - Worktree lifecycle and proving a squash-merged branch landed before cleanup
 - **[README.md](../README.md)** - Project overview and quick start

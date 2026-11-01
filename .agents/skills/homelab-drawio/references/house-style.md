@@ -223,7 +223,7 @@ control edges (a delivery graph): there they are the flow.
 
 ## Applying it
 
-- Logo box: `python3 ../scripts/icon_style.py style <name> --role <role>` →
+- Logo box: `python3 scripts/icon_style.py style <name> --role <role>` →
   paste as the cell `style`.
   One box holds one product, or one logo family
   ([`icons.md`](icons.md#rules-that-keep-the-catalog-honest)).

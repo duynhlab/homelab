@@ -12,7 +12,7 @@ Stop at the first hit:
 
 | # | Source | How |
 |---|---|---|
-| 1 | the catalog (`assets/icons/`) | `python3 ../scripts/icon_style.py style <name> --role <role>` |
+| 1 | the catalog (`assets/icons/`) | `python3 scripts/icon_style.py style <name> --role <role>` |
 | 2 | CNCF Artwork (a CNCF project not yet catalogued) | **list** `projects/<slug>/icon/color/` (filenames are not slugs — ESO ships `eso-icon-color.svg`), fetch the colour SVG, `rsvg-convert -w 64 -h 64`, add it |
 | 3 | simple-icons (brand, CC0) | `https://cdn.simpleicons.org/<slug>` → rasterise, add |
 | 4 | project brand repo | fetch the official mark, rasterise, add |

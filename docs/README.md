@@ -6,7 +6,7 @@ Documentation for the **duynhlab microservices platform** — 11 Go services + a
 
 ## Documentation Structure
 
-```
+```text
 docs/
 ├── api/                          # API surface, service contracts, and workflow guides
 │   ├── README.md                 # Area hub and recommended learning path
@@ -565,6 +565,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **[Platform engineer](../.agents/skills/platform-engineer/SKILL.md)** - The owner's operating procedure and working rules; routes each task to the skill below that owns it
 - **[Git commits and PRs](../.agents/skills/git-pr/SKILL.md)** - Homelab branch names, commit and squash messages, PR titles and descriptions
 - **[Homelab docs](../.agents/skills/homelab-docs/SKILL.md)** - How a page here is written, verified, edited and reviewed: page shapes, style rules, prose pass
+- **[Page templates](./_templates/README.md)** - Tutorial, how-to, reference and explanation templates (the ADR-083 reader contracts); copy one for a new page
 - **[Homelab proposals](../.agents/skills/homelab-proposals/SKILL.md)** - RFC and ADR lifecycle; research runs in the [proposals-researcher](../.agents/agents/proposals-researcher.md) sub-agent
 - **[Homelab troubleshooting](../.agents/skills/homelab-troubleshooting/SKILL.md)** - Route an alert or symptom to its runbook, diagnose read-only first, tidy debug notes
 - **[Git worktrees](../.agents/skills/git-worktrees/SKILL.md)** - Worktree lifecycle and proving a squash-merged branch landed before cleanup

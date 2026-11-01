@@ -664,6 +664,19 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Page templates and a teach-first docs skill.** `docs/_templates/` holds
+  the four ADR-083 reader contracts (tutorial, how-to, reference,
+  explanation) with a guidance comment under every heading and a review gate
+  to delete before publishing. homelab-docs 1.2.0 adds `teaching.md` (layer
+  basic → complex on the platform's own components; every step is action →
+  command → real output → what to notice → checkpoint; open with observable
+  outcomes, close with next steps), maps each page shape to its contract and
+  template, and adds a Teaching review pass. `scripts/docs-check.sh`
+  (`make docs-check`) checks links and anchors, fence language tags, Mermaid
+  render, token patterns and the inbound links of a new page; CI runs it on
+  the changed pages without the Mermaid render. ADR-083 Adoption moves to
+  Partial and ADR-090 to Complete.
+
 - **Project skills review: the owner's rules move into platform-engineer.**
   platform-engineer 2.0.0 adds § Working with the owner: ten binding rules
   (gate → merge → tag → Kind, no green report mid-push, admin merge only on
@@ -888,6 +901,11 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-083 Adoption → Partial, ADR-090 Adoption → Complete.** The templates
+  the Steward decision obligated exist, the docs skill points to them, and
+  the navigation checks run in CI. The example-policy marker is documented
+  but not enforced; the observability pilot has not started.
+
 - **ADR-090 proposed: keep the docs procedure in `homelab-docs`.** It partly
   supersedes ADR-083's "no second project documentation skill" clause, which
   #1474 departed from without a record. ADR-083's reader contracts, Steward
@@ -1024,6 +1042,12 @@ Skeleton (copy what you need):
   Vietnamese domain guide is created before those gates pass.
 
 #### CI
+
+- **`markdown-links` runs `scripts/docs-check.sh --no-mermaid` on the changed
+  pages.** Anchors, fence language tags, token patterns and the inbound links
+  of a new page fail the job; the Mermaid render stays local because `mmdc`
+  needs Chromium. The checkout fetches full history so the script can diff
+  against `origin/main`.
 
 - **Daily cleanup of finished Actions runs.** `delete-workflow-runs.yml`
   calls the shared `delete-workflow-runs` reusable workflow in

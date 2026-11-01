@@ -63,6 +63,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Check Markdown links
         uses: tcort/github-action-markdown-link-check@e047c5b37f24ab722bbef1a27b6fab7f96bc4068 # v1.1.3
@@ -71,6 +73,11 @@ jobs:
           check-modified-files-only: 'yes'
           base-branch: main
           config-file: .github/markdown-link-check.json
+
+      # Anchors, fence language tags, token patterns and inbound links on the
+      # changed pages. Mermaid renders locally (mmdc needs Chromium), not here.
+      - name: Check changed docs pages
+        run: ./scripts/docs-check.sh --no-mermaid
 
   # 4. Final Status Notification
   notify:

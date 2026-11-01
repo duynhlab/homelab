@@ -5,13 +5,22 @@ content inform **action** or **knowledge**, and does it serve **learning** or
 **work**? Then use the homelab shape that owns that quadrant. Shapes order the
 content a page has; they are not a list of sections to fill.
 
-| Reader needs | Diátaxis type | Homelab shape | Model |
+The ADR-083 contract column names the reader contract the page serves; the
+generic template for each contract is in
+[`docs/_templates/`](../../../../docs/_templates/README.md), and an area
+variant wins when the page belongs to that area's series. Pages that teach
+also follow [teaching.md](teaching.md).
+
+| Reader needs | ADR-083 contract | Homelab shape | Copy from |
 |---|---|---|---|
-| Find the right page | — | Hub | [`docs/observability/README.md`](../../../../docs/observability/README.md) |
-| Understand how a subsystem works here | Explanation | Architecture guide (house shape) | [`docs/observability/profiling/README.md`](../../../../docs/observability/profiling/README.md) |
-| Act on an alert or incident | How-to | Runbook | [`MicroserviceDown.md`](../../../../docs/observability/runbooks/microservices/MicroserviceDown.md) |
-| Look up a fact | Reference | Catalog or contract | [Alert catalog](../../../../docs/observability/alerting/alert-catalog.md), [`docs/api/_template-service.md`](../../../../docs/api/_template-service.md) |
-| Learn a mechanism in depth | Tutorial or Explanation | Learning chapter | [`fundamentals/_template.md`](../../../../docs/databases/fundamentals/_template.md), [`internals/_template.md`](../../../../docs/observability/clickhouse/internals/_template.md) |
+| Find the right page | — | Hub | [`docs/observability/README.md`](../../../../docs/observability/README.md) (model) |
+| Reach a first success, step by step | Tutorial | Tutorial | [`_templates/tutorial.md`](../../../../docs/_templates/tutorial.md) |
+| Do a known task (rotate, add, promote, change) | How-to | Task guide | [`_templates/how-to.md`](../../../../docs/_templates/how-to.md) |
+| Act on an alert or incident | How-to | Runbook | [`runbooks/_TEMPLATE.md`](../../../../docs/observability/runbooks/_TEMPLATE.md) |
+| Look up a fact | Reference | Catalog or contract | [`_templates/reference.md`](../../../../docs/_templates/reference.md); service contracts: [`docs/api/_template-service.md`](../../../../docs/api/_template-service.md) |
+| Understand how a subsystem works here | Explanation | Architecture guide (house shape) | [`docs/observability/profiling/README.md`](../../../../docs/observability/profiling/README.md) (model) |
+| Understand one mechanism | Explanation | Explanation | [`_templates/explanation.md`](../../../../docs/_templates/explanation.md) |
+| Learn a mechanism in depth, in a series | Explanation | Learning chapter | [`fundamentals/_template.md`](../../../../docs/databases/fundamentals/_template.md), [`internals/_template.md`](../../../../docs/observability/clickhouse/internals/_template.md) |
 | Decide or record a decision | — | Research, RFC, ADR | [homelab-proposals](../../homelab-proposals/SKILL.md) |
 | Promote accepted RFC research into an area guide (RFC process step 4) | Explanation | Domain doc, house shape | this skill; the RFC links it ([`rfc/README.md`](../../../../docs/proposals/rfc/README.md)) |
 
@@ -63,6 +72,14 @@ do:
 
 A runbook names no cause the evidence does not support. When several causes
 share a symptom, say which check tells them apart.
+
+## Tutorial and task guide
+
+Copy the template. A tutorial walks a reader who has never done the task to
+one observable result, with a checkpoint after every step; a task guide
+assumes the reader and verifies more than it explains. The step shape
+(action, command, output, what to notice, checkpoint) is in
+[teaching.md § Write a step](teaching.md#write-a-step).
 
 ## Reference
 

@@ -92,7 +92,12 @@ is not.
 - A language identifier on every fenced block: `bash`, `promql`, `logsql`,
   `sql`, `yaml`, `mermaid`.
 - Descriptive link text; never `here` or a bare URL in prose.
-- Relative links inside the repository, so CI can check them.
+- Relative links inside the repository, so CI can check them. Link
+  `docs/api/` for a contract and the owning RFC or ADR for a decision;
+  official product docs go in § References. Check that a `#anchor` exists.
+- GitHub alerts (`> [!NOTE]`, `> [!WARNING]`) only for a deviation from
+  expected behaviour or a state-changing command
+  ([teaching.md § Callouts](teaching.md#callouts)).
 
 ## Commands and queries
 
@@ -105,7 +110,12 @@ is not.
 - Pass a password through stdin, a file, or `--ask-password`; never on the
   command line.
 - Show real error text when the reader will meet it, followed by the fix.
-- Do not invent expected output. Show it only when it is stable and useful.
+- Do not invent expected output. Show it only when it is stable and useful,
+  in a separate `text` fence after the command, with the environment and
+  date it was observed on the page.
+- A state-changing command carries `<!-- example-policy: ephemeral -->` or
+  `review-only` on the line before its fence; a missing marker means
+  `review-only` ([`docs/_templates/README.md`](../../../../docs/_templates/README.md#executable-examples)).
 
 ## Lists and tables
 

@@ -41,6 +41,18 @@ snippet, a third-party article embedded in the body.
 - Does troubleshooting say what to inspect next?
 - Are platform gaps separated from docs guidance and tracked as issues?
 
+## Pass 3b: Teaching
+
+For a tutorial, an explanation, or a learning chapter
+([teaching.md](teaching.md)):
+
+- Can the reader act after the first example?
+- Is every term defined on this page or linked to the area glossary?
+- Does each step carry a command, a real output, and what to notice?
+- Does the order run basic → complex, with the deployed path first?
+- Does the page open with observable outcomes and end with a next step?
+- Does every diagram have a "What to notice" after it?
+
 ## Pass 4: Style and retrieval
 
 - Are names exact and terms consistent with manifests and output?

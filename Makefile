@@ -91,6 +91,10 @@ flux-status: ## Show Flux status (all resources)
 validate: ## Validate Kubernetes manifests (Kustomize)
 	./scripts/flux-validate.sh
 
+.PHONY: docs-check
+docs-check: ## Check Markdown changed against origin/main (links, fences, Mermaid, inbound links)
+	./scripts/docs-check.sh
+
 ##@ End-to-end assertions
 
 # GATE selects the target preset (compose | kind); every script reads it. These

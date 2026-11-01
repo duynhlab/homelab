@@ -6,6 +6,12 @@ Newest first.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-01
+
+- Add § Squash merge: keep a PR at one commit, or set the squash message so
+  it carries one duynebot trailer; GitHub's default for a multi-commit PR
+  repeats it after a `---------` line.
+
 ## [2.1.0] - 2026-11-01
 
 - Tie closing keywords to complete issue acceptance evidence; partial deliveries

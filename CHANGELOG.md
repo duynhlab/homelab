@@ -92,6 +92,8 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- git-pr 2.2.0: a squash commit carries one duynebot trailer; keep a PR at
+  one commit or set the squash message at merge.
 - Add the platform work-tracking procedure and a dated inventory of RFCs, ADRs,
   issues, and outstanding verification. Agents preserve a next action at handoff.
 

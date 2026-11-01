@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0033 Phase 0 documentation evals and the observability pilot |
-| **Adoption** | Not started |
+| **Adoption** | Partial — the four templates exist under `docs/_templates/`; navigation and example-safety checks run in `scripts/docs-check.sh` (links, inbound links, Mermaid); the example-policy marker is documented, not enforced; the observability pilot has not started |
 
 ## Context
 
@@ -153,7 +153,7 @@ cover the same platform area.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Add four source templates under `docs/_templates/` | `duynhne` | RFC-0033 documentation pilot | Each contract states audience, prerequisites, outcome, evidence, and next step |
+| Add four source templates under `docs/_templates/` | `duynhne` | Done 2026-11-01 ([`docs/_templates/`](../../../_templates/README.md)) | Each contract states audience, prerequisites, outcome, evidence, and next step |
 | Point `platform-engineer` to the templates | `duynhne` | RFC-0033 documentation pilot | One project skill remains the operating procedure |
 | Build example-marker and navigation checks | `duynhne` | RFC-0033 Phase 0/pilot | Unsafe or unclassified executable behavior fails closed |
 | Pilot the capability map in `docs/observability/` | `duynhne` | RFC-0033 Phase 1 canary | Reader routes, deterministic checks, and task-success evidence are recorded |
@@ -186,4 +186,5 @@ preventing drift, or executable examples cannot be isolated safely.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted the four content contracts, review split, and safe-example policy |
+| 2026-11-01 | Accepted / Partial | The four templates land under `docs/_templates/`, pointed to by the `homelab-docs` skill per ADR-090; `scripts/docs-check.sh` runs the navigation checks on changed pages in CI |
 | 2026-11-01 | Accepted / Not started | [ADR-090](../ADR-090-homelab-docs-skill/) (Proposed) would partly supersede the "no second project documentation skill" clause: `homelab-docs` shipped in #1474. The contracts, review split and example policy are unchanged |

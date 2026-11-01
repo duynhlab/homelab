@@ -34,7 +34,7 @@ details in platform-engineer, not duplicated here).
 
 ## Repository layout
 
-```
+```text
 kubernetes/
   clusters/   # Flux bootstrap + Kustomization CRDs per cluster (local/prod) — the dependency chain
   infra/      # Controllers + configs: monitoring, APM, databases, secrets, SLO, kyverno, envoy-gateway
@@ -108,7 +108,7 @@ Every manifest applied to the cluster must satisfy admission:
   behind a CR), list them in `healthChecks` and **omit `wait`**. A wave carrying
   both is a wave that gates on nothing.
 - **Flux enforces deployment order via `dependsOn`** — apps won't start until infra is ready. Chain (in `kubernetes/clusters/local/`):
-  ```
+  ```text
   flux-system → controllers-local → {secrets, monitoring, network-policies,
   gateway-api-crds, pgroles-operator, ...}
   secrets → {cert-manager, clickhouse-keeper, storage, profiling}
@@ -210,6 +210,7 @@ writing or refactoring them:
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
 - **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).
 - One hub per area; link every new doc from [`docs/README.md`](docs/README.md) and the area index.
+- **New pages start from [`docs/_templates/`](docs/_templates/README.md)** (the ADR-083 reader contracts: tutorial, how-to, reference, explanation) or the area's own template. Run `make docs-check` before pushing a docs change; CI runs the same script on the changed pages.
 - **RFC domain spin-off:** when an owner promotes research to `docs/<area>/<topic>/README.md`, use the house shape above, English only, link `RFC-NNNN/research.md` + `RFC-NNNN/README.md`. Diagrams may repeat research — keep labels accurate to deployed vs **planned** reality.
 
 ### Documentation history and evidence

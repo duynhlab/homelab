@@ -7,7 +7,7 @@ description: >-
   page clearer, shorter, or less AI-sounding, while verifying every claim
   against the manifests, the running cluster, and the owning record.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Homelab docs
@@ -34,8 +34,13 @@ conventions it builds on stay in their owners and are not restated here:
 ## Choose a workflow
 
 - New page or full rewrite: [references/page-shapes.md](references/page-shapes.md)
-  to pick the shape, then the writing order in
+  to pick the shape and its template in
+  [`docs/_templates/`](../../../docs/_templates/README.md), then the writing
+  order in
   [references/editing-workflow.md § Write a new page](references/editing-workflow.md#write-a-new-page).
+- A page that teaches (tutorial, explanation, learning chapter):
+  [references/teaching.md](references/teaching.md) for layering, the step
+  shape, outcomes and next steps.
 - Targeted or structural change: [references/editing-workflow.md](references/editing-workflow.md).
 - Before finishing any change: [references/review-framework.md](references/review-framework.md).
 - Terms, formatting, commands, tables: [references/style-rules.md](references/style-rules.md).
@@ -67,7 +72,10 @@ Never leave a `[VERIFY]` marker in a finished page.
 - One page, one primary job. Extend the page that owns a task before creating
   a new one; [references/page-shapes.md § Create a page](references/page-shapes.md#decide-whether-to-create-a-page)
   has the test.
-- Happy path first, then alternatives, then failure modes.
+- Happy path first, then alternatives, then failure modes. On a page that
+  teaches, the first example is the smallest that produces an observation,
+  and each step shows the command, the real output, and what to notice
+  ([references/teaching.md](references/teaching.md)).
 - Write self-contained sections: repeat the full noun instead of a pronoun in
   a key statement, and keep the critical fact on the page rather than only
   behind a link.
@@ -101,7 +109,13 @@ Never leave a `[VERIFY]` marker in a finished page.
 3. Search for contradictory statements and links to changed headings.
 4. Confirm a new page has an inbound body link from its area hub and from
    [`docs/README.md`](../../../docs/README.md), in the same change.
-5. Render every changed Mermaid block (AGENTS.md § Diagram workflow).
+5. Run `scripts/docs-check.sh <changed files>` (`make docs-check` for every
+   Markdown file changed against `origin/main`): links and anchors, fence
+   language tags, Mermaid render with `mmdc`, token patterns, and the inbound
+   links of a new page. Fix every finding; CI runs the same script without
+   the Mermaid render, so a diagram that does not render locally is caught
+   only here. Inspect each rendered diagram for clipping and crossings
+   (AGENTS.md § Diagram workflow).
 6. Run the [review framework](references/review-framework.md), then the
    [prose pass](references/prose-quality.md) when wording changed.
-7. Run `make validate`; CI checks the Markdown links on the changed files.
+7. Run `make validate`.

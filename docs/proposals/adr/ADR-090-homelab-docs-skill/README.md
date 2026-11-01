@@ -20,7 +20,7 @@
 | **Supersedes** | [ADR-083](../ADR-083-documentation-steward/) in part: only the clause "Homelab will not create a second project documentation skill" |
 | **Superseded by** | — |
 | **Implementation tracking** | Opened when the owner accepts this ADR |
-| **Adoption** | Partial — the skill shipped in #1474; it does not yet point to the planned `docs/_templates/` |
+| **Adoption** | Complete — the skill shipped in #1474 and points to `docs/_templates/` since 2026-11-01 |
 
 ## Context
 
@@ -120,7 +120,7 @@ does not split authority.
 |------------|-------|----------|-------------------|
 | Ship `homelab-docs` and route to it from `platform-engineer` | `duynhne` | #1474 | Done |
 | On acceptance, record the partial supersede in ADR-083 (Superseded by row, § Amendments) and in the ADR index | `duynhne` | Tracking issue | ADR-083 points to this ADR |
-| Point `homelab-docs` to `docs/_templates/` when ADR-083 adds them | `duynhne` | RFC-0033 documentation pilot | `homelab-docs` links each template |
+| Point `homelab-docs` to `docs/_templates/` when ADR-083 adds them | `duynhne` | Done 2026-11-01 | `homelab-docs` links each template |
 
 ## Validation and compliance
 
@@ -149,3 +149,4 @@ A changed decision requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-11-01 | Proposed / Partial | Records the `homelab-docs` skill shipped in #1474 as a partial supersede of ADR-083 |
+| 2026-11-01 | Proposed / Complete | `docs/_templates/` exists and homelab-docs 1.2.0 routes every shape to its template |

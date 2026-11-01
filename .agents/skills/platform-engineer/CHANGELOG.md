@@ -6,6 +6,10 @@ Newest first.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-01
+
+- Route docs pages, runbooks and hubs to the new [homelab-docs](../homelab-docs/SKILL.md) skill in the IDE skills map.
+
 ## [1.1.0]
 
 - Route the RFC/ADR lifecycle to the new [homelab-proposals](../homelab-proposals/SKILL.md) skill: collapse § RFC / ADR gate to a dispatcher pointer, replace the RFC and ADR rows in the IDE skills map (they sent authoring to `spec-driven-development`, `planning-and-task-breakdown`, and `documentation-and-adrs`, whose templates and paths do not match this repo) with one row, and name the skill in the override footnote.

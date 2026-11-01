@@ -6,7 +6,7 @@ description: >-
   Use for non-trivial work in this repo; route application code and shared CI
   to their owning repositories.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Platform engineer (homelab)
@@ -151,6 +151,7 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | E2E Phase B | `agent-browser` | [e2e-audit Phase B](../../../local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-8-min) |
 | Incident triage / debug-note cleanup | [`homelab-troubleshooting`](../homelab-troubleshooting/SKILL.md) | runbook index + `make validate` |
 | GitOps incident | `gitops-cluster-debug` | `make flux-status` |
+| Docs page, runbook or hub | [`homelab-docs`](../homelab-docs/SKILL.md) | AGENTS.md Docs conventions, hub link, `make validate` |
 | Draw.io diagram (asked by name, or editing a `.drawio`) | [`homelab-drawio`](../homelab-drawio/SKILL.md) | Mermaid stays the default (AGENTS.md Diagrams) |
 | Before PR | `code-review-and-quality` | one change per branch |
 | Worktree cleanup | [`git-worktrees`](../git-worktrees/SKILL.md) | prove landed before deleting |

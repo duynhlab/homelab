@@ -563,4 +563,5 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 - **[AGENTS.md](../AGENTS.md)** - AI agent guide for navigating the codebase
 - **[Git commits and PRs](../.agents/skills/git-pr/SKILL.md)** - Homelab branch names, commit and squash messages, PR titles and descriptions
+- **[Homelab docs](../.agents/skills/homelab-docs/SKILL.md)** - How a page here is written, verified, edited and reviewed: page shapes, style rules, prose pass
 - **[README.md](../README.md)** - Project overview and quick start

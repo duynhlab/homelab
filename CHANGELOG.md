@@ -92,6 +92,9 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Add an Analysis stage and full-workflow Kanban view to platform work tracking,
+  with a shared active-work limit for research and execution.
+
 - git-pr 2.2.0: a squash commit carries one duynebot trailer; keep a PR at
   one commit or set the squash message at merge.
 - Add the platform work-tracking procedure and a dated inventory of RFCs, ADRs,

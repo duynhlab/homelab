@@ -6,6 +6,11 @@ Newest first.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-01
+
+- Route active research to Analysis and execution to In progress under the shared
+  work limit in the tracking procedure.
+
 ## [3.0.0] - 2026-11-01
 
 - Require an existing work-item check at task entry and an evidence/next-action

@@ -630,7 +630,7 @@ no labels from it. The collector runs five pipelines: `traces`, `logs`,
 
 | Field | Signal | Join |
 |-------|--------|------|
-| `trace_id` | Logs, traces | VictoriaTraces links back to logs (`tracesToLogsV2` → `victorialogs`); the reverse direction is not wired. ClickHouse joins `otel_logs` ↔ `otel_traces` on this field in one query |
+| `trace_id` | Logs, traces | VictoriaTraces links to logs (`tracesToLogsV2` → `victorialogs`) and logs link back to the trace (`derivedFields`). ClickHouse joins `otel_logs` ↔ `otel_traces` on this field in one query |
 | `span_id` | Logs | Span-scoped log lines |
 | `pyroscope.profile.id` | Traces, profiles | Set on the root server span for span-scoped CPU in 8 services — not order, order-worker, checkout or checkout-worker, where the replay-safe tracer provider is left unwrapped. No one-click span → profile link: **manual pivot**, see [profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform) |
 | `service.name` / `app` | Metrics, traces, logs, profiles | Fleet identity via `OTEL_SERVICE_NAME` |

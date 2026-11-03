@@ -135,15 +135,26 @@ Provisioned by GitOps as plugin `victoriametrics-logs-datasource`:
 - **CR**: [`kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml)
 - **UID**: `victorialogs` · **URL**: `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`
 
-Correlation is asymmetric today:
+Correlation runs both ways on the `trace_id` field:
 
-- **Trace → log works.** The VictoriaTraces datasource carries `tracesToLogsV2`
-  (datasource `victorialogs`, tag `trace_id`), so a span's **Logs** tab shows
-  the correlated lines. Configured on `datasource-victoriatraces.yaml`.
-- **Log → trace is not wired.** The VictoriaLogs datasource has no
-  `derivedFields`, so a `trace_id` in a log line is not a clickable link — copy
-  it and search the trace store. A gap, not a feature; it predates
-  [RFC-0027](../../proposals/rfc/RFC-0027/README.md).
+- **Trace → log.** `datasource-victoriatraces.yaml` sets `tracesToLogsV2` with
+  `filterByTraceID: true`. Grafana then builds `trace_id:="<id>"` for a
+  VictoriaLogs target and shows **Logs for this trace** on the trace and in a
+  span's **Links** menu. Without `filterByTraceID` (and with no custom query)
+  Grafana creates no link at all.
+- **Log → trace.** `datasource-victorialogs.yaml` declares a `derivedFields`
+  entry on the `trace_id` field, so an expanded record shows **View trace**,
+  which opens the trace in VictoriaTraces.
+- **Trace → metrics.** The span **Links** menu also offers request rate, error
+  rate and p95 latency from the `spanmetrics_*` series, filtered by
+  `span_name`. The Jaeger API returns the service as `serviceName`, not as a
+  tag, so the link cannot filter by service: a span name that several services
+  share sums all of them.
+
+Verified 2026-11-03 on local-stack (Grafana 13.3.0, VictoriaLogs plugin
+0.33.1): all three links opened the expected query and returned data for one
+`product` trace. The Kind datasources carry the same settings and have not
+been clicked through on Kind.
 
 ## Retention & sizing
 

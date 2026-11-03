@@ -24,7 +24,7 @@ this shape is the edge's **access log**: it is ClickHouse-**only**
 | **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC → [`victorialogs.md`](victorialogs.md) |
 | **Query** | LogsQL → [`logsql-guide.md`](logsql-guide.md) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
-| **Correlation** | `trace_id` field ↔ VictoriaTraces. **trace→log is configured** (`tracesToLogsV2`); log→trace has no derived field — see [`victorialogs.md`](victorialogs.md#grafana-datasource--trace-correlation) |
+| **Correlation** | `trace_id` field ↔ VictoriaTraces, both directions in Grafana — see [`victorialogs.md`](victorialogs.md#grafana-datasource--trace-correlation) |
 | **App logging** | How services emit logs (libraries, format, levels, wiring) → [`../../api/logs.md`](../../api/logs.md) |
 
 > This doc is the **architecture** view: the pipeline, why this stack, and how it
@@ -251,15 +251,15 @@ trace_id:abc123def456                                    # everything for one tr
 (Severity is also per-path: app records follow the OTel model and carry
 `severity_text`; only Vector-shipped records carry `level`.)
 
-- **Trace → log:** in a VictoriaTraces span, the **Logs** tab shows the correlated
-  lines (`tracesToLogsV2` → `victorialogs` datasource, tag `trace_id`).
-- **Log → trace:** **not wired** — no `derivedFields` on the datasource; copy the
-  `trace_id` and search the trace store
+- **Trace → log:** in a VictoriaTraces trace, **Logs for this trace** opens
+  `trace_id:="<id>"` on the `victorialogs` datasource.
+- **Log → trace:** a record's `trace_id` field carries a **View trace** link to
+  the span in VictoriaTraces
   ([details](victorialogs.md#grafana-datasource--trace-correlation)).
 
 ## Documentation map
 
-```
+```text
 logging/
 ├── README.md          # This hub — the two paths, architecture, edge, why VictoriaLogs, scaling
 ├── victorialogs.md    # The store: streams model, VLSingle, ingest contracts, retention, scale-out

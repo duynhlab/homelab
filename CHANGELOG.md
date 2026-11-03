@@ -107,6 +107,17 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Observability
+
+- **Grafana links traces, logs and span metrics both ways.** The
+  VictoriaTraces datasource now sets `filterByTraceID`, so Grafana builds
+  the `trace_id:="<id>"` query; before this it created no logs link. A span
+  also links to request rate, error rate and p95 latency from `spanmetrics_*`.
+  VictoriaLogs adds a `trace_id` derived field (**View trace**). The same
+  settings apply in local-stack, where they were clicked through. The
+  VictoriaMetrics datasource plugin moves to 1.0.0: with `httpMethod: POST`
+  it sends query parameters in the request body.
+
 #### Proposals
 
 - Align 17 ADR index adoption entries with their existing completion records.

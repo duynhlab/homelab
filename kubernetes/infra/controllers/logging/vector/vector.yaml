@@ -195,7 +195,7 @@ spec:
             # fallback chain at the first missing label.
             svc = string(labels."app.kubernetes.io/name") ?? string(labels."app") ?? string(.container_name) ?? "unknown"
             msg = to_string(.message) ?? encode_json(.message)
-            now_ns = to_unix_timestamp(now(), unit: "nanoseconds")
+            now_ns = to_unix_timestamp!(now(), unit: "nanoseconds")
             ts_ns = now_ns
             if is_timestamp(.timestamp) {
               ts_ns = to_unix_timestamp!(.timestamp, unit: "nanoseconds")

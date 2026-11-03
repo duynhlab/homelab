@@ -1,8 +1,9 @@
 # Grafana datasource for the local stack — VictoriaTraces is queried through the
 # Grafana Jaeger datasource type (VT exposes the Jaeger query API at /select/jaeger;
 # there is no native VT plugin). Mirrors the in-cluster datasource
-# (kubernetes/infra/configs/monitoring/grafana/datasource-victoriatraces.yaml),
-# minus the logs/metrics correlation we don't run locally.
+# (kubernetes/infra/configs/observability/grafana/datasource-victoriatraces.yaml),
+# including the trace -> logs and trace -> metrics links. `$$` escapes Grafana's
+# env-var expansion in provisioning files.
 apiVersion: 1
 datasources:
   - name: VictoriaTraces
@@ -14,3 +15,22 @@ datasources:
     jsonData:
       nodeGraph:
         enabled: true
+      tracesToLogsV2:
+        datasourceUid: victorialogs
+        filterByTraceID: true
+        spanStartTimeShift: -1m
+        spanEndTimeShift: 1m
+      tracesToMetrics:
+        datasourceUid: victoriametrics
+        spanStartTimeShift: -15m
+        spanEndTimeShift: 15m
+        tags:
+          - key: name
+            value: span_name
+        queries:
+          - name: Request rate
+            query: sum(rate(spanmetrics_calls_total{$$__tags}[5m]))
+          - name: Error rate
+            query: sum(rate(spanmetrics_calls_total{$$__tags, status_code="STATUS_CODE_ERROR"}[5m]))
+          - name: p95 latency (ms)
+            query: histogram_quantile(0.95, sum by (le) (rate(spanmetrics_duration_milliseconds_bucket{$$__tags}[5m])))

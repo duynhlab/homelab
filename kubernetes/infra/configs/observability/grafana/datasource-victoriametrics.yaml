@@ -16,7 +16,7 @@ spec:
       timeInterval: 15s
   plugins:
     - name: victoriametrics-metrics-datasource
-      version: "0.26.1"
+      version: "1.0.0"
   instanceSelector:
     matchLabels:
       dashboards: grafana

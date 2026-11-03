@@ -13,6 +13,14 @@ spec:
     url: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428
     jsonData:
       maxLines: "50" # plugin default became 1000 in 0.31; keep Explore light
+      # Log -> trace: a record's trace_id field links to the span in VictoriaTraces.
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          url: ${__value.raw}
+          urlDisplayLabel: View trace
+          datasourceUid: victoriatraces
   plugins:
     - name: victoriametrics-logs-datasource
       version: "0.33.1"

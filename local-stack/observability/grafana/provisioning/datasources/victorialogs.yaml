@@ -13,3 +13,10 @@ datasources:
     url: http://victoria-logs:9428
     jsonData:
       maxLines: "50" # same limit as the cluster
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          url: $${__value.raw}
+          urlDisplayLabel: View trace
+          datasourceUid: victoriatraces

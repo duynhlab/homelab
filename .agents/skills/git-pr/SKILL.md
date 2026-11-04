@@ -6,7 +6,7 @@ description: >-
   contribution conventions. Use when naming a branch, committing, opening or
   updating a PR, or summarizing a branch for reviewers.
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
 ---
 
 # Git commits and pull requests
@@ -56,7 +56,7 @@ its dictionary:
 
 ### Author and co-author
 
-Every commit is authored by **duynhne** with **duynebot** as co-author. The
+Every commit is authored by **duynhne** with **duynhbot** as co-author. The
 local git identity on agent machines is often the bot, so set the author
 explicitly on **every** commit you create — in this repo and in sibling repos:
 
@@ -67,13 +67,13 @@ git commit --author="duynhne <108656040+duynhne@users.noreply.github.com>" ...
 Append exactly this trailer (after a blank line at the end of the message):
 
 ```text
-Co-Authored-By: duynebot <bot@duynh.me>
+Co-Authored-By: duynhbot <bot@duynh.me>
 ```
 
-- `Co-Authored-By: duynebot <bot@duynh.me>` is the **only** permitted
+- `Co-Authored-By: duynhbot <bot@duynh.me>` is the **only** permitted
   attribution trailer. Forbid `Signed-off-by`, `Assisted-by`, `Generated-by`,
   and any tool-injected co-author (for example `Cursor
-  <cursoragent@cursor.com>`) — strip those and keep only `duynebot`.
+  <cursoragent@cursor.com>`) — strip those and keep only `duynhbot`.
 - GitHub squash-merge already credits duynhne as author, so setting `--author`
   matters most for commits pushed directly or carried on the PR branch.
 
@@ -127,14 +127,14 @@ you publish, confirm that the Summary leads with why the change is needed.
 
 With more than one commit on a PR, GitHub's default squash message lists
 every commit as `* subject`, keeps each commit's trailer, and then appends
-its own `Co-authored-by: duynebot` after a `---------` line. The result
+its own `Co-authored-by: duynhbot` after a `---------` line. The result
 carries the trailer two or more times.
 
 - Keep a PR at one commit. Fold a review fix into it with
   `git commit --amend` and `git push --force-with-lease` on your own
   branch; GitHub's default squash text is then already correct.
 - When a PR has several commits, write the squash message yourself: the PR
-  title, one coherent body, and exactly one `Co-Authored-By: duynebot
+  title, one coherent body, and exactly one `Co-Authored-By: duynhbot
   <bot@duynh.me>`. An agent merge passes it explicitly:
 
   ```bash
@@ -143,7 +143,7 @@ carries the trailer two or more times.
 
   In the web UI, delete the `* commit` list and the `---------` block before
   confirming.
-- After the merge, `git log -1 --format=%B <sha> | grep -ci duynebot` prints
+- After the merge, `git log -1 --format=%B <sha> | grep -ci duynhbot` prints
   `1`. Never rewrite `main` to fix an old squash.
 
 ## Write or review
@@ -158,7 +158,7 @@ carries the trailer two or more times.
    compatibility only when supported by evidence.
 3. Check the subject, body, PR title, PR description and branch name against
    the rules above — including the `type(scope): description` format, the
-   explicit `duynhne` author, a single `Co-Authored-By: duynebot
+   explicit `duynhne` author, a single `Co-Authored-By: duynhbot
    <bot@duynh.me>` trailer with no tool-injected co-author left behind (a
    squash message included), and no closing keyword in a commit. When reviewing, report concrete violations
    and provide corrected text. Leave compliant text unchanged unless
@@ -181,7 +181,7 @@ telemetry can identify each client, as required by ADR-089.
 Update the telemetry schema and dashboard pins together to keep
 client-name queries compatible with the stored column.
 
-Co-Authored-By: duynebot <bot@duynh.me>
+Co-Authored-By: duynhbot <bot@duynh.me>
 ```
 
 Documentation change:
@@ -194,7 +194,7 @@ so operators can distinguish deployed behavior from rollout work.
 
 Link the owning ADR instead of repeating its design decisions.
 
-Co-Authored-By: duynebot <bot@duynh.me>
+Co-Authored-By: duynhbot <bot@duynh.me>
 ```
 
 PR description, title `docs(observability): derive alert catalog counts from

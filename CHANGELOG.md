@@ -92,6 +92,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The co-author bot is `duynhbot`.** The account was renamed from
+  `duynebot`, so git-pr 2.3.0 and AGENTS.md require
+  `Co-Authored-By: duynhbot <bot@duynh.me>`. The email is unchanged.
+
 - Add an Analysis stage and full-workflow Kanban view to platform work tracking,
   with a shared active-work limit for research and execution.
 

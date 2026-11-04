@@ -6,6 +6,12 @@ Newest first.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-04
+
+- The co-author trailer is `Co-Authored-By: duynhbot <bot@duynh.me>`. The
+  bot account was renamed from `duynebot`; the email is unchanged, so GitHub
+  still links the co-author. Older commits keep the old name.
+
 ## [2.2.0] - 2026-11-01
 
 - Add § Squash merge: keep a PR at one commit, or set the squash message so

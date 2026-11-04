@@ -163,7 +163,7 @@ the source of truth for their conventions. For creating, using, or cleaning up w
   ([`docs/proposals/adr/README.md` § Working log](docs/proposals/adr/README.md#working-log)).
 - Author every commit as `duynhne <108656040+duynhne@users.noreply.github.com>`
   (set `--author` explicitly — agent machines default to the bot identity) with a
-  `Co-Authored-By: duynebot <bot@duynh.me>` trailer; **`gh auth switch --user duynhne`**
+  `Co-Authored-By: duynhbot <bot@duynh.me>` trailer; **`gh auth switch --user duynhne`**
   for PRs. See [git-pr](.agents/skills/git-pr/SKILL.md).
 
 ### Skill versioning

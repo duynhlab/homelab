@@ -8,7 +8,7 @@ description: >-
   incidents to homelab-troubleshooting, and application code and shared CI to
   their owning repositories.
 metadata:
-  version: "3.1.0"
+  version: "3.1.1"
 ---
 
 # Platform engineer (homelab)
@@ -205,7 +205,7 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | GitOps incident | `gitops-cluster-debug` | `make flux-status` |
 | Docs page, runbook or hub (writing the page) | [`homelab-docs`](../homelab-docs/SKILL.md) | AGENTS.md Docs conventions, hub link, `make validate` |
 | Draw.io diagram (asked by name, or editing a `.drawio`) | [`homelab-drawio`](../homelab-drawio/SKILL.md) | Mermaid stays the default (AGENTS.md Diagrams) |
-| Branch, commit, PR text | [`git-pr`](../git-pr/SKILL.md) | `type(scope):` subject, duynhne author, duynebot trailer |
+| Branch, commit, PR text | [`git-pr`](../git-pr/SKILL.md) | `type(scope):` subject, duynhne author, duynhbot trailer |
 | Before PR | `code-review-and-quality` | one change per branch |
 | Worktree cleanup | [`git-worktrees`](../git-worktrees/SKILL.md) | prove landed before deleting |
 | Rollout | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |

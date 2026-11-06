@@ -92,7 +92,7 @@ services:
       - analytics-service-cdc-storage:/data
 
   analytics-service-cdc-bootstrap:
-    image: amazon/aws-cli:2.39.0@sha256:6014c77975a4ae237395924cc821333f20bf87c91964a45dd4ed5f3b13b424f5
+    image: amazon/aws-cli:2.39.6@sha256:eccdb3ec77e159d43ca6a750a70738c546883138be7f094498294a1477ec7e42
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |

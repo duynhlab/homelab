@@ -92,6 +92,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **git-worktrees 1.1.0 adopts Worktrunk.** `wt switch`, `wt list` and
+  `wt remove` are the preferred worktree commands, with plain-Git fallbacks;
+  new worktrees live at `../homelab.<branch>`. The landed check moves to
+  `wt list` `⊂` or a patch-id match with the squash commit, because the
+  per-file diff against `origin/main` called three merged branches unmerged
+  once `main` had moved on the same files. `wt merge` and the other
+  local-merge commands are forbidden; merges still go through a PR.
+
 - **The co-author bot is `duynhbot`.** The account was renamed from
   `duynebot`, so git-pr 2.3.0 and AGENTS.md require
   `Co-Authored-By: duynhbot <bot@duynh.me>`. The email is unchanged.

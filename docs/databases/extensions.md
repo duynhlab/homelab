@@ -57,7 +57,7 @@ spec:
     extensions:
       - name: pg_stat_ch
         image:
-          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:…
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.2.0@sha256:…
     shared_preload_libraries:
       - pgaudit
       - pg_stat_statements

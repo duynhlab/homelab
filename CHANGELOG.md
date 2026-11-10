@@ -1396,6 +1396,13 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **pg_stat_ch v0.4.0 → v0.4.1** (`duynhlab/images` `pg-stat-ch` 0.2.0, on
+  product-db, its replica and platform-db). Fixes a double free when an
+  interrupted dequeue is retried and clamps `batch_max` to `queue_capacity`
+  (both 8192 here). The extension SQL stays at 0.4, so no `ALTER EXTENSION`;
+  the new image volume rolls each cluster's pods. The new `track_labels` GUC
+  stays off, and the writer keeps its LZ4 profile until Kind shows the ZSTD
+  decoder works.
 - **RustFS chart and image 1.0.1 → 1.0.4** (cluster and the Compose analytics
   twin). 1.0.2 fixes seven advisories, two of them bypasses of scoped
   permissions (`?versionId=` overwrite, dot-segment delete), and makes the

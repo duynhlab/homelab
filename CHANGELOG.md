@@ -112,7 +112,7 @@ Skeleton (copy what you need):
 - **VictoriaTraces v0.12.1 → v0.13.0** (#1541). The OTLP gRPC TLS default
   change does not reach the plaintext OTLP/HTTP insert path the collector uses.
 - VictoriaLogs datasource 0.33.1 → 0.34.0 (#1533); VictoriaMetrics datasource
-  1.0.0 → 1.0.1 (#1525).
+  1.0.0 → 1.0.1 (#1552, replacing the conflicted #1525).
 - Pyroscope chart and image 2.4.2 → 2.4.3 (#1528, #1526), the hand-pinned
   `image.tag` with it; karma v0.133 → v0.134 (#1454).
 

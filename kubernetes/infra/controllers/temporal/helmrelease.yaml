@@ -21,7 +21,7 @@ spec:
   chart:
     spec:
       chart: temporal
-      version: "1.8.0" # appVersion 1.32.0 (>= 1.29.1 → Worker Versioning capable)
+      version: "1.8.0" # appVersion 1.32.2 (>= 1.29.1 → Worker Versioning capable)
       sourceRef:
         kind: HelmRepository
         name: temporalio
@@ -35,9 +35,9 @@ spec:
   values:
     server:
       replicaCount: 1
-      # Chart 1.7.0 defaults to 1.32.0; pinned to match local-stack.
+      # Chart 1.8.0 defaults to 1.32.2; pinned to match local-stack.
       image:
-        tag: "1.32.1"
+        tag: "1.32.2"
       # Shared default for frontend / matching / worker. `history` overrides it
       # below -- it is the only service that carries the 512 history shards, and
       # measurement says it needs an order of magnitude more than its siblings.
@@ -137,7 +137,7 @@ spec:
     admintools:
       enabled: true
       image:
-        tag: "1.32.1" # chart default 1.32.0; same as the search-attributes Job
+        tag: "1.32.2" # chart default 1.32.2; same as the search-attributes Job
       resources:
         requests:
           cpu: 25m
@@ -148,9 +148,9 @@ spec:
     web:
       enabled: true
       replicaCount: 1
-      # Chart 1.7.0 defaults to 2.54.1; pinned to match local-stack.
+      # Chart 1.8.0 defaults to 2.56.1; pinned to match local-stack.
       image:
-        tag: 2.57.0
+        tag: 2.58.1
       resources:
         requests:
           cpu: 25m

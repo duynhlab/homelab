@@ -36,7 +36,7 @@ spec:
     extensions:
       - name: pg_stat_ch
         image:
-          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.2.0@sha256:5f810ba7044f8d7f693e1e22b1caa09153dc542af78875d0361e95917f773754
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.2.1@sha256:23b0b73a22e3b7676b528db77f306a4e6ff83c5518cfb5b28dec8b9952c2512a
 
     shared_preload_libraries:
       - pgaudit

@@ -23,5 +23,5 @@ spec:
     # the v-prefixed tag: upstream also pushes `1.9.3`, a different artifact
     # (sha256:da69a5e0...) whose chart version string drops the `v`;
     # .renovaterc.json5 restricts this chart to v-prefixed tags for that reason.
-    tag: v1.9.3
-    digest: sha256:be1b8f163a338f94e7d6532336c08d6856fc70a0b790ac14a2826a54d23e0dd3
+    tag: v1.10.0
+    digest: sha256:dcb82a14c04b426615a71d97222c7edf9f5ff58b800d241e71ac5784ae6dc7b7

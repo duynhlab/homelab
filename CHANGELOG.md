@@ -88,1421 +88,163 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
-### Feature
+## [3.0.0] - 2026-11-12
 
-#### Docs
+<!-- markdown-link-check-disable -->
+<!-- Condensed at release time; the full entries are in Git history before this cut. -->
 
-- **git-worktrees 1.1.0 adopts Worktrunk.** `wt switch`, `wt list` and
-  `wt remove` are the preferred worktree commands, with plain-Git fallbacks;
-  new worktrees live at `../homelab.<branch>`. The landed check moves to
-  `wt list` `⊂` or a patch-id match with the squash commit, because the
-  per-file diff against `origin/main` called three merged branches unmerged
-  once `main` had moved on the same files. `wt merge` and the other
-  local-merge commands are forbidden; merges still go through a PR.
-
-- **The co-author bot is `duynhbot`.** The account was renamed from
-  `duynebot`, so git-pr 2.3.0 and AGENTS.md require
-  `Co-Authored-By: duynhbot <bot@duynh.me>`. The email is unchanged.
-
-- Add an Analysis stage and full-workflow Kanban view to platform work tracking,
-  with a shared active-work limit for research and execution.
-
-- git-pr 2.2.0: a squash commit carries one duynebot trailer; keep a PR at
-  one commit or set the squash message at merge.
-- Add the platform work-tracking procedure and a dated inventory of RFCs, ADRs,
-  issues, and outstanding verification. Agents preserve a next action at handoff.
-
-#### Proposals
-
-- Track delivery through outcome-based initiatives and independently verifiable
-  tasks; retain standalone ADR trackers when they own a separate delivery boundary.
-
-### Bugfix
-
-#### Observability
-
-- **Grafana links traces, logs and span metrics both ways.** The
-  VictoriaTraces datasource now sets `filterByTraceID`, so Grafana builds
-  the `trace_id:="<id>"` query; before this it created no logs link. A span
-  also links to request rate, error rate and p95 latency from `spanmetrics_*`.
-  VictoriaLogs adds a `trace_id` derived field (**View trace**). The same
-  settings apply in local-stack, where they were clicked through. The
-  VictoriaMetrics datasource plugin moves to 1.0.0: with `httpMethod: POST`
-  it sends query parameters in the request body.
-
-#### Proposals
-
-- Align 17 ADR index adoption entries with their existing completion records.
+The database-governance release. RFC-0029 is implemented: every service runs
+on the owner / migrator / runtime split with platform-owned authorization
+(ADR-088), verified TLS on every PostgreSQL hop and OpenBAO rotating every
+runtime password (ADR-089). RFC-0030 is implemented: PeerDB mirrors product-db
+into ClickHouse on Kind and analytics-service serves the Backoffice from it.
+`pg_stat_ch` streams every statement execution into ClickHouse, and its
+`application_name` cutover is the breaking change. The docs toolchain gains the
+homelab-docs skill, page templates, `make docs-check`, work tracking and
+Worktrunk, and the second Renovate round
+([#1262](https://github.com/duynhlab/homelab/issues/1262)) cleared 24 bumps.
 
 ### Breaking Change
 
 #### Observability
-
-- **Query telemetry stores `application_name`, not `app`.** The ClickHouse
-  schema Job pins clickhouse-ddl 2.0.0. The pg_stat_ch extension still inserts
-  the client name as upstream's `app`, which is now an `EPHEMERAL` column, so
-  `events_raw`, `db_app_user_1m` and `errors_recent` store and expose it as
-  `application_name`. Any query that reads `app` fails. Fresh-only: Kind
-  rebuilds the store, so there is no migration. The as-code dashboards move to
-  `0.7.0` in the same change: its query-telemetry board reads
-  `application_name`, lists its variables from the 90-day rollup, hides PgDog's
-  and Barman's sessions under *Workload only*, and adds a table of roles whose
-  statements arrive without a name.
+- Query telemetry stores `application_name`, not `app` (clickhouse-ddl 2.0.0, grafana-dashboards 0.7.0): any query that reads `app` fails. Fresh-only; Kind rebuilds the store.
 
 ### Feature
 
 #### GitOps
-
-- **The DR replica deploys last.** `databases-cnpg-dr-local` now also
-  depends on `apps-local`, so a bring-up starts `product-db-replica` only after
-  the apps are up and product-db's first base backup exists. Nothing waits on
-  the DR wave, so no other wave moves.
-
-- **Real CDC replaces the Kind fixture** (RFC-0030 phases 5–6, ADR-066). The
-  `cdc-local` wave now runs `peerdb-bootstrap` (peers + the three mirrors,
-  admitted one source at a time on heartbeat and row counts) and
-  `analytics-views` (the ten `*_live` views, definer `analytics_view_owner`).
-  ClickHouse gains `analytics_ingest` and the non-login `analytics_view_owner`;
-  `clickhouse-ddl` 2.1.0 creates the Replicated `analytics` database. The
-  ClickHouse peer is `replicated: true`, and the ingest profile sets
-  `database_replicated_allow_replicated_engine_arguments = 2` so PeerDB's
-  `ReplicatedReplacingMergeTree` DDL takes the database's own Keeper path.
-  `scripts/analytics/serving-fixture.sh` is gone; local-stack keeps its fixture.
-- **PeerDB runs on Kind** (RFC-0030 phases 1 and 4, ADR-066). Upstream chart
-  `peerdb` 0.9.17 (core v0.37.5, images digest-pinned) in the `peerdb`
-  namespace and a new `cdc-local` wave gated on the HelmRelease: catalog
-  `peerdb_catalog` on platform-db over verify-full, the platform Temporal in a
-  `peerdb` namespace with the `MirrorName` search attribute, staging bucket
-  `analytics-service-cdc` through the shared RustFS key (recorded gap, #1315).
-  The mirrors followed in phases 5–6 (above).
-- **analytics-service runs on Kind, dark-launched then routed** (#1360,
-  RFC-0030 phases 8–9 / ADR-069). The `analytics` namespace (app tier), its
-  domain ResourceSet (no DB, no migrate, no gRPC; ClickHouse reader from an ESO
-  Secret; staff JWKS pair; probes, resources, SLO), the `analytics_reader` CHI
-  user with SELECT on the ten reviewed `analytics.*_live` views under a
-  `readonly=2` profile, the OpenBAO seed and `ClusterExternalSecret`, and
-  `duyne-viewer` in the staff realm. The serving layer started fixture-backed
-  (PeerDB's table shape) and is now fed by the CDC mirrors (above);
-  `scripts/analytics-reader-sweep.sh` is row K3.12. The first tag waited on the
-  read path until the owner accepted the funnel limit (analytics-service#4);
-  `v0.1.0` is released.
-- **Service Deployments select on the chart's own labels only.** The `app`
-  label kept from `mop` (`extraSelectorLabels`) is dropped from the five domain
-  ResourceSets, `rs-frontend`, `rs-backoffice` and `mockpay`; the selector is
-  now `app.kubernetes.io/name` + `app.kubernetes.io/instance`. Nothing selected
-  on `app` except Vector (below); the `app` label on metrics comes from OTel
-  `service_name` through vmagent and is unchanged. Because the selector is
-  immutable, each Deployment was orphaned (`--cascade=orphan`) and recreated by
-  Helm, which adopted the running ReplicaSet and rolled it — no downtime.
-  `application-delivery.md` documents the procedure and the
-  `chartNameChangeStrategy: InPlaceUpdate` knob the `mop` → `duynh` swap could
-  have used; the runbooks select pods with `-l app.kubernetes.io/name=`.
-  Measured on Kind for all 13 workloads: no Service ever dropped to zero ready
-  endpoints, and 222 probe requests through the gateway (review, product) all
-  returned 200.
-- **The five domain ResourceSets render the same SLO block, and the `migrate`
-  init container has resources.** The `slo_disabled` guard existed only in
-  `fulfillment-rs`, so the flag was silently ignored in the other four domains;
-  every template now wraps the `<name>-slo` HelmRelease in it. `migrate` gets
-  requests (50m / 32Mi) and a 128Mi memory limit, like every other container.
-
-- **Every service now deploys with the `duynh` chart, and the `mop` chart is
-  gone.** The five domain ResourceSets, `rs-backoffice`, `rs-frontend` and
-  `mockpay` render their HelmReleases on `duynh-chart-oci` (`>=0.3.1 <0.4.0`);
-  `mop-chart-oci` is removed. The migration stays an init container (now
-  declared in the ResourceSets, so a migrator Secret is a values change), gRPC
-  is an extra Service port with `appProtocol: grpc`, and the selector and labels
-  are kept with `nameOverride` + `extraSelectorLabels` (the `app` selector
-  label was then dropped, see the entry above). Flux treats a chart
-  *name* change as a new release target, so each release was uninstalled and
-  reinstalled rather than upgraded: on Kind every service was down for about
-  10–15 s and its Service was recreated, Helm history restarting at v1.
-  Rendered against the cluster's real inputs, all 13 workloads match what `mop`
-  rendered — names, selector, ports, `appProtocol`, env, probes, resources, init
-  container and volumes; the only differences are a ServiceAccount per release
-  (no token mounted) and `maxUnavailable: 0` rollouts.
+- Every service deploys with the `duynh` chart (`>=0.3.1 <0.4.0`) and the `mop` chart is gone; Flux reinstalled each release (about 10–15 s down per service on Kind).
+- Service Deployments select on `app.kubernetes.io/name` + `instance` only; the `app` selector label is dropped, with Deployments orphaned and re-adopted and no Service losing its endpoints.
+- The five domain ResourceSets honour `slo_disabled` and give the `migrate` init container resources.
+- Real CDC replaces the Kind fixture (RFC-0030 phases 1–6, ADR-066): PeerDB chart 0.9.17 (core v0.37.5) in the `peerdb` namespace, and `cdc-local` runs `peerdb-bootstrap` and `analytics-views`.
+- analytics-service runs on Kind, dark-launched then routed (#1360, ADR-069): `analytics` namespace and ResourceSet, `analytics_reader` CHI user, staff JWKS; `v0.1.0` released.
+- `databases-cnpg-dr-local` depends on `apps-local`, so the DR replica deploys last.
 
 #### Gateway
-
-- **`api-analytics-protected`** routes `/analytics/v1/protected` to the
-  `analytics` namespace under `jwt-edge-staff` (#1360, RFC-0030 phase 9): the
-  thirteenth API route and the seventh target of the staff policy; no
-  BackendTrafficPolicy, like the other `/protected/` routes. Kind K4.13 asserts
-  the guard chain at the edge (25 checks).
+- `api-analytics-protected` routes `/analytics/v1/protected` under `jwt-edge-staff` (#1360); Kind K4.13 asserts the guard chain.
 
 #### Observability
-
-- **Pyroscope runs without the chart's Alloy.** `alloy.enabled: false`: every
-  service already pushes profiles through its SDK, so Alloy only profiled
-  Pyroscope and itself, for about 110Mi of memory. Application profiles are
-  unchanged; `monitoring/pyroscope` and `monitoring/alloy` leave the
-  `service_name` list.
-
-- **`system.*` log tables are watched and bounded.** `ClickHouseSystemTablesLarge`
-  (warning) fires when a replica's `system` database passes 2 GiB, 20 % of its
-  10Gi data volume, with a runbook for finding a log without a TTL and for
-  dropping `*_N` upgrade leftovers. `system.opentelemetry_span_log`, born once
-  analytics queries began carrying trace context and shipped by upstream
-  without a TTL, now keeps 7 days.
-
-- **Flux dashboards sit under GitOps in Grafana.** Two `GrafanaFolder` CRs with
-  fixed UIDs build the tree GitOps → Flux; the Flux boards use `folderRef:
-  flux`, and a post-renderer pins the Kyverno chart board to `gitops`, since the
-  chart can only name a folder by title.
-
-- **`CDCStandbySlotsNotSynced`** (#1377). A custom CNPG query on product-db
-  counts each instance's synced and stale `peerflow_slot_*` copies; the alert
-  fires when a standby has held fewer than three synced copies for 15 min, the
-  state a switchover leaves on the demoted primary. Detection plus the guarded
-  drop in the CDC hub is the procedure; automatic dropping was declined.
-
-- **CDC and analytics alerts are live** (RFC-0030, ADR-069). `cdc-alerts.yaml`
-  watches the three PeerDB slots through CNPG's exporter (inactive 5 min,
-  WAL retained over 512 MiB and over 900 MiB, a slot missing) and the mirrors
-  through PeerDB's metrics. PeerDB now exports OTLP metrics with the `peerdb_`
-  prefix. The five analytics freshness rules move from a docs candidate to
-  `analytics-alerts.yaml`.
-
-- **RFC-0030 telemetry qualification:** document the idle freshness sampler (now deployed), standard ClickHouse spans/metrics, bounded diagnostics, dashboard/alert candidates and a SHA-pinned fleet review. Runtime C22/G8/G10 remain Linux gates.
-
-- **PgDog pool alerts** (#1350): `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`
-  and `PgDogPoolBanned` on PgDog's own metrics (`pgdog_cl_waiting`,
-  `pgdog_total_checkout_timeouts`, `pgdog_banned`), with runbooks; the catalog's
-  "PgDog pooler saturation alerts" row moves from Planned to Active.
-
-- **Pool connection churn on the Microservices (OTel) board.** The as-code
-  dashboards move to `0.8.0`, which adds two panels to the database row:
-  *Pool dead connections replaced* (`pgx_pool_acquire_evictions_total`) and
-  *Pool connect failures* (`pgx_pool_connect_failures_total` by `error_type`,
-  the signal behind `PgxPoolConnectFailures`). The local-stack copy of the
-  board gets the same two panels (#1338).
-
-- **`PgxPoolConnectFailures` alert** (#1338). dbx v0.39.0 counts every
-  connection a service fails to open in `pgx_pool_connect_failures_total`,
-  labelled with the SQLSTATE (`28P01`, `57P01`, `53300`) or `connect`; pgxpool
-  never retries one. The alert fires when failures continue in every 5-minute
-  window for 10 minutes, so the short `28P01` burst of a password rotation does
-  not page. Runbook, alert catalog and the metrics docs list it with
-  `pgx_pool_acquire_evictions_total`.
-
-- **Authorization guards beyond membership options (ADR-088).** New CNPG
-  queries `pg_role_config` (each migrator's `role=`) and
-  `pg_default_privileges` (each Job-owned database's owner defaults), the
-  `db_authz → authz_admin` edge in `pg_role_membership`, and alerts
-  `CNPGRoleConfigDrift`, `CNPGDefaultPrivilegesDrift`,
-  `CNPGAuthorizationGuardMissing` with runbooks. K3.7 asserts all three guards;
-  K3.8/K3.9 check the migrator is the owner from login and after `RESET ROLE`;
-  K3.10 checks the catalog Job; the isolation sweep adds `db_authz` and the
-  `postgres` database.
-
-- **PostgreSQL query telemetry: dashboard, store and alerts.** ClickHouse gains
-  a second Replicated database, `pg_stat_ch` (`clickhouse-ddl` 1.2.1:
-  `events_raw` on `ReplicatedMergeTree`, 7 days hot → cold, 90 days, plus the
-  `query_stats_5m`, `db_app_user_1m` and `errors_recent` rollups), and the
-  `clickhouse-schema` Job now bootstraps and verifies both databases. The CHI
-  defines the INSERT-only `pg_stat_ch` user, with its own settings profile
-  pinning `network_compression_method: LZ4` (ClickHouse 26 replies in ZSTD,
-  which the extension cannot decode). New Grafana board
-  `postgresql-query-telemetry` (Databases folder), written as Go in
-  `duynhlab/grafana-dashboards` and delivered by the as-code artifact pinned at
-  0.6.0 — its first board on the logical `clickhouse` datasource: server-side
-  p50/p95/p99 over time, statements/s by operation, database and application,
-  errors by SQLSTATE, CPU-vs-I/O split, top statements by total time and
-  physical reads, slowest individual executions, recent errors, and an
-  exporter-health row. Three alerts with runbooks — `PgStatChExportFailing`,
-  `PgStatChDroppingEvents`, `PgStatChNotExporting` — watch the loss counters,
-  because the extension drops rather than back-pressures.
-- **Kind gate row K3.7: guarded database memberships have not drifted.**
-  `smoke.js` asserts that the ADR-086 guard reports a series for every edge in
-  `GUARDED_EDGES` (today `vault_rotator → notification`) and that
-  `max(cnpg_pg_role_membership_drift)` is `0`, so `make e2e GATE=kind` fails on
-  drift instead of leaving it to the page. Passes on Kind (16/16 rows); with a
-  fake edge added the row fails as it should. The RFC-0029 negative rows K3.8
-  (runtime cannot change the schema) and K3.9 (migrator creates nothing as
-  itself) are written into the audit as **planned** for Phase 2.
-
-- **PostgreSQL role-membership guard (ADR-086).** A `pg_role_membership`
-  custom query on `platform-db` exports the PG18 `ADMIN` / `INHERIT` / `SET`
-  options of each guarded membership; one row per expected edge, so a revoked
-  edge reads `drift=1` instead of vanishing. `CNPGRoleMembershipDrift`
-  (critical) fires when an edge is missing or its options differ, and
-  `CNPGRoleMembershipGuardMissing` (warning) when the query stops reporting.
-  First edge: `vault_rotator → notification` = `ADMIN TRUE, INHERIT FALSE,
-  SET FALSE`. On Kind both a flipped `INHERIT` and a revoked edge fired after
-  `for: 5m` and resolved within two minutes of the repair `GRANT`.
-
-- **Vector takes a pod's `service` stream field from
-  `app.kubernetes.io/name` first**, then `app`, then the pod name: the same
-  order the OTLP leg already used. frontend, backoffice and mockpay keep their
-  values after losing `app`. Platform pods that carried only the standard label
-  now report their workload name instead of their pod name (every CNPG cluster
-  reads `service="postgresql"`, OpenBAO `openbao`, Envoy runtime lines
-  `envoy`); streams stay per pod because `pod_name` is a stream field too.
-  Queries in the guides select by `namespace`, `container_name` or `pod_name`
-  and are unaffected.
-
-- **Service SLOs come from the new `slo` chart** — one `<service>-slo`
-  HelmRelease per service, emitted by the domain ResourceSets and skipped with
-  `slo_disabled` (inventory). It renders the same `PrometheusServiceLevel`
-  (spec identical, so the Sloth ids and recording rules do not change) and the
-  same minimum-events burn-rate rule as `mop`, under new names
-  (`<service>-slo`, `<service>-slo-burn`) so the cutover cannot hit a Helm
-  ownership conflict.
+- `pg_stat_ch`: every statement execution on `platform-db` and `product-db` is an event in ClickHouse (image-volume extension, INSERT-only user, password through `postBuild.substituteFrom`), with the `pg_stat_ch` database and rollups (clickhouse-ddl 1.2.1), the `postgresql-query-telemetry` board (grafana-dashboards 0.6.0) and the `PgStatChExportFailing` / `PgStatChDroppingEvents` / `PgStatChNotExporting` alerts.
+- Service SLOs come from the `slo` chart: one `<service>-slo` HelmRelease per service with the same `PrometheusServiceLevel` spec.
+- CDC and analytics alerts (`cdc-alerts.yaml`, `analytics-alerts.yaml`, `CDCStandbySlotsNotSynced` #1377); PeerDB exports OTLP metrics with the `peerdb_` prefix.
+- PostgreSQL authorization guards: `CNPGRoleMembershipDrift` / `CNPGRoleMembershipGuardMissing` (ADR-086) and `CNPGRoleConfigDrift` / `CNPGDefaultPrivilegesDrift` / `CNPGAuthorizationGuardMissing` (ADR-088), asserted by Kind rows K3.7–K3.10.
+- PgDog pool alerts `PgDogClientsWaiting`, `PgDogCheckoutTimeouts`, `PgDogPoolBanned` (#1350); `PgxPoolConnectFailures` and two pool-churn panels on the OTel board (grafana-dashboards 0.8.0, #1338).
+- `ClickHouseSystemTablesLarge` watches each replica's `system` database at 2 GiB; `system.opentelemetry_span_log` keeps 7 days.
+- Pyroscope runs without the chart's Alloy (`alloy.enabled: false`, about 110Mi).
+- Flux dashboards sit under GitOps → Flux through two `GrafanaFolder` CRs.
+- Vector takes a pod's `service` stream field from `app.kubernetes.io/name` first, then `app`, then the pod name.
+- RFC-0030 telemetry qualification documented: idle freshness sampler, standard ClickHouse spans and metrics, dashboard and alert candidates.
 
 #### Databases
-
-- **CDC mirrors survive a promotion** (RFC-0030 G7.3, U7). PeerDB now creates
-  its replication slots with `FAILOVER true`, and CNPG's slot sync keeps a copy
-  on each standby. On Kind a promotion lost no rows: 100/100 arrived 36 s
-  later, with no duplicates and no resync. The CDC hub has the one-line fix for
-  slots created before the setting.
-
-- **The CDC edges have gate scripts** (RFC-0030 G1.3, G2.5, G3.6, G6.2,
-  G6.4). `cdc-target-check.sh` checks the mirrors and slots, and with `--pii`
-  proves marker rows reach neither the raw tables, the retained Avro staging
-  nor PeerDB's logs. `db-tls-check.sh` covers the CDC pooler hop.
-  `pgcron-restore-check.sh` restores product-db onto the pg_cron operand, and
-  `pgcron-rollback-drill.sh` rehearses leaving it and coming back. The CDC hub
-  records the restore WAL-size setting and the rollback order.
-
-- **CDC source on product-db** (RFC-0030 phase 3, ADR-067/068). CNPG
-  `Publication`s `analytics_order|checkout|payment` hold exactly the ADR-067
-  tables and columns plus each database's `analytics_cdc_heartbeat`; the
-  `peerdb_<db>` roles are CNPG `DatabaseRole`s (REPLICATION is
-  superuser-only) with exact-table SELECT on the published tables (granted by
-  the bootstrap below since #1378, not pgroles); a
-  bootstrap Job (CronJob every 10 min) creates the heartbeat tables as each
-  owner and schedules three 30-second pg_cron jobs plus a daily history
-  cleanup as `analytics_heartbeat`. PeerDB's only path in is
-  `product-db-pooler-cdc`, a session-mode CNPG PgBouncer Pooler with TLS on
-  both hops and a NetworkPolicy admitting only the `peerdb` namespace.
-  `scripts/analytics/cdc-source-check.sh` asserts G3.1–G3.4.
-- **pg_cron on product-db** (RFC-0030 phase 2, ADR-068). The operand is
-  `postgresql-cron` 1.0.0 (CNPG 18.6 + pg_cron 1.6.8, duynhlab/images) through
-  an `ImageCatalog`, because CNPG reads the PostgreSQL major from an image tag
-  and this tag is the image's own version. `pg_cron` is preloaded with
-  background workers (`max_worker_processes` 8 → 12, replica matched),
-  `cron.database_name=postgres`; `postInitSQL` creates the extension, the
-  `analytics_heartbeat` role and its single `EXECUTE` on
-  `cron.schedule_in_database` (owner decision on #1325 — a live cluster runs
-  those four statements once by hand). Slot safety for CDC:
-  `max_replication_slots` 10, `max_slot_wal_keep_size` 1GB.
-- **Opt-in stale reads through PgDog** (#1304). PgDog runs
-  `read_write_split = "prefer_primary"` with `ban_replica_lag = 2000`; the
-  `product` database lists `product-db-ro`, and product-service reads related
-  products from it (`DB_READ_REPLICA=true`, startup option
-  `-c pgdog.role=replica`). Everything else stays on the primary. A banned
-  replica falls back to the primary. The PgDog reload sidecar now also
-  reloads `pgdog.toml` and `users.toml`, so a config change reaches running
-  pods without a roll.
-
-- **A PgDog certificate renewal reloads in place instead of rolling** (#1350).
-  The HelmRelease no longer copies `tls.crt` into a pod annotation; a
-  `tls-reload` sidecar (PgDog's own image, added through `postRenderers` with
-  `shareProcessNamespace`) sends PgDog `SIGHUP` when the mounted certificate
-  changes, and PgDog re-reads its TLS files. Renewals were the most frequent
-  PgDog roll and each cost checkout requests. Verified on Kind: new serial on
-  all three pods, no restart.
-
-- **OpenBAO rotates every product-db runtime password.** The six runtimes
-  (`product`, `inventory`, `cart`, `order`, `checkout`, `payment`) move to
-  OpenBAO static roles (720h) like platform-db's (#1310): product-db gets its
-  own `vault_rotator` (bootstrap SQL with ADMIN on each runtime, `inRoles`,
-  drift guard, `hostssl product vault_rotator` on the cluster and its DR
-  replica) and its own `openbao-db-config` Job in namespace `product`, so
-  neither cluster's Job depends on the other. The eleven runtime
-  ExternalSecrets read `database/static-creds/<svc>-runtime` every 15s, the
-  DatabaseRoles drop `passwordSecret`, and the pods and both workers read the
-  password from a mounted file with no `DB_PASSWORD` env (images product
-  1.16.3, inventory 0.9.2, cart 2.4.2, order 2.10.3, checkout 0.13.3, payment
-  2.8.1). Every runtime password on the platform now has one writer (#1311).
-
-- **OpenBAO rotates every platform-db runtime password.** `user_runtime`,
-  `shipping_runtime` and `review_runtime` join `notification_runtime` on
-  OpenBAO static roles (720h, ADR-025, ADR-089): `vault_rotator` holds ADMIN
-  on each (bootstrap SQL, `inRoles`, drift guard), the ExternalSecrets read
-  `database/static-creds/<svc>-runtime` through `openbao-db`, the
-  DatabaseRoles drop `passwordSecret`, and the pods read the password from a
-  mounted file (`db_password_file`; images user 2.5.2, shipping 1.10.1,
-  review 2.6.1). With a password file the domain templates no longer set
-  `DB_PASSWORD` on the service container, notification included. Runtime
-  ExternalSecrets refresh every 15s instead of 1m, which shortens the window
-  in which a new connection still holds the old password. OpenBAO reaches
-  platform-db with `sslmode=require` (#1309).
-
-- **The DR cluster verifies and isolates like product-db.**
-  `product-db-replica` serves a `homelab-ca` certificate
-  (`product-db-replica-server-tls`) and carries product-db's `pg_hba`
-  instead of CNPG's self-signed CA and default `host all all all` rule, so
-  after a promotion PgDog and `migrate` connect with `verify-full` and only
-  the host changes. `make validate` fails when the two `pg_hba` lists
-  differ, and `make db-tls` checks the replica hop when the DR wave is on
-  (#1307).
-
-- **PgDog authenticates by passthrough and keeps no passwords.** The
-  `pgdog-product` HelmRelease drops its six `users[]` entries and their
-  positional password `valuesFrom` (ADR-014, now superseded) and sets
-  `passthrough_auth = "enabled_allow_change"` (ADR-025): PgDog asks each
-  client for its password over the required TLS, checks it against
-  `product-db` and caches it, and a rotated password replaces the cache at
-  the next login. A runtime password change no longer needs a HelmRelease
-  reconcile or a PgDog rollout (#1283 row 4).
-
-- **Both clusters serve a homelab-ca certificate, and every direct hop
-  verifies it.** `platform-db` and `product-db` take their server certificate
-  from a cert-manager `<cluster>-server-tls` (`spec.certificates`), so
-  clients verify the primary with the same `*-db-ca-trust` CA they use for
-  the poolers. `migrate`, the seed Job, both authz Jobs and CronJobs and
-  PgDog's upstream (`tls_verify = verify_full`) move from `require`/`prefer`
-  to `verify-full`, and every service, migrator and `db_authz` line in
-  `pg_hba` becomes `hostssl`. `temporal`, `keycloak` and `vault_rotator` keep
-  `host` (#1296); pgroles stays `require` (no root-certificate field).
-  `make db-tls` adds the two direct hops.
-
-- **Every product-db client verifies PgDog, and PgDog refuses plaintext.**
-  product, inventory, cart, order, checkout and both Temporal workers move from
-  `sslmode=disable` to `verify-full`, joining payment. Each namespace gets a
-  `product-db-ca-trust` Certificate on the live `homelab-ca` (payment's
-  `payment-db-ca-trust` is renamed to it), and `fulfillment-rs` learns
-  `db_ca_secret`. PgDog sets `tls_client_required`, so a plaintext login gets
-  `only TLS connections are allowed`. `make db-tls` (`scripts/db-tls-check.sh`)
-  checks each pooled hop: the right host and CA reach authentication, the
-  Service IP and a foreign CA fail the handshake, and plaintext is refused.
-
-- **platform-db services verify PgBouncer, and PgBouncer refuses plaintext.**
-  user, notification, shipping and review move from `sslmode=disable` to
-  `verify-full`. The CNPG Pooler serves `platform-db-pooler-tls` through
-  `clientTLSSecret`, sets `client_tls_sslmode: require` and
-  `server_tls_sslmode: verify-full`; each namespace gets a
-  `platform-db-ca-trust` Certificate. The identity, comms and catalog domain
-  templates take the `db_ca_secret` input (comms merges it with the password
-  file volume). Verified on Kind: wrong host name, foreign CA and plaintext
-  are refused, and a renewal reloads in place (ADR-089, #1283 row 1).
-
-- **payment verifies PgDog (`sslmode=verify-full`).** A new Certificate,
-  `payment-db-ca-trust`, is issued by the live `homelab-ca` and read only for
-  its `ca.crt`. The checkout domain template mounts it and sets
-  `PGSSLROOTCERT` on the service container when an RSIP sets `db_ca_secret`;
-  `migrate` keeps `require` straight to CNPG. Verified on Kind: wrong host
-  name and wrong CA are refused, and a PgDog renewal keeps payment connected.
-  PgDog still accepts plaintext (ADR-089, #1283 row 1).
-
-- **PgDog drains on restart and rolls itself on a certificate renewal**
-  (ADR-089, #1283). Each pod now has a 10 s `preStop` sleep and a 75 s grace
-  period, so it leaves the Service before PgDog's 60 s shutdown drain. The
-  `pgdog-product-tls` Secret carries `reconcile.fluxcd.io/watch`, and the
-  HelmRelease copies `tls.crt` into a pod annotation, so a renewal rolls the
-  Deployment with no manual step. Verified on Kind with `cmctl renew`: the pods
-  rolled in about 87 s and served the new serial. A roll still costs a few
-  fail-closed 503s (5 of 1993 requests under load), because idle pooled client
-  connections get `57P01`; the client retry is duynhlab/pkg#124.
-
-- **cart, order, checkout and payment move to the owner / migrator / runtime
-  split (RFC-0029 product-db wave 2, ADR-088).** Every one of the ten services
-  is now on the split. On product-db:
-  - The role catalog Job + CronJob own `<svc>_owner` and `<svc>_migrator` for
-    all six databases (`ROLE_SERVICES`), and one pgroles policy per database
-    owns the grants.
-  - Runtime and migrator ExternalSecrets (`product-db-<svc>-runtime-secret`,
-    `product-db-<svc>-migrator-secret`, copies in each service namespace) are
-    seeded per cluster in OpenBAO at `product-db/<svc>-runtime` / `-migrator`.
-    The single-role `product-db-<svc>-secret` Secrets, their KV seeds and
-    logins are gone.
-  - `pg_hba` admits only each database's runtime, migrator and `db_authz`
-    (`hostssl` for payment), and the guard queries and `absent()` selectors
-    cover the four new migrator edges and databases.
-
-  PgDog lists `cart_runtime`, `order_runtime`, `payment_runtime` and
-  `checkout_runtime` (ADR-014 indices kept). order-worker and checkout-worker
-  use their service's runtime Secret. `db-authz-check.sh`, the isolation sweep,
-  `smoke.js` and local-stack (`init.sql`, compose, audit rows) cover all ten
-  services. Verified on a fresh Kind bring-up 2026-10-16: authz-check 120/120,
-  isolation sweep, six policies Ready, drift restored in 26 s, e2e saga 9/9,
-  staff 59/59, operator 26/26.
-
-- **payment reaches its database through PgDog, over client TLS (ADR-089).**
-  PgDog terminates client TLS with the cert-manager `Certificate`
-  `pgdog-product-tls` (ClusterIssuer `homelab-ca`); TLS stays optional, so the
-  other services keep plaintext. payment connects with `sslmode=require`:
-  encrypted, not verified, and `verify-full` is a follow-up. PgDog reads the
-  certificate only at start, so a renewal needs a PgDog restart
-  ([pooler operations](docs/databases/runbooks/pooler-operations.md)). payment's
-  migrate stays direct to `product-db-rw` over `hostssl`; local-stack keeps
-  payment direct to PostgreSQL, with no pooler. On Kind (2026-10-16) PgDog
-  serves the `homelab-ca` certificate, every `payment_runtime` session comes
-  from a PgDog pod, and the reconciler's session advisory lease works through
-  it (7 passes completed, none failed, no lock left). The database topology
-  diagram shows the new edge.
-
-- **product and inventory move to the owner / migrator / runtime split
-  (RFC-0029 product-db wave 1, ADR-088).** product-db gets the platform-db
-  shape:
-  - `authz_admin` in the bootstrap SQL and a `db_authz` login.
-  - A role catalog Job + CronJob (`product-db/authz/`), sharing platform-db's
-    `apply.sh` and `roles.sql`, with `PGHOST` picking the cluster.
-  - One pgroles policy per service, with host `product-db-rw.product.svc`.
-  - Runtime and migrator ExternalSecrets seeded per cluster in OpenBAO, and
-    `Database` objects owned by `<svc>_owner`.
-  - `pg_hba` lines for the runtime, migrator and `db_authz`, and a
-    `pgroles-system` network policy.
-  - Guard queries for the role membership and role config, and default
-    privileges in both databases. The `*GuardMissing` alerts now name the
-    cluster they fire for.
-
-  PgDog lists `product_runtime` and `inventory_runtime` (ADR-014 indices kept),
-  and both services read `db_runtime_secret` / `db_migrator_secret`. The
-  bootstrap database keeps its name `product`; its initdb role `product` is now
-  NOLOGIN with no `pg_hba` line, and CNPG hands the database to
-  `product_owner`. `db-authz-check.sh`, the isolation sweep, `smoke.js` K3.7 and
-  local-stack (`init.sql`, `product-authz` / `inventory-authz`, A23) cover the
-  two services. The database topology diagram now shows PgDog as primary-only
-  and the authorization executors. product moves to `1.16.2`, whose migration
-  000006 checks the table ACL instead of effective privilege (product-service#241),
-  which the split needs.
-
-- **Platform clients name themselves too (ADR-089).** The role catalog Job and
-  CronJob run as `db-authz` (`PGAPPNAME`), `db-authz-check` as `db-authz-check`,
-  Keycloak as `keycloak` (`ApplicationName` in the JDBC URL, also in local-stack),
-  Temporal as `temporal` (`connectAttributes` on both datastores; local-stack uses
-  `PGAPPNAME`, which its driver reads), and the OpenBAO database engine as
-  `openbao`. pgroles stays unnamed: its `PostgresPolicy` connection has no
-  `application_name` field in 0.13 or 0.14.
-
-- **PgDog sends every query to the primary (ADR-089).** The six product-db
-  databases no longer list `product-db-r`, so PgDog cannot route a `SELECT`
-  outside a transaction to a replica, where a read right after a commit could
-  miss it. A flow that tolerates stale reads will opt in through an explicit
-  replica profile with a lag tolerance (planned). The pooler docs, architecture
-  guide, PgDog runbook and the replication-lag runbook drop the read-split and
-  replica-ban text. ADR-089 adoption moves to Partial.
-
-- **Every service, migration and worker sets `application_name`
-  (ADR-089).** The five domain ResourceSets set `PGAPPNAME` to the service
-  name on the main container and `<name>-migrate` on the `migrate` init
-  container; `order-worker` and `checkout-worker` use their own names, and
-  local-stack sets the same values. Demo seeds run as `<name>-seed` (local-stack
-  and `make seed`), and local-stack's grant jobs as `db-authz`. pgx reads
-  `PGAPPNAME`, so no service code changes. Through PgDog the name replaces `PgDog` on product-db sessions.
-  Platform consumers (`db-authz`, Keycloak, Temporal, OpenBAO, pgroles) follow
-  later.
-
-- **user, shipping and notification run on three database roles (RFC-0029
-  D2, ADR-088).** The role catalog Job now owns `<svc>_owner` and
-  `<svc>_migrator` (with `role=<svc>_owner`) for all four `platform-db`
-  services; CNPG keeps each `<svc>_runtime`. The pgroles operator 0.13.0
-  (`pgroles-system`, own Flux wave) owns the in-database grants of user,
-  shipping and notification through one `PostgresPolicy` per database
-  (`adopt`, as `db_authz` → `authz_admin`); review stays on the Job. pgroles
-  cannot leave `schema_migrations` out of a table wildcard (PGR-10), so those
-  three runtimes hold it, by owner decision. OpenBAO now rotates
-  `notification_runtime` (static role `notification-runtime`). `platform-db`
-  bootstraps a neutral `platform` database, and `user` became an ordinary
-  `Database` owned by `user_owner`. `identity-rs` and `comms-rs` gained the
-  runtime/migrator Secret branch; the `shared-db` KV literals are gone.
-  local-stack mirrors the split for the four services and plays the grants
-  with the cluster's `grants.sql`.
-
-- **The platform applies review's database authorization (ADR-088).** review
-  no longer carries roles or grants: an `authz_admin` role (bootstrap SQL,
-  NOLOGIN CREATEROLE, unmanaged by CNPG) reached by the `db_authz` login (CNPG
-  `DatabaseRole`, `inRoles: [authz_admin]`, random OpenBAO password) runs a
-  role catalog Job on every change and a CronJob every 10 minutes. It creates
-  `review_owner` and `review_migrator`, sets `ALTER ROLE review_migrator SET
-  role = review_owner` so the migrator is the owner at login, keeps the
-  membership `f/f/t` and exact, and applies review's grants, default privileges
-  and `REVOKE EXECUTE … FROM PUBLIC`. It creates `schema_migrations` as the
-  owner before the first migrate, so the runtime never holds it. Drift it
-  may not repair fails the run (`KubeJobFailed`). The owner and migrator
-  `DatabaseRole`s are gone, the catalog template drops `DB_MIGRATION_ROLE`,
-  review is pinned to `2.6.0`, and
-  local-stack runs the cluster's `grants.sql` after review's migration.
-  One executor role in CNPG would deadlock a new cluster (CNPG creates a role
-  with `CREATE ROLE … IN ROLE`) or have its memberships revoked, hence two.
-
-- **Every statement execution on `platform-db` and `product-db` is now an
-  event in ClickHouse (`pg_stat_ch`).** The pg_stat_ch 0.4.0 extension arrives
-  as a CNPG image-volume extension (`ghcr.io/duynhlab/images/pg-stat-ch`,
-  built inside the pinned operand image and `ldd`-checked there), is preloaded
-  on both clusters and mounted-but-not-preloaded on `product-db-replica`, and
-  ships one 44-column event per execution over the native protocol to
-  ClickHouse database `pg_stat_ch` as an INSERT-only user. The password is a
-  postmaster GUC, so `databases-local` substitutes
-  `${PG_STAT_CH_CLICKHOUSE_PASSWORD}` at apply time from a Secret ESO lands in
-  `flux-system` (`postBuild.substituteFrom`, first use in this repo) — no
-  manifest carries it; OpenBAO seeds `secret/local/infra/clickhouse/pg_stat_ch`.
-  The `platform-db-authz` ConfigMap opts out of that substitution
-  (`kustomize.toolkit.fluxcd.io/substitute: disabled`), because `apply.sh`'s
-  bash `${...}` would otherwise fail the whole wave.
-  Ring sized for the 1 Gi pods (8192 slots, 16 MiB strings). The `pg_stat_ch`
-  custom query exports the exporter's own health as `cnpg_pg_stat_ch_*`.
-  Guide: `docs/observability/metrics/postgresql/query-telemetry.md`.
-- **review runs on three database roles (RFC-0029 Phase 2 canary).**
-  `review_owner` (cannot log in) owns the database; `review_migrator` reaches
-  it only through `SET ROLE` (`DB_MIGRATION_ROLE`); the service logs in as
-  `review_runtime` with CRUD on `reviews` only. `pg_hba` admits the runtime
-  and the migrator, their passwords are random per cluster (the committed
-  `shared-db/review` literal is gone), and review-service is pinned to
-  `2.5.0`. `catalog-rs.yaml` takes `db_runtime_secret` / `db_migrator_secret`
-  for a converted service; product keeps the old inputs until Phase 3. The
-  ADR-086 guard watches the new edge, `db-isolation-sweep.sh` covers 84 pairs,
-  `db-authz-check.sh` runs K3.8–K3.9 as the real logins, `kind-seed.sh` seeds
-  with the migrate container's identity, and local-stack mirrors the roles
-  (A23). Verified 2026-10-08 on a fresh Kind cluster and a fresh local-stack:
-  all gate rows pass.
-
-- **`scripts/pg-authz-lab/`: the RFC-0029 authorization experiments as a
-  repeatable gate.** `run.sh pg` runs PG-01..08 against a throwaway PostgreSQL
-  container, each experiment asserting its own pass condition; `run.sh cnpg`
-  runs CNPG-01..07 against the Kind `platform-db` with `lab_*` objects only and
-  removes them afterwards. First run 2026-10-06: 8/8 and 7/7. The new CNPG-07
-  confirms that `inherit: false` on a member makes CNPG create (and recreate)
-  its owner edge as `ADMIN f / INHERIT f / SET t`, which the authorization
-  conventions rely on.
+- RFC-0029 wave by wave: review canary, then user / shipping / notification (pgroles operator 0.13.0 owns the grants), product / inventory, then cart / order / checkout / payment. `authz_admin` / `db_authz` catalog Jobs apply every role and grant (ADR-088); fleet gate 2026-10-16.
+- OpenBAO rotates every runtime password on platform-db (#1309) and product-db (#1310, #1311): static roles (720h), a `vault_rotator` per cluster, passwords read from a mounted file, no `DB_PASSWORD` env.
+- Every PostgreSQL hop verifies a homelab-ca certificate: both clusters serve `<cluster>-server-tls`, PgBouncer and PgDog refuse plaintext, every service runs `sslmode=verify-full`, the DR replica carries product-db's `pg_hba`, and `make db-tls` checks each hop (ADR-089, #1283, #1307).
+- PgDog authenticates by passthrough (`enabled_allow_change`, ADR-025) and stores no passwords; it drains on restart, reloads a renewed certificate in place through a `tls-reload` sidecar (#1350), sends every query to the primary, and offers opt-in stale reads (product's related products, #1304).
+- Every service, migration, worker, seed and platform client sets `application_name` (`PGAPPNAME`, ADR-089).
+- CDC source on product-db (RFC-0030 phase 3, ADR-067/068): CNPG Publications, `peerdb_<db>` roles, pg_cron heartbeats on the `postgresql-cron` 1.0.0 operand, `product-db-pooler-cdc` with TLS on both hops; slots are `FAILOVER true` and survive a promotion; gate scripts `cdc-target-check.sh`, `pgcron-restore-check.sh`, `pgcron-rollback-drill.sh`.
+- `scripts/pg-authz-lab/` replays the RFC-0029 PostgreSQL and CNPG experiments as a gate (8/8, 7/7).
 
 #### Secrets
-
-- **ClickHouse's cold tier uses its own RustFS key.** `clickhouse-rustfs` reads
-  the `clickhouse` IAM user (scoped to `clickhouse-otel`) instead of the RustFS
-  root key, which only the bucket scripts use now. A running cluster picks the
-  key up on the next ClickHouse pod restart.
-
-- **Each RustFS consumer has its own identity.** The bucket setup Job and
-  CronJob now also create one IAM user per bucket (`cnpgbackup`, `pyroscope`,
-  `clickhouse`, `peerdb`) bound to a policy scoped to that bucket, through
-  RustFS's `/rustfs/admin/v3` API with `curl --aws-sigv4`, and prove the
-  isolation (own bucket reachable, a neighbour's denied) before reporting
-  Complete. OpenBAO seeds `secret/local/infra/rustfs/{cnpg,pyroscope,clickhouse,peerdb}`
-  and the Barman, Pyroscope and PeerDB ClusterExternalSecrets read them; the
-  root key is left to the setup scripts and, until its freeze lifts, to
-  ClickHouse's cold tier (its user is provisioned, not yet consumed). This
-  closes the shared-key gap recorded under ADR-066 (#1315). Verified against
-  RustFS 1.0.4 in a container (provisioning, re-run, object round-trip,
-  cross-bucket write denied); the Kind pass is the merge gate.
-- **No literal passwords in the OpenBAO bootstrap.** The `temporal`,
-  `keycloak` and `product` (initdb) seeds are random per cluster, like every
-  other seed, and the KV seed loop no longer holds platform-db runtime
-  passwords (#1309).
+- Each RustFS consumer has its own IAM user (`cnpgbackup`, `pyroscope`, `clickhouse`, `peerdb`), and ClickHouse's cold tier uses the `clickhouse` key (closes #1315).
+- No literal passwords in the OpenBAO bootstrap: the `temporal`, `keycloak` and `product` seeds are random per cluster (#1309).
 
 #### Local-stack
-
-- **Postgres logs name the session** (#1403). `log_line_prefix` is now
-  `%m [%p] %q%u@%d app=%a client=%h`, and connection and disconnection logging
-  is on like the CNPG clusters, so a raw log line in VictoriaLogs names the
-  service that caused it. Set in `postgres/init.sql` with `ALTER SYSTEM`,
-  because `compose.analytics.yaml` replaces the postgres `command`.
-
-- **Kind-safe analytics drills and fixture** (#1360). The fixture heartbeat
-  versions rows by millisecond timestamp (a counter restarting at 1 per process
-  left the pre-restart row visible and the service never recovered); the Kind
-  failure drill probes the never-Ready replacement pod instead of waiting for a
-  rollout `maxUnavailable: 0` never completes.
-- **Lighter, closed-off bring-up.** Each service repository now builds one
-  image (`local-stack/<repo>:dev`); its migrate, seed, worker and mockpay
-  containers reuse it, so a cold build is 10 builds instead of ~31. Every
-  container has a `mem_limit` sized from measured usage (Go services peak at
-  23–44 MiB, Keycloak ~1 GiB with its heap now capped, the stack ~3.5 GiB). Every
-  published port binds `127.0.0.1`, and the project is named `local-stack`, so a
-  worktree no longer changes container names. A one-shot `gateway-ready` job
-  waits until the edge serves a route, and both SPAs wait for it. Grafana's
-  plugins persist in a volume. Valkey is pinned to `9.1.2`, the cluster chart's
-  version. `make e2e*` now requires `GATE=compose|kind`: the targets used to
-  default to different stacks.
+- Lighter, closed-off bring-up: one image per repository, `mem_limit` on every container, ports on `127.0.0.1`, project name `local-stack`, a `gateway-ready` job; `make e2e*` requires `GATE=compose|kind`.
+- Postgres logs name the session (`log_line_prefix` with `app=%a`, #1403); Kind-safe analytics drills and fixture (#1360).
 
 #### Docs
-
-- **Page templates and a teach-first docs skill.** `docs/_templates/` holds
-  the four ADR-083 reader contracts (tutorial, how-to, reference,
-  explanation) with a guidance comment under every heading and a review gate
-  to delete before publishing. homelab-docs 1.2.0 adds `teaching.md` (layer
-  basic → complex on the platform's own components; every step is action →
-  command → real output → what to notice → checkpoint; open with observable
-  outcomes, close with next steps), maps each page shape to its contract and
-  template, and adds a Teaching review pass. `scripts/docs-check.sh`
-  (`make docs-check`) checks links and anchors, fence language tags, Mermaid
-  render, token patterns and the inbound links of a new page; CI runs it on
-  the changed pages without the Mermaid render. ADR-083 Adoption moves to
-  Partial and ADR-090 to Complete.
-
-- **Project skills review: the owner's rules move into platform-engineer.**
-  platform-engineer 2.0.0 adds § Working with the owner: ten binding rules
-  (gate → merge → tag → Kind, no green report mid-push, admin merge only on
-  green, named-path staging, evidence over memory, read the service code,
-  adoptable features hold a bump, pre-deployment contracts, an
-  Envoy-Gateway-native edge, explain the mechanism). It also fixes the chart
-  names (`duynh`, `slo`) and adds git-pr to the skills map.
-  homelab-troubleshooting 0.2.0 routes `CertManager*` alerts and corrects the
-  logging path (`slogx`), the ClickHouse manifest paths and the alert-count
-  command. homelab-docs 1.1.0 follows the runbook `_TEMPLATE.md`.
-  homelab-proposals 0.2.0 routes the optional RFC domain doc to homelab-docs.
-  homelab-drawio 1.0.1 asserts the v2 palette in its evals. The docs, proposals
-  and runbook hubs now link the skill that works on them.
-
-- **New `homelab-docs` skill.** [`.agents/skills/homelab-docs/`](.agents/skills/homelab-docs/SKILL.md)
-  owns how a page under `docs/` is written, verified, edited and reviewed. It
-  routes to the AGENTS.md docs conventions instead of repeating them, and adds
-  what they lacked: a verification order (manifests and cluster first, records
-  by status, Context7 for upstream), page shapes mapped to Diátaxis, a homelab
-  term table with the planned and reference labels, an editing triage, a
-  five-pass review with blockers, and a prose pass that names the AI patterns
-  and ease claims to remove. platform-engineer (1.2.0) routes docs work to it;
-  the prose sweep of existing pages is a follow-up.
-
-- **`git-commits` is now `git-pr`, and it writes PR descriptions.** The
-  skill owned commits and branch names, while PR descriptions had no guide.
-  It now covers the PR title, which becomes the squash subject, and the
-  description: a Summary that leads with why in about 100 words, no file
-  lists, and a Gate that names only the checks that ran. Commit bodies and PR
-  text follow the ASD-STE100 sentence rules. Closing keywords move from
-  commits to the PR description. Version 2.0.0; every live link follows the
-  rename.
-
-- **New `homelab-proposals` skill.** [`.agents/skills/homelab-proposals/`](.agents/skills/homelab-proposals/SKILL.md)
-  (with its `.claude/skills` symlink) routes the RFC/ADR authoring lifecycle —
-  reserve a number, `research.md` and its review gate, the RFC, the one-per-ADR
-  split, acceptance, and the tracking issue — to the owning files in
-  `docs/proposals/` without copying the templates or process. platform-engineer
-  (bumped to 1.1.0) stays the dispatcher: its § RFC / ADR gate collapses to a
-  pointer and the IDE skills map replaces the RFC and ADR rows (which sent
-  authoring to `spec-driven-development`, `planning-and-task-breakdown` and
-  `documentation-and-adrs`, whose templates and paths do not match this repo)
-  with one row. Routed from `AGENTS.md`. The research phase is delegated to
-  the `proposals-researcher` sub-agent (`.agents/agents/`, symlinked into
-  `.claude/agents/`, which Cursor reads too): it writes `research.md` and runs
-  the Context7 audit in its own context, never git or a manifest. It is an IDE
-  helper a person invokes, not the RFC-0033 runtime, which stays uninstalled.
-
-- **Runbook: slow ClickHouse query → flame graph.**
-  `runbooks/clickhouse/slow-query-flame-graph.md` walks on-call from a slow
-  panel or a `MEMORY_LIMIT_EXCEEDED` to the `query_id` and its replica, checks
-  the sample count, re-runs a `SELECT` at 100 Hz when needed, exports the
-  stacks with `INTO OUTFILE … FORMAT TSVRaw` (the password stays at the
-  prompt), draws them with `flamegraph.pl`, and maps the widest bar to a fix
-  for the `otel` sorting keys and indexes. The profiling guide's commands now
-  use `FORMAT TSVRaw`, which keeps C++ names such as `'lambda'` intact.
-
-- **Profiling ClickHouse guide** — `docs/observability/clickhouse/profiling.md`
-  explains the sampling profiler the server has been running since day one
-  (1 Hz CPU and wall-clock timers per query thread, a 4 MiB memory step, the
-  `symbols` column) and how to render CPU and memory flame graphs from
-  `system.trace_log` with `flameGraph()` and `flamegraph.pl`. Everything is a
-  per-query `SETTINGS`, including the `allow_introspection_functions = 1` that
-  `flameGraph()` requires; nothing changes in the shared profile. Records why a
-  Pyroscope eBPF agent is the wrong tool for this binary (needs `hostPID`, CPU
-  only, no `query_id`). Verified on Kind with ClickHouse 26.10.
-
-- **homelab-troubleshooting 0.1.0 knows the field traps.** Seven domain
-  references gain a *Known traps* list (22 traps met on this platform, each
-  re-checked and linked to its owning doc) and the skill gains six evals.
-  Traps no doc owned were written into their home first: ZFS-host prerequisites
-  and "merging is not deploying" in `docs/platform/setup.md`, Flux `force` and
-  `cpu: null` in `application-delivery.md`, three counter traps and a
-  metric-existence audit in the alert lifecycle guide, the Grafana operator's
-  create-only behaviour on Kind, the Collector's missing `_total` suffix and
-  ClickHouse's read-only user storage. The setup guide's seed section now
-  describes the `seed` subcommand and `make seed` instead of seed migrations.
-
-- **Repository skills carry a version.** Each of the five skills under
-  `.agents/skills/` declares a semver `metadata.version` and keeps a
-  `CHANGELOG.md`; AGENTS.md § Skill versioning sets the bump rules.
-  homelab-troubleshooting starts at 0.0.1, the others at 1.0.0.
-
-- **New `homelab-troubleshooting` skill.** [`.agents/skills/homelab-troubleshooting/`](.agents/skills/homelab-troubleshooting/SKILL.md)
-  (with its `.claude/skills` symlink) routes an incident or firing alert to its
-  owning runbook and consolidates stray debug notes into their authoritative
-  home. A concise SKILL.md router over `references/` (triage/safety, entry
-  modes, signal correlation, docs hygiene) and ten per-domain routing files; it
-  points at existing procedures rather than copying them, enforces
-  read-only-first diagnosis with approval gates for failover/PITR/secret and
-  live non-GitOps changes, and reports runbook-index gaps instead of inventing
-  steps. Routed from `AGENTS.md` and the platform-engineer skill, with
-  `evals/evals.json`.
-
-- **New `git-worktrees` hygiene skill.** `.agents/skills/git-worktrees/SKILL.md`
-  (with its `.claude/skills` symlink) captures worktree lifecycle rules: one
-  worktree per task, commit before removing, and proving a squash-merged branch
-  landed via a file-scoped diff before deletion. Routed from `AGENTS.md` and the
-  platform-engineer skill.
-
-- **Each `docs/architecture/` folder renders its diagrams.** api, databases,
-  observability, secrets, security and workflows gain a `README.md` that shows
-  every diagram in the folder with the question it answers and where it is
-  explained; platform's README now shows the current topology too.
-
-- Add the Go telemetry implementation guide, Linux Kind verification checklist
-  and dated code/documentation audits; connect the learning and verification paths.
-
-- **RFC-0030 Mermaid diagrams show the deployed CDC path.** The RFC
-  architecture and ADR-066 decision view drop their "planned" nodes and the
-  retired fixture; the CDC hub sequence shows the CDC pooler and the `s3()`
-  read; PeerDB joins the platform API topology, the pooler map, the database
-  architecture and the ClickHouse signal map; `docs/api/analytics.md` gains a
-  request-path diagram; RFC/ADR-068/069 diagrams use the right classes. Every
-  changed block was rendered with `mmdc`.
-
-- **Architecture diagrams show the CDC path** (RFC-0030). `databases/topology`
-  adds PeerDB, the CDC pooler and the CDC bootstrap Job; `tls-data-tier` adds
-  PeerDB's three verified PostgreSQL hops (the plaintext ClickHouse, RustFS and
-  Temporal hops in a note) and re-counts homelab-ca at 7 leaves and 14
-  anchors, matched in `docs/secrets/cert-manager.md` §12.1; `network-policies`
-  draws the unfenced `peerdb` namespace and its two allows; `app-mesh` adds
-  analytics; `signal-flow` adds PeerDB's OTLP metrics. `databases/cdc` now
-  shows the snapshot worker holding the exported snapshot while flow-worker
-  copies, as PeerDB v0.37.5 does.
-
-- **CDC hub: components, Temporal and drill results** (RFC-0030). The
-  components table names what `peerdb-server` is and what the chart ships but
-  the platform turns off; a new "Why Temporal" section explains why PeerDB
-  needs it and why it shares the platform server. The Operations section
-  records the G7.1, G7.2, G7.4 and G7.8 drill results, and
-  `scripts/analytics/cdc-drills.sh` lands. The CDC diagram is re-laid out:
-  RustFS, Temporal and the catalog share one tier, so the data path runs
-  straight down (0 crossings, 0 warnings).
-
-- **Draw.io diagrams have a title hierarchy.** The `homelab-drawio` skill sizes
-  frame titles by depth: diagram title 18, the cluster frame 14, every inner
-  frame 11 and muted, top-right (top-left when it holds frames itself). Routing,
-  label placement and `validate.py` read each title's real size and side. All 18
-  generated diagrams are regenerated: crossings 112 to 111, warnings unchanged,
-  no title collisions.
-
-- **The CDC path is a Draw.io diagram** (`docs/architecture/databases/cdc`).
-  It is generated from an IR checked against the PeerDB, pooler and bootstrap
-  manifests, and replaces the hub's Mermaid flowchart. The row-sequence
-  diagram stays Mermaid.
-
-- **Commerce CDC hub** (`docs/databases/cdc/`): what PeerDB is, how it compares
-  with Debezium, `MaterializedPostgreSQL`, ClickPipes, batch and Airbyte, the
-  architecture and a row's path, platform behavior, operations and traps;
-  linked from the databases hub, extensions (pg_cron) and poolers (CDC pooler).
-
-- **The analytics contract is as-built.** `docs/api/analytics.md` moves from
-  *Planned* to live (first on a fixture-backed serving layer, now CDC-fed) with the compose and Kind
-  evidence rows and the open read-path finding (analytics-service#4); the API
-  index, the Backoffice consumer map (seventh service, `analytics` module,
-  eighth screen), the repositories table and the observability index follow;
-  the Kind audit gains its 2026-10-23 run record and the `backoffice.duynh.me`
-  host in K4.14.
-- Document the draft RFC-0030 analytics API: exact money strings, USD-only v1,
-  event-date ledger totals, cohort semantics and fail-closed freshness. Backend
-  code and UI preview remain undeployed pending Linux qualification.
-
-- **The TLS topology is two diagrams** (#1339): `security/tls-pki-edge` (who
-  issues each certificate, and the request, identity and east-west hops) and
-  `security/tls-data-tier` (every database, pooler and store hop, with the
-  issuer → server and pooler certificate edges drawn instead of implied). The
-  combined view had 52 edge crossings; the two have 7 and 24. Moving dashes
-  (`flowAnimation`) are documented as a current primary flow, not a dashed
-  edge, in AGENTS.md and the house style. The two Temporal diagrams drop the
-  release numbers that went stale on every bump, and `platform/topology` names
-  the TLS state of the Keycloak and Temporal SQL edges.
-
-- **ADR-089 records its parameters and the rotation runbook covers both
-  clusters.** ADR-089 lists the certificate lifetimes, renewal pickup, expiry
-  alerts, the planned CA-overlap procedure, the rotation error budget (zero
-  failed requests; window measured on manual and scheduler-driven rotations)
-  and the credentials as built. The rotation runbook (`rotate-cnpg-service-password.md`)
-  now covers both clusters, adds an emergency rotation (roll PgDog to drop
-  cached passwords, end old sessions) and keeps the manual migrator flow
-  (#1303).
-
-- **Git commit conventions have one owner.** The `git-commits` skill defines
-  homelab messages and branch names; agent instructions and documentation link
-  to it and distinguish the microservice Gitflow target from current practice.
-
-- `docs/databases/extensions.md` compares the PostgreSQL query-telemetry tools
-  (`pg_stat_statements`, `auto_explain`, `pg_stat_monitor`, `pg_tracing`, the
-  OTel `postgresql` receiver, `pg_stat_ch`) by collection model, history,
-  strength, limitation and platform status, and its ImageVolume section now
-  describes the deployed `pg_stat_ch` delivery instead of a reference
-  capability. The custom-metrics reference, the PostgreSQL metrics hub, the
-  plan-regression workflow and `DBClientQueryP95High` point at the new
-  per-execution signal.
-- Define concise manifest comments and evidence-aware documentation conventions;
-  remove editorial update footers from authoring templates while preserving
-  decision and verification dates.
-
-- **Database platform learning and operations:** add storage/capacity,
-  security/access and maintenance/upgrade guides; connect the hub's reading
-  order to task runbooks. Reconcile current CNPG/PostgreSQL pins, qualify
-  RPO/failover claims, correct major-upgrade capabilities and record remaining
-  infrastructure follow-ups without changing manifests or historical drills.
-
-- **New `docs/databases/authorization.md`: the owner / migrator / runtime
-  conventions** (RFC-0029 Phase 1, not deployed). Role, `DatabaseRole`,
-  Secret, KV and `pg_hba` naming with the names considered and rejected; role
-  attributes, including `inherit: false` on the migrator, which gives its
-  membership the `f/f/t` shape with no SQL (measured on PostgreSQL 18.6);
-  ResourceSet wiring; the migration contract and the `0001_authorization`
-  snippet; the gate rows; local-stack parity; catalog queries for effective
-  access. Linked from the docs index, the database hub, the add-a-service
-  runbook and the OpenBAO KV table.
-
-- **Every PostgreSQL cluster in the Draw.io diagrams carries the PostgreSQL
-  logo, and keeps its cylinder.** The `homelab-drawio` generator used to refuse
-  a logo on a datastore; it now draws one as a child image cell inside the
-  cylinder, because draw.io paints no `image=` on `cylinder3`, and the
-  validators treat that cell as part of its store. product-db, platform-db and
-  the DR replica gain the logo in the databases, platform, TLS, Temporal and
-  secrets diagrams.
+- New skills: `homelab-docs` (page shapes, verification order, five-pass review; ADR-090), `homelab-proposals` with the `proposals-researcher` sub-agent, `homelab-troubleshooting` (22 field traps), `git-worktrees` (Worktrunk in 1.1.0); `git-commits` becomes `git-pr` and owns PR descriptions and squash messages. Every skill carries a semver version and changelog; platform-engineer 2.0.0 records the owner's ten working rules.
+- `docs/_templates/` holds the four ADR-083 reader contracts; `scripts/docs-check.sh` (`make docs-check`) checks links, anchors, fence tags, Mermaid and inbound links.
+- Platform work tracking: intake procedure, Analysis stage, Kanban view, a shared active-work limit and a dated RFC / ADR / issue inventory. Issue titles use one bracketed prefix and native types. The co-author bot is `duynhbot`.
+- New guides: the Commerce CDC hub, `docs/databases/authorization.md`, database storage / security / maintenance guides, the `extensions.md` query-telemetry comparison, the ClickHouse profiling guide and slow-query flame-graph runbook, the Go telemetry implementation guide and Linux Kind checklist; `docs/api/analytics.md` is as-built.
+- Draw.io: the CDC path, the TLS topology split into `tls-pki-edge` and `tls-data-tier` (#1339), a README per architecture folder; the generator keeps edges inside their frames, sizes titles by depth and draws product logos (PostgreSQL inside the cylinder).
+- Manifest comment and evidence-aware documentation conventions; editorial footers removed.
 
 #### Proposals
-
-- **ADR-090 accepted.** The docs procedure stays in the `homelab-docs`
-  skill; ADR-083 gains § Amendments and a `Superseded by` row for its "no
-  second documentation skill" clause, and the index shows both. Tracking
-  issue #1477 records that every obligation had already shipped.
-
-- **ADR-083 Adoption → Partial, ADR-090 Adoption → Complete.** The templates
-  the Steward decision obligated exist, the docs skill points to them, and
-  the navigation checks run in CI. The example-policy marker is documented
-  but not enforced; the observability pilot has not started.
-
-- **ADR-090 proposed: keep the docs procedure in `homelab-docs`.** It partly
-  supersedes ADR-083's "no second project documentation skill" clause, which
-  #1474 departed from without a record. ADR-083's reader contracts, Steward
-  split and example policy are unchanged; ADR-083 and RFC-0033 gain history
-  rows.
-
-- **RFC-0034 research expands with the `duynh` chart as-built.** Record that the
-  chart already renders the `app.kubernetes.io/{name,instance,version,managed-by}`
-  baseline via `duynh.labels`, that its selector (`name` + `instance`) is
-  immutable, and that the only gaps are `part-of` (never rendered) and a
-  chart-level `component` default. Adds a render-path diagram and sharpens the
-  chart open question; still `research.md`-only, no manifest or chart changes.
-- **RFC-0034 reserved (`researching`).** Open research for a platform-wide
-  Kubernetes labels and annotations standard: inventory the two custom prefixes
-  in use (`platform.duynhlab.dev/*` and the no-`.dev` `platform.duynhlab/*`), the
-  uneven `app.kubernetes.io/*` set, and the load-bearing selectors, then compare
-  options. `research.md` + index row only; no README.md, no manifest changes.
-- **RFC-0030 implemented.** ADR-066, ADR-067 and ADR-068 are
-  `Accepted / Complete`: drills, alerts, failover slots and a cold bring-up all
-  passed on Kind. ADR-069 is Complete with admin-service 0.5.2, released after
-  the full E2E audit (#1380).
-
-- **ADR-069 Adoption `Not started` → `Partial`; RFC-0030 phases 8–10 landed**
-  (#1360, #1361). The service, the edge route and the Backoffice page are
-  deployed on a fixture-backed serving layer and pass their compose and Kind
-  rows; the performance bar (G8.5) fails on one million facts and holds the
-  first tag (analytics-service#4). Phases 1–7 (pooled CDC, PeerDB, mirrors)
-  followed on 2026-10-23 (above).
-- **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
-  allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
-  Keep the accepted architecture separate from pending cluster qualification.
-
-- **RFC-0029 is Implemented.** Every service on `platform-db` and `product-db`
-  runs on the owner / migrator / runtime split with the platform applying roles
-  and grants; the fleet gate of 2026-10-16 is recorded in the Kind audit.
-  ADR-084, ADR-086 and ADR-088 Adoption `Complete`; ADR-089 stays `Partial`,
-  with its remaining obligations (verified TLS on both poolers, PgDog
-  certificate renewal, `passthrough_auth`, rotation delivery, replica and CDC
-  profiles) tracked in #1283.
-- Align RFC-0029 with ADR-088 platform-owned authorization and accept the
-  access contract as ADR-089: direct migrations, pooled consumers with native
-  per-instance monitoring and recovery exceptions, verify-full TLS on both
-  pooled hops, `application_name` through `PGAPPNAME`, primary-default reads
-  (PgDog's automatic read split becomes a gate) and per-role rotation
-  defaults. Record today's baseline, CNPG Pooler and PgDog support read from
-  upstream source, the remaining product-db rollout, and restore the
-  resolved historical decisions; D1/D2 evidence is unchanged.
-
-- **ADR-088 supersedes ADR-085.** Database authorization is platform-owned:
-  roles by the catalog Job, in-database grants by that Job or by pgroles;
-  services receive credentials only. Evidence from the 2026-10-12 pgroles/CNPG
-  lab (PGR-01…09, CNPG-08…10). ADR-084 and ADR-086 amended, RFC-0029 records
-  the pause and the redesign; `authorization.md` rewritten with exec evidence.
-
-- **RFC-0011 refreshed; ADR-087 proposed for homelab access.** Correct the
-  M720q disk assumptions, replace unverified capacity and purchase claims with
-  qualification gates, and review every open design question against the current
-  Envoy/Keycloak platform. Require restore evidence before migration. ADR-087
-  separates Tailscale administration from selected Cloudflare Tunnel/Access web
-  routes while preserving application authorization. RFC remains provisional;
-  ADR adoption has not started, and no infrastructure is installed. Four editable
-  Draw.io previews show physical connectivity, a hardware-to-applications stack
-  with individual observability products, separate private/web access, and all
-  seven OSI network layers. Tailscale homelab guidance clarifies native clients,
-  subnet routers and Kubernetes API proxies without selecting router placement.
-  SVG/PNG exports and sourced product icons accompany the reference design.
-
-- **RFC-0029 Phase 1: open questions resolved, ADR-084/085 amended.** The
-  owner chose a greenfield cutover: the legacy `<svc>` login is never created,
-  there is no compatibility window, and rollback is `git revert` plus a fresh
-  `make up`; the ownership transfer for existing data stays as reference only.
-  Migrations reach the owner through `migratex.WithSetRole` (duynhlab/pkg),
-  chosen over a catalog `ALTER ROLE … SET role` default and over pgroles. The
-  membership alert pages and also gates the Kind run (K3.7). The PUBLIC
-  `CONNECT` difference with local-stack is kept and recorded.
-
-- **RFC-0029 Phase 0 step 6 is done; ADR-086 Adoption `Partial`.** The RFC,
-  ADR-084 and research.md now agree with the decisions taken at acceptance:
-  two Secrets per service (not three), the domain ResourceSets (not the chart)
-  gain the migrator Secret input, the canary is `review`, and the resolved
-  research questions are ticked. The PUBLIC `CONNECT` difference between
-  local-stack and the cluster is recorded as an open parity question.
-
-- **RFC-0029 is `Accepted`, with ADR-084, ADR-085 and ADR-086 created at
-  `Accepted`** (Adoption `Not started`).
-  [ADR-084](docs/proposals/adr/ADR-084-split-service-database-roles/) splits
-  each service database into a NOLOGIN owner, a migrator that reaches it only
-  through `SET ROLE`, and a runtime login that owns nothing, amending ADR-013;
-  [ADR-085](docs/proposals/adr/ADR-085-service-migrations-own-authorization/)
-  puts object ACLs, default privileges (with a global PUBLIC `EXECUTE` revoke)
-  and the backfill in each service's migrations;
-  [ADR-086](docs/proposals/adr/ADR-086-guard-membership-options/) guards PG18
-  membership options with a CNPG monitoring query and alert. Owner decisions:
-  canary `review`, local-stack mirrors the roles, existing data moves to the
-  owner once per service by runbook while new clusters are born correct.
-
-- **RFC-0029 → `provisional`: its README is authored.** The owner approved
-  "ready for RFC" with the gate at 11/11. The proposal splits each service's
-  login/owner role into a NOLOGIN owner, a migrator that reaches ownership only
-  through `SET ROLE`, and a runtime login that owns nothing; service migrations
-  carry object ACLs, default privileges and backfill; a catalog query plus alert
-  guards the membership options CNPG cannot express. The decision stays open for
-  architecture review (canary, chart Secret inputs, drift collector), and three
-  ADRs are listed to be created there.
-
-- **RFC-0029 Phase 0 ran on the Kind cluster, and the leaked `vault_rotator`
-  password is now rejected.** The runbook pre-seeded KV, applied the #989
-  manifests, repaired the membership to `ADMIN TRUE, INHERIT FALSE, SET FALSE`,
-  forced a notification rotation through the new credential and proved the old
-  value fails with `password authentication failed` while the new one logs in.
-  The research records the run step by step; its gate moves to 10/11, leaving
-  only owner sign-off. The membership drift guard is still to be built. The
-  rotation runbook gains what the run taught: headless OIDC login, a transient
-  `applied=false` after the first apply, a pooler login as rotation evidence,
-  and a non-interactive old-password check.
-
-- **RFC-0029 research refreshed; it is still not ready for its README.** The
-  research now records the 2026-10-05 re-check (PostgreSQL 18.6 / CNPG 1.30.1,
-  local-stack's per-service non-superuser logins, Phase 0 merged in #989 but not
-  applied), adds pgroles v0.13.0 as a third object-authorization alternative —
-  useful for default privileges and drift review, unable to own the
-  `vault_rotator` edge because it does not manage membership `SET` — and adds
-  the unwatched `vault_rotator → notification` membership as a negative
-  invariant, with a monitoring-query guard as Phase 0 step 6. The gate stays at
-  9/11: live Phase 0 rotation and owner sign-off.
-
-- **RFC-0029 opens at `researching`: PostgreSQL authorization and access
-  governance.** The research maps ten authorization layers and exactly 25
-  production scenarios, with ownership/default privileges as the deep-dive
-  center. Its verification record proves 14/14 PostgreSQL 18.1/CNPG 1.30
-  experiments, catalogs 147 service-owned tables, and passes the live HBA and
-  Context7/source audits. It records owner/migrator/runtime as a hypothesis and
-  keeps Phase 0 live rotation plus owner approval visibly open; no RFC README or
-  Vietnamese domain guide is created before those gates pass.
+- RFC-0029 `researching` → `provisional` → `Accepted` → **Implemented**: ADR-084, ADR-086 and ADR-088 (supersedes ADR-085) Complete; ADR-089 Partial (#1283).
+- RFC-0030 **Implemented**: ADR-066, ADR-067 and ADR-068 Complete; ADR-069 Complete with admin-service 0.5.2 (#1380).
+- ADR-090 accepted (the docs procedure stays in `homelab-docs`); ADR-083 Adoption Partial, ADR-090 Complete (#1477).
+- ADR-087 proposed (Tailscale administration, Cloudflare web access) and RFC-0011 refreshed; RFC-0034 reserved (`researching`) for a Kubernetes labels and annotations standard.
+- Delivery is tracked through outcome-based initiatives and verifiable tasks; standalone ADR trackers stay when they own a delivery boundary.
 
 #### CI
-
-- **`markdown-links` runs `scripts/docs-check.sh --no-mermaid` on the changed
-  pages.** Anchors, fence language tags, token patterns and the inbound links
-  of a new page fail the job; the Mermaid render stays local because `mmdc`
-  needs Chromium. The checkout fetches full history so the script can diff
-  against `origin/main`.
-
-- **Daily cleanup of finished Actions runs.** `delete-workflow-runs.yml`
-  calls the shared `delete-workflow-runs` reusable workflow in
-  `gha-workflows` every day at 02:17 ICT and deletes finished runs older
-  than 7 days (schedule only, no manual trigger). Running runs and the
-  executing run are never deleted. The repository carried 4,854 runs when
-  the caller was added.
+- `markdown-links` runs `docs-check.sh --no-mermaid` on the changed pages; `delete-workflow-runs.yml` deletes finished runs older than 7 days every day.
 
 ### Bugfix
 
 #### GitOps
-
-- **`databases-local` substitutes into the two CNPG Clusters only.** Its
-  `postBuild.substituteFrom` (the pg_stat_ch password) used to reach every
-  object in the wave, so each script had to opt out by hand; one missed
-  annotation would either fail the build on bash `${arr[@]}` or silently blank
-  a `${VAR}`. `configs/databases/kustomization.yaml` now opts every object out
-  with a patch and lets only `Kind: Cluster` back in, and `make validate` fails
-  if anything else is in scope or a Cluster references a variable other than
-  `${PG_STAT_CH_CLICKHOUSE_PASSWORD}`. The rendered manifests differ only in
-  that annotation.
-
-- Trim release diaries and repeated explanations in service, worker, CNPG,
-  Temporal and edge manifests without changing configuration. Preserve sizing
-  evidence in the owning docs and keep rollback constraints and Flux markers.
-
-- **mockpay logs are stored once, and its telemetry reports the running
-  release.** It ships logs over OTLP but lacked the
-  `platform.duynhlab.dev/otlp-logs` label, so Vector also tailed its stdout
-  (29 lines each way in 30 minutes on Kind); the label is added.
-  `service.version` said 2.5.0 while the image is 2.8.0.
+- `databases-local` substitutes `${PG_STAT_CH_CLICKHOUSE_PASSWORD}` into the two CNPG Clusters only, and `make validate` fails on anything else in scope.
+- mockpay carries the `otlp-logs` label (its logs are stored once) and reports its real `service.version`.
+- Release diaries trimmed from service, worker, CNPG, Temporal and edge manifests without changing configuration.
 
 #### Observability
-
-- **Grafana keeps its boards across a pod restart** (#1456). `grafana-data` is a
-  2Gi PVC instead of an `emptyDir`. grafana-operator v5.25.0 never re-applies a
-  `GrafanaManifest` after the instance loses its DB, so the dashboards-as-code
-  folders and boards used to vanish on every Grafana restart while still
-  reporting `ApplySuccessful`.
-
-- **The analytics alert and dashboard candidates match the stored state
-  label.** `docs/observability/analytics/` matched and grouped on
-  `analytics_source_state_ratio="…"`, but only the metric name takes the
-  `_ratio` unit suffix: the OTel attribute `analytics.source.state` lands as
-  the label `analytics_source_state`, so every state matcher selected nothing.
-  The rules, their promtool tests and the dashboard legend now use the label
-  as stored; `promtool test rules` passes.
+- Grafana keeps its boards across a pod restart: `grafana-data` is a 2Gi PVC (#1456).
+- Grafana links traces, logs and span metrics both ways (`filterByTraceID`, a `trace_id` derived field, `spanmetrics_*` links; VictoriaMetrics datasource 1.0.0).
+- The analytics alert and dashboard candidates match on `analytics_source_state`, the label as stored.
 
 #### Databases
-
-- **A cold bring-up no longer deadlocks on the CDC grants** (RFC-0030). The
-  exact-table grants for the PeerDB roles, and the publications, named app
-  tables that only the service migrations create. In `databases-local`, whose
-  `wait: true` waits on every object it applies, they kept that wave from ever
-  going Ready, so `apps-local` and its migrations never started. Each service
-  policy's failed plan also withheld the runtime default privileges. pgroles
-  allows one policy per database, so `product-db-cdc-bootstrap` now owns the
-  CDC grants: SELECT on exactly the tables each publication carries, revoked
-  and granted in one transaction, re-asserted every 10 min. The publications
-  move to the `cdc-local` wave (`configs/cdc/source/`), and `peerdb-bootstrap`
-  waits until every published table is readable before it creates a mirror.
-
-- **A PgDog roll no longer fails requests** (#1350). Clients behind PgDog
-  recycle pooled connections within about 60 s (`DB_POOL_MAX_CONN_LIFETIME=45s`,
-  `DB_POOL_HEALTH_CHECK_PERIOD=10s`) and PgDog's `preStop` is 70 s (grace 140 s),
-  so no idle client is left on a pod when it gets SIGINT, as PgDog's upgrade
-  guide prescribes. Services pin the dbx v0.40.1 releases, which also fix a
-  connection leak: dbx v0.39.0–v0.40.0 could block forever in the acquire
-  check behind pgconn's background reader. Measured on Kind at 2 orders/s:
-  0 server 5xx during a roll against 0 at baseline (5–24 before).
-
-- **PgDog runs without a CPU limit** (was 200m), as the rest of the platform;
-  `cpu: null` drops the chart's 1000m default. During a roll the new pods were
-  throttled through the login burst. Measured on Kind: no more throttling, but
-  the roll's checkout timeouts did not drop (#1350 stays open).
-
-- **A fresh bring-up no longer stalls on the authz policies.** `db_authz` had
-  `CONNECTION LIMIT 10`, but pgroles keeps about three idle connections per
-  PostgresPolicy. product-db's six policies needed ~18, so the last ones failed
-  with `pool timed out` and backed off 300 s, holding `databases-local`
-  (`wait: true`) Unknown for 15+ minutes. The limit is now sized from the
-  policy count: 25 on product-db, 15 on platform-db (#1293).
-
-- **`make seed` no longer copies `PGSSLROOTCERT` into the seed Job.** The
-  seed dials CNPG directly like `migrate` and mounts no CA file, so pgx failed
-  to parse its DSN once a service set `db_ca_secret`.
-
-- **The DR replica's daily backup is no longer `immediate`** (#1285). A new
-  `product-db-replica` turns Ready while it is still replaying the source's WAL,
-  and the immediate backup's `pg_backup_start` was cancelled by the recovery
-  conflict, raising `PostgresBackupFailed` (critical) for about an hour on a
-  fresh bring-up. The first base backup is now the 03:30 run; the bootstrap
-  runbook shows how to take one by hand once replay has caught up.
-
-- **The committed `vault_rotator` database password is removed from current
-  manifests and replaced with one random value per cluster.** Fresh OpenBAO
-  bootstrap writes the value to KV; ESO projects one reload-labelled
-  basic-auth Secret; a full CNPG `DatabaseRole` applies it to PostgreSQL; and
-  the OpenBAO database configurator reads the same Secret with the password on
-  stdin instead of its process arguments. The new rotation runbook makes the
-  existing-cluster pre-seed mandatory, stages rollout behind a suspended Flux
-  database wave, enforces all three unmodeled PG18 membership options, exercises
-  an actual notification workload reconnect, and requires the historical
-  credential to fail. The retained Job is force-replaced only after CNPG
-  observes the new Secret revision; repository state alone does not claim that
-  live revocation has happened.
+- A cold bring-up no longer deadlocks on the CDC grants: `product-db-cdc-bootstrap` owns them and the publications move to `cdc-local`.
+- A PgDog roll no longer fails requests (#1338, #1350): dbx v0.39.0 replaces closed pooled connections, dbx v0.40.1 fixes an acquire leak, clients recycle connections within 60 s and PgDog's `preStop` is 70 s; PgDog runs without a CPU limit.
+- `db_authz` gets a connection limit sized from the pgroles policy count (#1293); `make seed` no longer copies `PGSSLROOTCERT`; the DR replica's daily backup is no longer `immediate` (#1285).
+- The committed `vault_rotator` password is replaced with one random value per cluster, with a rotation runbook that requires the old credential to fail.
 
 #### Services
-
-- **A PgDog roll no longer fails requests with `57P01`** (#1338,
-  duynhlab/pkg#124). dbx v0.39.0 checks each pooled connection before handing
-  it out and replaces one the pooler has already closed. Measured on Kind
-  (2 orders/s for 180 s through the edge, `rollout restart deploy/pgdog-product`):
-  0 `57P01` (was 5), 39 connections replaced. The roll still costs about 21
-  requests (24 5xx against 3 at baseline): checkout queries time out when each
-  old PgDog pod receives SIGINT (#1350).
-
-- **mockpay runs without a CPU limit** (was 50m), as the rest of the platform.
+- mockpay runs without a CPU limit.
 
 #### Local-stack
-
-- Match RFC-0030 snapshot Avro objects using the renamed `analytics_service_*`
-  mirrors so both PII gates check column allowlists across all ten tables.
-
-- **The compose gate checks what the cluster does.**
-  - Edge access logs are ClickHouse-only, as on the cluster (ADR-061). C13 now
-    reads `otel.otel_logs` and asserts VictoriaLogs holds none.
-  - Service healthchecks probe `/ready` instead of `/health`.
-  - payment heals reconciliation discrepancies (`RECON_HEAL_ENABLED`).
-  - checkout and the edge wait for inventory.
-  - PostgreSQL runs on Debian trixie and is initialised with locale `C`, like
-    the CNPG clusters, so text ordering matches. It used to be `en_US.utf8` on
-    Alpine.
-  - The README states the remaining divergences (no database TLS) and drops
-    stale claims: one role per database, edge logs through Vector, the VM pin.
+- The compose gate checks what the cluster does: ClickHouse-only edge logs (ADR-061), `/ready` healthchecks, reconciliation healing, locale `C` on Debian trixie; the PII gates cover the renamed `analytics_service_*` mirrors.
 
 #### Docs
-
-- **The alert catalog counts what Flux deploys** (#1384). The Summary said 278
-  hand-written rules; 272 are applied, because six chart replication-lag files
-  sit outside the kustomization. The domain table now sums to that total:
-  Microservices 21, PostgreSQL 62 (with the pooler and role guard), RFC-0021 32
-  (stock and payment doubt), and a new ClickHouse row of 24. Kind-inert rules
-  are seven, not six. `scripts/alert-catalog-counts.sh` renders the rule
-  kustomizations, prints the counts and fails when a deployed alert has no row.
-
-- **Draw.io product boxes carry their logos.** PgBouncer and PeerDB join the
-  homelab-drawio icon catalogue, and the CDC, database, TLS, network-policy,
-  signal-flow and ClickHouse diagrams now show the PgBouncer, PeerDB, Valkey,
-  RustFS and ClickHouse logos on their boxes. `validate.py --ir` warns
-  (`house.missing_logo`) on a box whose first label line names one catalogued
-  product without its logo; `icon: none` opts out a box that only names one.
-
-- Correct Collector pipeline/memory/sampling explanations and telemetry runbooks;
-  separate current dashboard artifact reference from historical panel material.
-
-- **Draw.io edges stay in their frames and apart.** The homelab-drawio
-  generator keeps every edge inside the innermost frame around both its
-  ends and 10 px off frame borders, widens a gutter until its lanes sit
-  14 px apart, and routes a title detour on the inside of the frame. Before
-  this, `databases/cdc` and `security/tls-pki-edge` ran edges outside the
-  Kind cluster frame, 12 runs rode frame borders, and 59 pairs of lanes sat
-  5 px apart or on one line. `validate.py` gains `edge_leaves_frame`
-  (ERROR), `edge_on_frame_border` and `lanes_too_close` (WARN), and sizes
-  multi-line edge labels by their lines; every IR diagram is regenerated.
-
-- **RFC-0030 docs describe what is deployed.** A review against the manifests
-  removed "planned" and "fixture-backed" claims for the CDC path across the
-  RFC, ADR-066/068/069, the API, observability, databases and platform docs;
-  corrected the PeerDB licence (core AGPL-3.0, chart ELv2), the pgroles-grant
-  instruction, the product-db slot cap, the Flux chain (`cdc-local`,
-  `pgroles-operator-local`; 32 Kustomizations), the Kind audit rows (K3.13 CDC
-  path, K3.14 failover slots) and a wrong NetworkPolicy reference for `peerdb`.
-
-- **Analytics go-live docs describe what is deployed.** `analytics-service`,
-  its edge route and the Backoffice page are current in RFC-0030 (status,
-  architecture diagram, `FINAL` instead of `argMax`), ADR-069 (telemetry
-  implemented, Adoption `Partial` with the 90-day funnel's ~0.55 s recorded as
-  the owner-accepted deviation from the 500 ms bar), the ADR/RFC indexes,
-  `docs/api/` (contract TLS and read-path text, eleven services, 27 protected
-  operations, staff verifiers and JWKS namespaces), the edge inventory (36
-  reconciled HTTPRoutes, 34 policies, the `api-analytics-protected` row), the
-  ClickHouse and Keycloak guides, the Admin Portal page and the
-  platform-api, request-path and secrets Draw.io diagrams. CDC, PeerDB and the
-  `pg_cron` heartbeats stay **planned**; the serving data is the fixture. Kind
-  row K4.12's edge-404 check now applies only before the route lands.
-
-- Link RFC-0030's four accepted ADRs to dedicated tracking issues and native
-  obligation tasks; retain the Linux handoff as an index and historical evidence.
-
-- Align RFC-0030 and ADR-066 source access with RFC-0029: CDC uses a qualified
-  primary-only pooler profile with verified TLS on both hops. Keep direct
-  Compose evidence explicitly separate and block rollout until lifecycle gates pass.
-
-- Align RFC-0030 resource names with analytics-service across the CDC prototype,
-  SQL access contract, RFC and ADRs. Require fresh disposable qualification
-  state; historical evidence remains tied to its original commits.
-
-- Standardize issue title prefixes and native types in the issue forms and
-  contribution guidance; align RFC-0030 tracking without changing its gates.
-
-- Remove accumulated editorial footers from docs; keep unique historical
-  verification evidence beside its owning claims and preserve RFC/ADR metadata.
-  Align the edge 429 catalog with the deployed `enforced` counter.
-
-- **The two Temporal worker runbooks select the worker pods again.**
-  `TemporalWorkflowFailureRateHigh` and `TemporalWorkerRequestErrorRateHigh`
-  used `-l app=order-fulfillment` / `-l app=checkout-abandon`, labels the
-  worker pods never had; they now use `app.kubernetes.io/name=order-worker` /
-  `checkout-worker`.
-
-- **The SLO docs counted a retired service and a dropped SLO.** They listed
-  `auth` and three SLOs per service (31 SLOs, 62 alerts); the cluster runs nine
-  chart services with two SLOs each since `mop` 0.19.0, plus inventory's and
-  Keycloak's two — 22 SLOs, 44 alerts. Corrected while moving the SLO docs to
-  the `slo` chart; the alerting README, the alert catalog and
-  `slo-burn-rate-alerts.md` were missed then and now agree, and
-  `getting_started.md` names the service level `<service>-slo`.
-
-- **The OpenBAO database-engine diagram now draws where `vault_rotator`'s
-  credential comes from** (`docs/secrets/openbao.md`): the per-cluster KV value,
-  its ESO Secret, the CNPG `DatabaseRole` and the configurator Job that reads it
-  — the path #989 introduced, which the prose already described.
+- The alert catalog counts what Flux deploys (272 rules, `scripts/alert-catalog-counts.sh`, #1384); the SLO docs count 22 SLOs and 44 alerts; the Temporal worker runbooks select the worker pods again.
+- RFC-0030 and the analytics go-live docs describe what is deployed (PeerDB licence, the 32-Kustomization Flux chain, Kind rows K3.13 / K3.14, the edge inventory); RFC-0030 names, source access and tracking align with RFC-0029 and analytics-service.
+- Collector pipeline, memory and sampling explanations corrected; the OpenBAO database-engine diagram draws `vault_rotator`'s credential path; Draw.io logos, edge routing and frame validation.
+- Align 17 ADR index adoption entries with their completion records.
 
 #### CI
-
-- **Smoke K5.8 recognises a mockpay restart** (#1209). mockpay's ledger is in
-  memory, so a restart makes `PaymentReconciliationDiscrepancy` fire for about
-  an hour on `missing_provider` alone. K5.8 no longer counts it when every
-  discrepancy in the window is `missing_provider` and mockpay started at least
-  5 minutes after payment; the alert itself is unchanged.
+- Smoke K5.8 recognises a mockpay restart (#1209).
 
 ### Performance
 
 #### Local-stack
-
-- **Analytics serving views read `FINAL`, not a per-call `argMax`.** The
-  fixture (compose and Kind) and the PeerDB prototype define each
-  `analytics.*_live` view as `SELECT … FROM <raw> FINAL WHERE
-  _peerdb_is_deleted = 0` over PeerDB's `ReplacingMergeTree(_peerdb_version)`:
-  same rows, NULLs included, without a full `GROUP BY` on every read. With the
-  reader's typed joins (analytics-service#5) the 90-day overview queries on one
-  million ledger facts drop from 0.77–1.61 s to 0.23–0.55 s on two threads
-  (analytics-service#4); the funnel is the one query still above 500 ms.
+- Analytics serving views read `FINAL` instead of a per-call `argMax`: the 90-day overview drops from 0.77–1.61 s to 0.23–0.55 s on one million facts (analytics-service#4, #5).
 
 ### Dependency
 
 #### GitOps
-
-- **Renovate audit round 2 (#1262, 2026-10-28):** 24 Renovate PRs merged after a
-  static review with the PR CI as the gate; 14 held with the decisions listed in
-  the issue. renovatebot/github-action 46.3.10; aws-cli 2.39.0 for the RustFS
-  bucket Jobs and the Compose analytics setup (only `s3api` calls, unaffected
-  by the new CRT transfer default); `postgres:18.6-trixie` digest refresh.
+- Renovate audit round 2 (#1262, 2026-10-28): 24 PRs merged, 14 held with decisions. renovatebot/github-action 46.3.6 → 46.3.11; aws-cli 2.37.7 → 2.39.0; `postgres:18.6-trixie` digest refresh; flux-operator-bootstrap module 0.8.0 → 0.9.0; Terraform helm provider 3.1.2 → 3.3.0; busybox 1.37 → 1.38.
 
 #### Gateway
-
-- **Envoy Gateway v1.9.2 → v1.9.3** (chart by digest, Compose image). Proxies
-  move to Envoy 1.39.5 (CVE-2026-35189, OAuth2/API-key filter crashes); the CRDs
-  are identical between the tags, so nothing was re-vendored. Renovate's PR used
-  the un-prefixed `1.9.3` tag, a different chart artifact, so #1436 pins
-  `v1.9.3` by hand and `.renovaterc.json5` now offers only v-prefixed tags for
-  this chart.
+- Envoy Gateway v1.9.2 → v1.9.3 (Envoy 1.39.5, CVE-2026-35189); `.renovaterc.json5` offers only v-prefixed chart tags (#1436).
 
 #### Observability
-
-- **Vector chart and image 0.59.0 → 0.60.0** (cluster and Compose). The
-  `kubernetes_logs` source now attaches `kubernetes.namespace_annotations.*`;
-  `victorialogs_all` ships whole events, so the field reaches VictoriaLogs and
-  is kept on purpose for filtering by namespace annotation (#1262, decision 2).
-  The two breaking changes (datadog_metrics series v1, influxdb `version`) are
-  not used; the OTLP leg to ClickHouse and the plan stream are unchanged.
-- **Grafana 13.2.3 → 13.3.0** (cluster and Compose). The one breaking change
-  renames the `[marketplace]` ini section, which is not set; the pinned plugins
-  accept 13.3. VictoriaLogs datasource 0.32.0 → 0.33.1 (Drilldown drawer,
-  incremental hits).
-- **Pyroscope 2.4.0 → 2.4.2** (chart, cluster `image.tag`, Compose). The chart
-  templates are unchanged; the image pin, which Renovate does not track, moves
-  with it for the 2.4.1 security updates.
-- **OTel collector chart range `<0.176.0` → `<0.179.0`** (resolves 0.178.0):
-  internal-telemetry resource attributes now render in list form; the contrib
-  image stays pinned at 0.161.0 (#1239 held).
-- **VictoriaMetrics operator chart 0.67.2 → 0.68.1 (operator v0.75.0).** The
-  cluster follows the operator's defaults, so VMSingle, VMAgent and VMAlert move
-  from v1.148.0 to v1.152.0. VictoriaLogs stays at v1.52.0, and VTSingle stays
-  pinned at v0.11.1. The release notes for v1.149–v1.152 and VictoriaLogs list no
-  breaking change for this setup: the POST-only admin endpoints have no callers,
-  and the multitenancy-header default needs a flag that is not set. The operator
-  adds the VTAgent CRD and a config-reloader argument. Local-stack stays ahead
-  at v1.154.0 / v1.53.0 by design.
-- **Pyroscope 2.3.1 → 2.4.0** (chart and image). The bundled Alloy subchart
-  moves 1.5.2 → 1.12.1, and the headless Service drops out of the ServiceMonitor.
-- **Temporal server and admin-tools pinned to 1.32.1** (chart 1.7.0 defaults to
-  1.32.0), matching local-stack and the search-attributes Job. No schema change.
+- ClickHouse server and Keeper 26.9 → 26.10; Grafana ClickHouse datasource 4.22.0 → 4.23.5 (#1234, #1348, #1469; the six upstream boards follow the tag).
+- Grafana 13.2.3 → 13.3.0; VictoriaLogs datasource 0.32.0 → 0.33.1; VictoriaMetrics datasource 0.26.1 → 1.0.0.
+- VictoriaMetrics operator chart 0.67.2 → 0.68.1 (VMSingle, VMAgent and VMAlert v1.148.0 → v1.152.0); VictoriaTraces v0.11.1 → v0.12.1.
+- OTel collector chart range `<0.176.0` → `<0.179.0` (0.178.0); contrib image 0.161.0 → 0.164.0.
+- Vector chart and image 0.59.0 → 0.61.0 (namespace annotations kept on the VictoriaLogs leg).
+- Pyroscope 2.3.1 → 2.4.2 (Alloy subchart 1.12.1, then disabled); karma v0.131 → v0.133.
 
 #### Databases
-
-- **pg_stat_ch v0.4.0 → v0.4.2** (`duynhlab/images` `pg-stat-ch` 0.2.1, on
-  product-db, its replica and platform-db). v0.4.1 fixes a double free when an
-  interrupted dequeue is retried and clamps `batch_max` to `queue_capacity`
-  (both 8192 here); v0.4.2 drops the worker's dequeue copy and appends events
-  straight to the export sink. The extension SQL stays at 0.4, so no
-  `ALTER EXTENSION`; the new image volume rolls each cluster's pods. The new
-  `track_labels` GUC stays off, and the writer keeps its LZ4 profile until
-  Kind shows the ZSTD decoder works.
-- **RustFS chart and image 1.0.1 → 1.0.4** (cluster and the Compose analytics
-  twin). 1.0.2 fixes seven advisories, two of them bypasses of scoped
-  permissions (`?versionId=` overwrite, dot-segment delete), and makes the
-  audit log record the real identity; 1.0.3 is Console only; 1.0.4 refreshes
-  trust roots. The chart adds a `tls:` block (off) and nothing else changes for
-  the plain-HTTP standalone setup. The IAM code is the same as 1.0.1.
-- **PeerDB chart 0.9.17 → 0.9.19.** The component images stay digest-pinned at
-  v0.37.5, so the running app is unchanged; the chart's goose migrate init
-  container only renders for images ≥ 0.37.6, and the header comment records
-  the `peerdb-ca` mount that bump will need.
-- **Valkey chart 0.12.0 → 0.12.1 (Valkey 9.1.2 → 9.1.3, Compose too).** 9.1.3
-  is a security release (cluster Pub/Sub heap overflow; the cache runs
-  non-cluster) and fixes a 9.0 ↔ 9.1 RDB incompatibility (persistence is off).
-- **PgDog chart v0.90 → v0.92 (PgDog v0.1.60 → v0.1.61).** v0.1.61 stops
-  one client with a wrong password from blocking the pool under passthrough
-  auth; the chart adds only QoS backoff settings.
-
-- **pgroles operator 0.13.0 → 0.14.0.** Chart values are unchanged and the
-  CRDs add status fields only; Flux's `upgrade.crds: CreateReplace` applies them
-  before the controller, as the upgrade notes require. Relevant fixes: an
-  auto-approved plan the executor cannot apply now waits as one `Pending` plan
-  instead of being re-created every few seconds, and a stalled Kubernetes request
-  fails after 30 s instead of silently holding a reconcile. Membership
-  `inherit`/`admin` changes are made in place on PostgreSQL 16+. 0.14 still has no
-  `application_name` connection parameter.
-
-- Bump the PgDog chart for `product-db` from `v0.39` (PgDog 0.1.26) to
-  `v0.90` (PgDog v0.1.60). The rendered `pgdog.toml` keeps the same
-  effective settings; the chart no longer writes binary defaults out, and
-  it now sets `load_balancing_strategy = "round_robin"` (was the binary's
-  `random`), a zone topology spread (`ScheduleAnyway`) and a termination
-  grace of 65 s to match the 60 s shutdown timeout. Every `pgdog_*` metric
-  the dashboards and alerts read still exists. Upstream breaking changes
-  in this range touch sharding, plugins and 2PC, none of which are used.
+- pg_stat_ch v0.4.0 → v0.4.2 (`pg-stat-ch` image 0.2.1); cloudnative-pg chart 0.29.0 → 0.29.1; pgroles operator 0.13.0 → 0.14.0.
+- PgDog chart v0.39 → v0.92 (PgDog 0.1.26 → v0.1.61); PeerDB chart 0.9.17 → 0.9.19 (images stay at v0.37.5); RustFS 1.0.1 → 1.0.4; Valkey chart 0.12.0 → 0.12.1 (Valkey 9.1.3).
 
 #### Secrets
-
-- **OpenBao chart 0.30.3 → 0.30.6 (server 2.7.1 → 2.7.2) and the Job CLI
-  images 2.7.2.** Security fixes in auth/cert, approle, the identity OIDC
-  provider, ssh and transit; seal, Raft storage and the KMS plugin pin are
-  untouched. 0.30.4 adds a `$namespace` variable to the bundled dashboard.
+- OpenBao chart 0.30.3 → 0.30.6 (server 2.7.0 → 2.7.2, Job CLI images with it); external-secrets chart 2.11.0 → 2.14.0; floci 1.7.0 → 2.3.0 (legacy envelopes still decrypt).
 
 #### Security
-
-- **trust-manager chart 0.25.0 → 0.26.0, default CA package unpinned.** The
-  release exists to drop the compromised eMudhra roots (emSign ECC Root CA - G3,
-  AAA Certificate Services) from the default CA bundle; the repository had
-  pinned `defaultPackageImage` to a 2023 bookworm package, which would have
-  kept those roots in `homelab-ca-bundle` after the bump. The pin is gone, so
-  the bundle follows the chart (`trust-pkg-debian-trixie` 20250419-deb13u1.1 at
-  0.26.0). No Bundle API or CRD change.
-- **Kyverno chart 3.9.1 → 3.9.2 (v1.19.2, 24 GHSAs)** with the CI Kyverno CLI
-  pinned to the same v1.19.2, as the `ci.yml` comment requires. Policy Reporter
-  chart 3.11.0 → 3.11.2 (UI 2.9.1, Kyverno plugin 0.7.3). cert-manager
-  1.21.2 → 1.21.3 (ACME ARI renewal-loop fix; additive CRD status field).
+- trust-manager chart 0.25.0 → 0.26.0 with the default CA package unpinned (drops the eMudhra roots); Kyverno chart 3.9.1 → 3.9.2 (v1.19.2) with the CI CLI; Policy Reporter 3.11.0 → 3.11.2; cert-manager 1.21.2 → 1.21.3; Keycloak 26.7.4 → 26.8.1.
 
 #### Services
-
-- **Worker Deployments follow the fleet patch release:** checkout-worker
-  0.13.7 and order-worker 2.10.7, closing the skew with the API Deployments
-  that Flux image automation had already moved.
-- **admin-service `0.5.2`** replaces the `sha-e97325a` pin: the same commit,
-  now released after the full local-stack E2E audit (A/B/C, C22) on
-  2026-10-24. The Analytics page's default window includes today (#1334).
-
-- **analytics-service 0.1.0 and Backoffice 0.5.1.** analytics-service's
-  first release (replacing `sha-8e4667f`) carries the typed ledger joins and
-  the orders semi-join (analytics-service#5); with the `FINAL` serving views the
-  90-day overview runs in 0.23–0.55 s on one million facts, the funnel's
-  ~0.55 s accepted by the owner as a known limit (analytics-service#4).
-  Backoffice 0.5.1 is the same Analytics page on node 26.12 / nginx 1.31.7 and
-  the minor dependency group, signed again (admin-service#52). Gate: full
-  local-stack A/B/C + C22 on the merged SHAs, 2026-10-23.
-
-- **Fleet patch release for the telemetry shutdown budget** (#1359): user
-  2.5.6, product 1.16.7, inventory 0.9.6, cart 2.4.6, order 2.10.7, review
-  2.6.5, shipping 1.10.5, notification 2.4.5, payment 2.8.5 (and mockpay),
-  checkout 0.13.7 — each flushes OTel on a fresh 5 s context after the HTTP
-  drain. **Backoffice 0.5.0** ships the Analytics page (replacing the
-  `sha-bae236d` pin; image unsigned while admin-service#52 is open).
-  analytics-service stays on `sha-8e4667f` (analytics-service#4). Gate:
-  full local-stack A/B/C + C22 on the merged SHAs, 2026-10-23.
-
-- **Ten services on `pkg/dbx` v0.39.0** (#1338): user 2.5.3, product 1.16.4,
-  inventory 0.9.3, cart 2.4.3, order 2.10.4, review 2.6.2, shipping 1.10.2,
-  notification 2.4.2, payment 2.8.2 (mockpay with it, up from 2.8.0) and
-  checkout 0.13.4; both workers follow their service.
+- Fleet patch releases for `pkg/dbx` v0.39.0 / v0.40.1 and the telemetry shutdown budget (#1338, #1350, #1359) end at user 2.5.6, product 1.16.7, inventory 0.9.6, cart 2.4.6, order 2.10.7, review 2.6.5, shipping 1.10.5, notification 2.4.5, payment 2.8.5 (and mockpay), checkout 0.13.7; both workers follow.
+- analytics-service 0.1.0; Backoffice 0.5.0 → 0.5.2 (the Analytics page; full E2E audit 2026-10-24).
 
 #### Temporal
-
-- **Temporal UI 2.55.0 → 2.57.0** (Compose and the cluster `web.image.tag`,
-  which is pinned to match local-stack). 2.56 stops honouring
-  X-HTTP-Method-Override (CVE fix) and adds the NOT IN filter.
+- Temporal server and admin-tools 1.32.1; UI 2.55.0 → 2.57.0.
 
 #### Local-stack
+- VictoriaMetrics, vmagent and vmalert v1.152.0 → v1.155.0 and VictoriaLogs v1.52.0 → v1.53.0 (Compose only; the cluster follows the operator); weaver v0.26.1 → v0.28.0.
 
-- **VictoriaMetrics, vmagent and vmalert v1.154.0 → v1.155.0** (Compose only;
-  the cluster follows the operator). vmalert's alert-state restore query drops
-  `default_rollup()`, which the VictoriaMetrics remote read accepts.
+#### CI
+- sigstore/cosign-installer 4.1.2 → 4.1.3.
 
 ## [2.0.0] - 2026-10-05
 

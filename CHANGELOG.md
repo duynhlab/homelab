@@ -88,6 +88,59 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Dependency
+
+#### GitOps
+
+- **Renovate round 3 (2026-11-12):** 24 PRs merged after a static review with
+  the PR CI as the gate; Envoy Gateway v1.10.0 (#1534, #1535: `watchable_depth`
+  removed from the vendored board, extension CRDs to re-vendor, `targetRef`
+  deprecated) and PgDog 0.1.64 (#1410: no chart ships it) held for the owner's
+  decision. flux-operator-bootstrap
+  module 0.9.0 → 0.10.0 (adds `disable_openapi_validation`, off) (#1540);
+  Terraform `kubernetes` provider 3.2.0 → 3.5.0 (#1455) — the next
+  `make tf-plan` may show one in-place update on the bootstrap namespace's
+  empty metadata maps, never a destroy; renovatebot/github-action
+  46.3.11 → 46.3.13 (#1521); aws-cli 2.39.0 → 2.40.1 for the RustFS bucket
+  Jobs and the Compose analytics setup (#1451, #1450).
+
+#### Observability
+
+- **otel-collector-contrib 0.164.0 → 0.165.0** (#1537). None of the release's
+  breaking changes (confighttp keepalive fields, servicegraph gates, transform
+  `flatten_data`, filelog gate, prometheus receiver labels) is used here.
+- **VictoriaTraces v0.12.1 → v0.13.0** (#1541). The OTLP gRPC TLS default
+  change does not reach the plaintext OTLP/HTTP insert path the collector uses.
+- VictoriaLogs datasource 0.33.1 → 0.34.0 (#1533); VictoriaMetrics datasource
+  1.0.0 → 1.0.1 (#1525).
+- Pyroscope chart and image 2.4.2 → 2.4.3 (#1528, #1526), the hand-pinned
+  `image.tag` with it; karma v0.133 → v0.134 (#1454).
+
+#### Databases
+
+- plugin-barman-cloud chart 0.8.1 → 0.9.0 (plugin v0.15.1 → v0.16.0) (#1545).
+
+#### Secrets
+
+- OpenBao chart 0.30.6 → 0.30.7 (#1527); floci 2.3.0 → 2.4.0 (#1466).
+
+#### Security
+
+- **Keycloak 26.8.1 → 26.8.2** (33 security fixes, #1529). Its Admin REST
+  audience check lands on `admin-cli`, the client the OpenBAO bootstrap uses,
+  and the realm is imported at start, so no caller changes.
+
+#### Temporal
+
+- **Temporal chart 1.7.0 → 1.8.0** with server and admin-tools 1.32.1 → 1.32.2
+  and UI 2.57.0 → 2.58.1 (#1536, #1531, #1532, #1539); the cluster's
+  hand-pinned tags follow local-stack.
+
+#### Local-stack
+
+- VictoriaMetrics, vmagent and vmalert v1.155.0 → v1.156.0 (#1546, #1547,
+  #1548); `postgres:18.6-trixie` digest refresh (#1523).
+
 ## [3.0.0] - 2026-11-12
 
 <!-- markdown-link-check-disable -->

@@ -1,152 +1,156 @@
 {
-  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
   extends: [
-    "config:recommended",
-    "docker:enableMajor",
-    // ":automergeBranch",
-    // ":automergeMinor",
-    ":dependencyDashboard",
-    ":disableRateLimiting",
-    ":semanticCommits",
-    ":timezone(Asia/Ho_Chi_Minh)",
+    'config:recommended',
+    'docker:enableMajor',
+    ':dependencyDashboard',
+    ':disableRateLimiting',
+    ':semanticCommits',
+    ':timezone(Asia/Ho_Chi_Minh)',
   ],
-  dependencyDashboardTitle: "Renovate Dashboard",
+  dependencyDashboard: {
+    title: 'Renovate Dashboard',
+  },
   flux: {
     managerFilePatterns: [
-      "/^kubernetes/.+\\.yaml$/",
+      '/^kubernetes/.+\\.yaml$/',
     ],
   },
-  "helm-values": {
+  'helm-values': {
     managerFilePatterns: [
-      "/^kubernetes/.+\\.yaml$/",
+      '/^kubernetes/.+\\.yaml$/',
     ],
   },
   kubernetes: {
     managerFilePatterns: [
-      "/^kubernetes/.+\\.yaml$/",
+      '/^kubernetes/.+\\.yaml$/',
     ],
   },
   customManagers: [
     {
-      // grafana-clickhouse-datasource: the plugin pin and the URL tag of its
-      // dashboards move together (packageRules groups them into one PR).
-      customType: "regex",
+      customType: 'regex',
       managerFilePatterns: [
-        "/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/",
-        "/^kubernetes/infra/configs/observability/grafana/dashboards/grafana-dashboard-clickhouse-upstream\\.yaml$/",
-        "/^local-stack/compose\\.yaml$/",
+        '/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/',
+        '/^kubernetes/infra/configs/observability/grafana/dashboards/grafana-dashboard-clickhouse-upstream\\.yaml$/',
+        '/^local-stack/compose\\.yaml$/',
       ],
       matchStrings: [
-        "grafana-clickhouse-datasource (?<currentValue>\\d+\\.\\d+\\.\\d+)",
-        "grafana/clickhouse-datasource/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/",
+        'grafana-clickhouse-datasource (?<currentValue>\\d+\\.\\d+\\.\\d+)',
+        'grafana/clickhouse-datasource/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/',
       ],
-      depNameTemplate: "grafana/clickhouse-datasource",
-      datasourceTemplate: "github-releases",
-      extractVersionTemplate: "^v(?<version>.*)$",
+      depNameTemplate: 'grafana/clickhouse-datasource',
+      datasourceTemplate: 'github-releases',
+      extractVersionTemplate: '^v(?<version>.*)$',
     },
     {
-      // victoriametrics-metrics-datasource: release-zip URL and the
-      // GrafanaDatasource pin (cluster only).
-      customType: "regex",
+      customType: 'regex',
       managerFilePatterns: [
-        "/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/",
-        "/^kubernetes/infra/configs/observability/grafana/datasource-victoriametrics\\.yaml$/",
+        '/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/',
+        '/^kubernetes/infra/configs/observability/grafana/datasource-victoriametrics\\.yaml$/',
       ],
       matchStrings: [
-        "victoriametrics-datasource/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/victoriametrics-metrics-datasource-v\\d+\\.\\d+\\.\\d+\\.zip",
-        "name: victoriametrics-metrics-datasource\\n\\s+version: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\"",
+        'victoriametrics-datasource/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/victoriametrics-metrics-datasource-v\\d+\\.\\d+\\.\\d+\\.zip',
+        'name: victoriametrics-metrics-datasource\\n\\s+version: "(?<currentValue>\\d+\\.\\d+\\.\\d+)"',
       ],
-      depNameTemplate: "VictoriaMetrics/victoriametrics-datasource",
-      datasourceTemplate: "github-releases",
-      extractVersionTemplate: "^v(?<version>.*)$",
+      depNameTemplate: 'VictoriaMetrics/victoriametrics-datasource',
+      datasourceTemplate: 'github-releases',
+      extractVersionTemplate: '^v(?<version>.*)$',
     },
     {
-      // victoriametrics-logs-datasource: release-zip URL, the
-      // GrafanaDatasource pin and the compose pin.
-      customType: "regex",
+      customType: 'regex',
       managerFilePatterns: [
-        "/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/",
-        "/^kubernetes/infra/configs/observability/grafana/datasource-victorialogs\\.yaml$/",
-        "/^local-stack/compose\\.yaml$/",
+        '/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/',
+        '/^kubernetes/infra/configs/observability/grafana/datasource-victorialogs\\.yaml$/',
+        '/^local-stack/compose\\.yaml$/',
       ],
       matchStrings: [
-        "victorialogs-datasource/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/victoriametrics-logs-datasource-v\\d+\\.\\d+\\.\\d+\\.zip",
-        "name: victoriametrics-logs-datasource\\n\\s+version: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\"",
-        "victoriametrics-logs-datasource (?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        'victorialogs-datasource/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/victoriametrics-logs-datasource-v\\d+\\.\\d+\\.\\d+\\.zip',
+        'name: victoriametrics-logs-datasource\\n\\s+version: "(?<currentValue>\\d+\\.\\d+\\.\\d+)"',
+        'victoriametrics-logs-datasource (?<currentValue>\\d+\\.\\d+\\.\\d+)',
       ],
-      depNameTemplate: "VictoriaMetrics/victorialogs-datasource",
-      datasourceTemplate: "github-releases",
-      extractVersionTemplate: "^v(?<version>.*)$",
+      depNameTemplate: 'VictoriaMetrics/victorialogs-datasource',
+      datasourceTemplate: 'github-releases',
+      extractVersionTemplate: '^v(?<version>.*)$',
     },
     {
-      // Images released by duynhlab/images, pinned <image>:<semver>@<digest>.
-      // depName is the full path, so a new image is tracked with no change here.
-      customType: "regex",
-      managerFilePatterns: ["/^kubernetes/.+\\.yaml$/"],
-      matchStrings: [
-        "(?<depName>ghcr\\.io/duynhlab/images/[a-z0-9-]+):(?<currentValue>\\d+\\.\\d+\\.\\d+)@(?<currentDigest>sha256:[a-f0-9]{64})",
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^kubernetes/.+\\.yaml$/',
       ],
-      datasourceTemplate: "docker",
+      matchStrings: [
+        '(?<depName>ghcr\\.io/duynhlab/images/[a-z0-9-]+):(?<currentValue>\\d+\\.\\d+\\.\\d+)@(?<currentDigest>sha256:[a-f0-9]{64})',
+      ],
+      datasourceTemplate: 'docker',
     },
     {
-      // CNPG Cluster `imageName:` — the kubernetes manager only reads `image:`.
-      customType: "regex",
-      managerFilePatterns: ["/^kubernetes/.+\\.yaml$/"],
-      matchStrings: [
-        "imageName: (?<depName>ghcr\\.io/cloudnative-pg/postgresql):(?<currentValue>\\S+)",
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^kubernetes/.+\\.yaml$/',
       ],
-      datasourceTemplate: "docker",
+      matchStrings: [
+        'imageName: (?<depName>ghcr\\.io/cloudnative-pg/postgresql):(?<currentValue>\\S+)',
+      ],
+      datasourceTemplate: 'docker',
     },
     {
-      // The Kind node image in scripts/kind-up.sh, pinned by tag and digest
-      // (RFC-0032). The regex takes the line after the `# renovate:` comment.
-      customType: "regex",
-      managerFilePatterns: ["/^scripts/kind-up\\.sh$/"],
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^scripts/kind-up\\.sh$/',
+      ],
       matchStrings: [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[^\\n]*?:(?<currentValue>v[0-9.]+)@(?<currentDigest>sha256:[a-f0-9]+)",
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[^\\n]*?:(?<currentValue>v[0-9.]+)@(?<currentDigest>sha256:[a-f0-9]+)',
       ],
     },
   ],
   packageRules: [
     {
-      matchPackageNames: ["grafana/clickhouse-datasource"],
-      groupName: "grafana-clickhouse-datasource",
+      matchPackageNames: [
+        'grafana/clickhouse-datasource',
+      ],
+      groupName: 'grafana-clickhouse-datasource',
     },
     {
-      matchPackageNames: ["VictoriaMetrics/victoriametrics-datasource"],
-      groupName: "grafana-victoriametrics-datasource",
+      matchPackageNames: [
+        'VictoriaMetrics/victoriametrics-datasource',
+      ],
+      groupName: 'grafana-victoriametrics-datasource',
     },
     {
-      matchPackageNames: ["VictoriaMetrics/victorialogs-datasource"],
-      groupName: "grafana-victorialogs-datasource",
+      matchPackageNames: [
+        'VictoriaMetrics/victorialogs-datasource',
+      ],
+      groupName: 'grafana-victorialogs-datasource',
     },
     {
-      // Patch and digest bumps only. A Kubernetes minor is a cluster
-      // recreation with its own gate (RFC-0032), and a node image newer than
-      // the Kind CLI supports fails at create time.
-      matchDatasources: ["docker"],
-      matchPackageNames: ["kindest/node"],
-      matchUpdateTypes: ["major", "minor"],
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'kindest/node',
+      ],
+      matchUpdateTypes: [
+        'major',
+        'minor',
+      ],
       enabled: false,
     },
     {
-      // Hold Tempo on 2.x. Tempo 3.0 removed the `ingester` and `compactor`
-      // modules, so the major is a hand-written config migration (drop both
-      // blocks, re-home the 168h block_retention) that a version bump cannot
-      // express — and the single-binary `grafana-community/tempo` chart has no
-      // 3.x appVersion to migrate to. The raw install this pin protects is
-      // scheduled for deletion by ADR-040 phase 2; revisit then.
-      matchDatasources: ["docker"],
-      matchPackageNames: ["grafana/tempo"],
-      allowedVersions: "<3",
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'grafana/tempo',
+      ],
+      allowedVersions: '<3',
     },
     {
-      // Upstream pushes `1.9.3` and `v1.9.3` as different chart artifacts; the
-      // OCIRepository pins the v-prefixed one (see envoy-gateway-oci.yaml), so
-      // only v-prefixed tags are valid versions for this chart.
-      matchDatasources: ["docker"],
-      matchPackageNames: ["docker.io/envoyproxy/gateway-helm"],
-      versioning: "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'docker.io/envoyproxy/gateway-helm',
+      ],
+      versioning: 'regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$',
     },
   ],
 }

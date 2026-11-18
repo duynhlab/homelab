@@ -17,7 +17,7 @@ spec:
   certificates:
     serverTLSSecret: platform-db-server-tls
     serverCASecret: platform-db-server-tls
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie
 
   plugins:
     - name: barman-cloud.cloudnative-pg.io

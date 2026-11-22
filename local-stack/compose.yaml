@@ -446,7 +446,7 @@ services:
   # (so `docker logs` works) but Vector no longer tails it -- the OpenTelemetry
   # access-log sink carries those lines instead.
   victoria-logs:
-    image: victoriametrics/victoria-logs:v1.53.0
+    image: victoriametrics/victoria-logs:v1.54.0
     mem_limit: 512m
     command:
       - "-httpListenAddr=:9428"

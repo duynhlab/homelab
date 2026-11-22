@@ -92,6 +92,17 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Renovate round 4 (2026-11-22):** 22 PRs merged after a static review with
+  the PR CI as the gate. Held for the owner: PostgreSQL 19 (#1587, #1588: major
+  upgrade, `pg_stat_ch` and `postgresql-cron` images rebuilt for 19);
+  PostgreSQL 18.7 (#1563, #1567: the `pg_stat_ch` and cron images are built
+  against the 18.6 operand and move with it); Valkey chart 1.0.0 (#1570:
+  `valkeyConfig` and `dataStorage` keys renamed) and Valkey 9.2.0 in Compose
+  (#1586: the chart still ships 9.1.3); Envoy Gateway v1.10.0 and PgDog
+  0.1.66 as in round 3. Kyverno 3.10.0 (#1565) waits for a merge with a
+  token that may edit workflows. KEDA chart 2.21.0 → 2.21.1 (#1557); aws-cli
+  2.40.1 → 2.42.1 (#1559, #1555).
+
 - **Renovate round 3 (2026-11-12):** 24 PRs merged after a static review with
   the PR CI as the gate; Envoy Gateway v1.10.0 (#1534, #1535: `watchable_depth`
   removed from the vendored board, extension CRDs to re-vendor, `targetRef`
@@ -106,6 +117,16 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Vector chart 0.61.0 → 0.62.1, image 0.62.0 in Compose** (#1566, #1568).
+  0.62.1 keeps the `Agent` role casing in the immutable selector; 0.62.0's
+  config-interpolation and internal-metric renames touch nothing here.
+- OTel collector chart range `<0.179.0` → `<0.183.0` (0.182.0, #1574); the
+  `kubernetesAttributes` and `hostmetrics` preset changes are unused here.
+- Grafana 13.3.0 → 13.3.1 (six CVEs, #1556); VictoriaMetrics datasource
+  1.0.1 → 1.0.2 (#1580); Pyroscope chart and image 2.4.3 → 2.4.4 with the
+  hand-pinned `image.tag` (#1584, #1581); ClickHouse 26.10 digest refresh in
+  the Compose analytics twin (#1553).
+
 - **otel-collector-contrib 0.164.0 → 0.165.0** (#1537). None of the release's
   breaking changes (confighttp keepalive fields, servicegraph gates, transform
   `flatten_data`, filelog gate, prometheus receiver labels) is used here.
@@ -118,13 +139,24 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **CloudNativePG operator 1.30.1 → 1.30.2, chart 0.29.1 → 0.29.2** (#1572,
+  #1573). The default PgBouncer image moves to 1.26.1, so poolers on the
+  default image roll once. PeerDB chart 0.9.19 → 0.9.20 (#1583): appVersion
+  only, the component images stay digest-pinned at v0.37.5. RustFS chart and
+  image 1.0.4 → 1.0.6 (#1558, #1561).
+
 - plugin-barman-cloud chart 0.8.1 → 0.9.0 (plugin v0.15.1 → v0.16.0) (#1545).
 
 #### Secrets
 
+- OpenBao chart 0.30.7 → 0.30.8 and server/CLI 2.7.3 (#1582, #1585);
+  external-secrets 2.14.0 → 2.15.0 (#1564); floci 2.4.0 → 2.5.0 (#1562).
+
 - OpenBao chart 0.30.6 → 0.30.7 (#1527); floci 2.3.0 → 2.4.0 (#1466).
 
 #### Security
+
+- Keycloak 26.8.2 digest refresh (#1554).
 
 - **Keycloak 26.8.1 → 26.8.2** (33 security fixes, #1529). Its Admin REST
   audience check lands on `admin-cli`, the client the OpenBAO bootstrap uses,
@@ -137,6 +169,8 @@ Skeleton (copy what you need):
   hand-pinned tags follow local-stack.
 
 #### Local-stack
+
+- VictoriaLogs v1.53.0 → v1.54.0 (#1569).
 
 - VictoriaMetrics, vmagent and vmalert v1.155.0 → v1.156.0 (#1546, #1547,
   #1548); `postgres:18.6-trixie` digest refresh (#1523).

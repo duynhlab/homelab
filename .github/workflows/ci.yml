@@ -31,7 +31,7 @@ jobs:
         uses: fluxcd/pkg/actions/yq@5e6f942cdd300f4092c0be92c7ef54c72af65476 # main 2026-08-19
 
       - name: Setup kubeconform
-        uses: fluxcd/pkg/actions/kubeconform@4bf3ea935541baf8b254aa52aeff62335b563113 # main 2026-08-19
+        uses: fluxcd/pkg/actions/kubeconform@5e6f942cdd300f4092c0be92c7ef54c72af65476 # main 2026-08-19
 
       - name: Setup kustomize
         uses: fluxcd/pkg/actions/kustomize@5e6f942cdd300f4092c0be92c7ef54c72af65476 # main 2026-08-19

@@ -88,7 +88,28 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Feature
+
+#### Observability
+
+- **Temporal Worker Controller metrics are now scraped.** Chart 1.15.0
+  (#690) renders a ServiceMonitor; with `metrics.disableAuth: true` the chart
+  adds a plain-HTTP metrics Service on :8080, so `prometheus.enabled: true`
+  lets VMAgent `selectAllByDefault` pick it up — the same path cert-manager
+  uses. No kube-rbac-proxy sidecar.
+
 ### Dependency
+
+#### Temporal
+
+- **Temporal Worker Controller charts 0.31.0 → 0.34.0 (appVersion 1.12.0 →
+  1.15.0)** — controller + CRDs in lockstep (ADR-054). Pulls in draining-version
+  lifecycle fixes (scale a drained version back up from 0, prune the server-side
+  version before the Deployment, back off failing drained-version deletes,
+  scope the active-poller check to the current version) and
+  `WorkerResourceTemplate.status.observedGeneration` so kstatus no longer reads
+  a copy-less template as InProgress. CRDs are additive; vendored kubeconform
+  schemas regenerated.
 
 #### GitOps
 

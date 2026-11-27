@@ -7,15 +7,15 @@ catalog copy lags the version this platform runs. Layout matches kubeconform's
 
 | File | Source |
 |------|--------|
-| `temporal.io/workerdeployment_v1alpha1.json` | `temporal-worker-controller-crds` chart **0.31.0** |
-| `temporal.io/clusterconnection_v1alpha1.json` | `temporal-worker-controller-crds` chart **0.31.0** |
+| `temporal.io/workerdeployment_v1alpha1.json` | `temporal-worker-controller-crds` chart **0.34.0** |
+| `temporal.io/clusterconnection_v1alpha1.json` | `temporal-worker-controller-crds` chart **0.34.0** |
 
 Regenerate when the chart pin in
 `kubernetes/clusters/local/sources/oci/temporal-worker-controller-crds-oci.yaml`
 moves:
 
 ```bash
-v=0.31.0   # the new chart version
+v=0.34.0   # the new chart version
 helm pull oci://docker.io/temporalio/temporal-worker-controller-crds --version "$v" --untar --untardir /tmp/twc
 for k in workerdeployment clusterconnection; do
   scripts/kubeconform-schemas/generate.py \

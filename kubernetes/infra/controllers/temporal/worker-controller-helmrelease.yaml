@@ -71,12 +71,21 @@ spec:
       enabled: true
       # No auth proxy. disableAuth: false would inject a kube-rbac-proxy sidecar
       # (registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.14.1) to authorize every
-      # scrape — and nothing scrapes this endpoint: the chart's own prometheus
-      # integration is marked "not yet supported", so there is no ServiceMonitor
-      # to add. That sidecar would be a second container and a stale third-party
-      # image guarding a port with no reader. Same call the VictoriaMetrics
-      # operator release makes about its admission webhooks in local dev.
+      # scrape — but VMAgent scrapes this endpoint over plain HTTP in-cluster
+      # (prometheus.enabled below renders the ServiceMonitor + :8080 Service),
+      # so the sidecar would be a second container and a stale third-party image
+      # guarding a port a reader already reaches. Same call the cert-manager
+      # release makes about its own metrics in local dev.
       disableAuth: true
+
+    # Chart-native ServiceMonitor, available since chart 0.34.0 / appVersion
+    # 1.15.0 (the earlier chart marked prometheus "not yet supported"). With
+    # disableAuth: true the chart adds a plain-HTTP metrics Service on :8080 and
+    # points the ServiceMonitor at it. The VictoriaMetrics operator converts it
+    # to a VMServiceScrape that VMAgent selectAllByDefault picks up — same path
+    # cert-manager, kyverno and valkey already use.
+    prometheus:
+      enabled: true
 
     # The OPTIONAL WorkerDeployment validating webhook. Left off (chart default):
     # the CRD's own CEL rules already reject the mistakes that matter — Progressive

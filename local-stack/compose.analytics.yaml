@@ -16,7 +16,7 @@ x-peerdb-env: &peerdb-env
 
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:26.10@sha256:60bb5a5d7c0df82933d15dacf5a71e1384f8109cb158e6d0e4023b09cbaf72a3
+    image: clickhouse/clickhouse-server:26.11@sha256:32c69c954eaaf66b5a37522f9883b918131f126209caa913af97b81f705d2da9
     environment:
       # Disposable bootstrap may create scoped ingest/read users.
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
